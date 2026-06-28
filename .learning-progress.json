@@ -1,10 +1,10 @@
 {
   "currentPhase": 1,
   "currentUnit": "1.1",
-  "completedUnits": [],
+  "completedUnits": ["1.1"],
   "learningNotes": {
-    "architecturePrinciples": [],
-    "patternsLearned": [],
+    "architecturePrinciples": ["Hexagonal architecture", "Domain-driven design package structure"],
+    "patternsLearned": ["JPA Entities", "Repository pattern", "Flyway migrations"],
     "challengesEncountered": []
   },
   "lastWorked": "2026-06-28"
