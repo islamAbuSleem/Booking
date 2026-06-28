@@ -37,3 +37,16 @@ Chosen single database with clear schemas for future extraction:
 - Configured JPA entities (Room, Booking, Guest, Rate)
 - Designed repositories with availability queries
 - Docker Compose for PostgreSQL, Redis, RabbitMQ
+
+### 2026-06-28 - Authentication & API (Units 1.2-1.3)
+- User entity with role-based access (GUEST/ADMIN)
+- JWT tokens with 24h expiry, refresh tokens
+- Spring Security configuration with stateless sessions
+- Booking REST endpoints with CRUD operations
+- Global exception handler with field-level validation errors
+- Frontend auth utilities with token refresh
+- REST API with proper HTTP status codes (201, 400, 404)
+
+## Next Steps
+
+Phase 1 complete. Ready for Phase 2: Performance and Caching.

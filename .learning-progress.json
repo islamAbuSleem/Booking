@@ -1,10 +1,18 @@
 {
   "currentPhase": 1,
-  "currentUnit": "1.1",
-  "completedUnits": ["1.1"],
+  "currentUnit": "1.3",
+  "completedUnits": ["1.1", "1.2", "1.3"],
   "learningNotes": {
     "architecturePrinciples": ["Hexagonal architecture", "Domain-driven design package structure"],
-    "patternsLearned": ["JPA Entities", "Repository pattern", "Flyway migrations"],
+    "patternsLearned": [
+      "JPA Entities",
+      "Repository pattern",
+      "Flyway migrations",
+      "JWT Authentication",
+      "Controller-Service-Repository pattern",
+      "Global Exception Handler",
+      "DTO pattern for API contracts"
+    ],
     "challengesEncountered": []
   },
   "lastWorked": "2026-06-28"
