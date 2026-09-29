@@ -1,0 +1,19 @@
+# Normalise line endings on commit, check out LF everywhere. Without this, git writes
+# CRLF on Windows while Prettier is configured for LF, and the two fight forever.
+* text=auto eol=lf
+
+# Keep these LF in the repository, and check them out unmodified.
+*.ts text eol=lf
+*.vue text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+
+# Generated or binary — never touch line endings.
+*.png binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+package-lock.json -diff linguist-generated
