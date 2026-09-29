@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+
+/*
+ * Tailwind v4 auto-detects source files from the CURRENT WORKING DIRECTORY upward.
+ * The build runs from frontend/, but the repo root is the git root, so detection is
+ * explicitly scoped here rather than left to inference. See context/progress-tracker.md D34.
+ */
+@source '../app';
+@source '../layouts';
+@source '../pages';
+@source '../error.vue';
+
+/*
+ * Design tokens. Authoritative values live in context/ui-tokens.md — this is a
+ * transcription of that file, not the source of truth. If they disagree, the doc wins.
+ *
+ * Corner radii are deliberately capped at 2px and there is no --radius-* pill token:
+ * pill shapes do not exist in this system (D23).
+ */
+@theme {
+  /* Surfaces — warm, never pure white or pure grey */
+  --color-bg: #f7f4ef;
+  --color-surface: #fffdfa;
+  --color-surface-alt: #efeae1;
+  --color-surface-inv: #1f1b16;
+
+  /* Lines */
+  --color-rule: #ded7ca;
+  --color-rule-strong: #b9ae9c;
+
+  /* Text */
+  --color-fg: #1f1b16;
+  --color-fg-muted: #6b635a;
+  --color-fg-subtle: #918878;
+  --color-fg-inv: #f7f4ef;
+
+  /* Accent — terracotta. White text only on a solid fill (D20). */
+  --color-accent: #a63d22;
+  --color-accent-hover: #8e3319;
+  --color-accent-bright: #c9522f;
+  --color-accent-wash: #f6e7e1;
+
+  /* Teal — links and information, never a large button fill */
+  --color-link: #1f4e5f;
+  --color-link-hover: #163b48;
+  --color-info: #1f4e5f;
+  --color-info-wash: #e4edf0;
+
+  /* Status */
+  --color-success: #3f6b4a;
+  --color-success-wash: #e6eee7;
+  --color-warning: #8a6a1f;
+  --color-warning-wash: #f5eedc;
+  --color-danger: #8c2f22;
+  --color-danger-wash: #f7e6e3;
+
+  /* Type — D24: narrow is the functional layer, sans is for prose */
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-sans: 'Archivo', 'Helvetica Neue', sans-serif;
+  --font-narrow: 'Archivo Narrow', 'Archivo', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Shape — 2px is the maximum, everywhere */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+
+  /* Motion */
+  --ease-editorial: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Editorial defaults. Component code should not need to restate these. */
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.2rem;
+  --text-label--letter-spacing: 0.08em;
+  --text-label--font-weight: 500;
+}
+
+/*
+ * Base layer. Set here rather than repeated on every component so the rules are
+ * genuinely global — a utility class on a wrapper div does not reach a table cell.
+ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-narrow);
+    /* 16px is a floor, never shrink type to make something fit (a11y). */
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Fraunces' "wonk" axis is the character. Body size, it looks like a bug. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  /* Editorial is left-aligned or justified. Never centred (D25). */
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Prices, dates, and any number in a column must not shift when they change. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Long-form prose uses the wider sans at a readable measure. */
+  .prose-70 {
+    max-width: 68ch;
+  }
+
+  /* Focus is always visible, on paper and on photographs. Never outline: none. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-wash);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

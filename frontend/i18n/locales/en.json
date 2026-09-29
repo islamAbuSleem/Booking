@@ -1,0 +1,67 @@
+{
+  "common": {
+    "brand": "The Gazette",
+    "brandSince": "Est. 2024",
+    "skipToContent": "Skip to content",
+    "loading": "Loading",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next"
+  },
+  "nav": {
+    "stays": "Stays",
+    "destinations": "Destinations",
+    "trips": "Trips",
+    "about": "About",
+    "listYourProperty": "List your property",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "menu": "Menu"
+  },
+  "search": {
+    "destination": "Destination",
+    "destinationPlaceholder": "City or property",
+    "checkIn": "Check-in",
+    "checkOut": "Check-out",
+    "guests": "Guests",
+    "guestsOne": "1 guest, 1 room",
+    "guestsMany": "{count} guests, 1 room",
+    "submit": "Search",
+    "invalidRange": "Check-out must be after check-in",
+    "useMyLocation": "Use my location"
+  },
+  "hotel": {
+    "perNight": "per night",
+    "from": "from",
+    "checkAvailability": "Check availability",
+    "freeCancellation": "Free cancellation until {time} before check-in",
+    "nights": "{count} nights",
+    "night": "{count} night",
+    "reviews": "reviews",
+    "review": "review",
+    "amenities": "Amenities",
+    "rooms": "Rooms",
+    "location": "Location",
+    "getDirections": "Get directions"
+  },
+  "status": {
+    "published": "Published",
+    "pending": "Pending review",
+    "rejected": "Rejected",
+    "suspended": "Suspended",
+    "confirmed": "Confirmed",
+    "awaitingPayment": "Awaiting payment",
+    "cancelled": "Cancelled",
+    "completed": "Completed"
+  },
+  "state": {
+    "noResults": "No stays match those filters",
+    "noResultsHint": "Try widening the dates or removing an amenity",
+    "noBookings": "You have no bookings yet",
+    "noBookingsHint": "Find a place worth staying in",
+    "error": "Something went wrong",
+    "errorHint": "We could not load this. Check your connection and try again"
+  }
+}

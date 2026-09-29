@@ -16,4 +16,7 @@ export default createConfigForNuxt({
     // One component per file, and the name must say what the component is.
     'vue/multi-word-component-names': 'error',
   },
+  // Nuxt resolves layouts and pages BY FILENAME, so `default.vue` and `index.vue` are
+  // the required names, not a naming slip. The rule cannot apply to them.
+  ignores: ['app/pages/**', 'app/layouts/**'],
 })

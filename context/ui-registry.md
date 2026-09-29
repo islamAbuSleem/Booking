@@ -2,9 +2,42 @@
 
 Every component built, one row each. Add a row when the component is created.
 
+## Base components (T2)
+
 | Component | Path | Type | Ticket | Status |
 |---|---|---|---|---|
-| _none yet_ | | | | |
+| `BaseAlert` | `app/components/BaseAlert.vue` | display | T2 | built |
+| `BaseBadge` | `app/components/BaseBadge.vue` | display | T2 | built |
+| `BaseButton` | `app/components/BaseButton.vue` | form | T2 | built |
+| `BaseCard` | `app/components/BaseCard.vue` | display | T2 | built |
+| `BaseEmptyState` | `app/components/BaseEmptyState.vue` | display | T2 | built |
+| `BaseInput` | `app/components/BaseInput.vue` | form | T2 | built |
+| `BaseModal` | `app/components/BaseModal.vue` | display | T2 | built |
+| `BasePagination` | `app/components/BasePagination.vue` | form | T2 | built |
+| `BaseSelect` | `app/components/BaseSelect.vue` | form | T2 | built |
+| `BaseSkeleton` | `app/components/BaseSkeleton.vue` | display | T2 | built |
+| `BaseSpinner` | `app/components/BaseSpinner.vue` | display | T2 | built |
+
+## Layouts (T2)
+
+| Component | Path | Type | Ticket | Status |
+|---|---|---|---|---|
+| `default` | `app/layouts/default.vue` | layout | T2 | built |
+| `dashboard` | `app/layouts/dashboard.vue` | layout | T2 | built |
+
+## Domain components
+
+Populated as later tickets build them — T4 home, T5 list, T6 detail, T7 booking, T8 trips,
+T10 host dashboard, T11 admin.
 
 **Type** — `display` (presentational) / `form` (input handling) / `layout` (page shell).
 **Status** — `planned` / `built` / `verified`.
+
+## Rules this registry enforces
+
+- One component per file. Two components in one file is a split, not a style choice
+  (`context/code-standards.md`, "One component per file").
+- A component that needs a sub-piece gets its own file, registered here.
+- Add the row **in the same commit** that creates the component.
+- Extract at the **second** duplicate, not the third (D14). When a component here is
+  duplicated for a third time, it should already have been lifted out.

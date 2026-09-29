@@ -34,15 +34,15 @@
 | Corner radius | 2px max everywhere; **no pills** (D23) | yes |
 | Functional typeface | Archivo Narrow (tables, labels, UI); Archivo (prose) (D24) | yes |
 | Table density | 64px rows, nowrap badges, fixed action columns (D27) | yes |
-| Wordmark | "The Gazette · EST. 2024" — **proposal, unconfirmed** (D26) | no |
-| Maps | Undecided; placeholder for now (D28) | no |
+| Wordmark | "The Gazette · EST. 2024" — **provisional**, unratified (D26) | no |
+| Maps | Placeholder only, no provider yet (D28) | no |
 | Spec files | `context/*.md` (this directory) | yes |
 
 ## Ticket Checklist
 
 ### Phase 1 — Foundation
 - [x] T1 Project scaffold and tooling
-- [ ] T2 Design system and app shell
+- [x] T2 Design system and app shell
 - [ ] T3 Mock data layer
 - [ ] T4 Home page
 - [ ] T5 Hotels list + filters
@@ -194,18 +194,24 @@
   hairlines, and a serif *are* the aesthetic; invented institutional history is noise that
   displaces the real navigation. `The Gazette · EST. 2024` is kept as the one piece of
   masthead theatre that is actually the brand.
-- **D26 — "The Gazette" is a proposal, not a decision.** The model invented the name and
-  reused it in 6 of 10 generations. It is the owner's call. Renaming is one token, not a
-  redesign — do not let it harden into the codebase before it is confirmed.
+- **D26 — "The Gazette" is provisional, not decided.** The model invented the name and
+  reused it in 6 of 10 generations. **Default adopted so the build is not blocked:** keep
+  it, because all 10 design references say it and renaming is a single-token find-and-
+  replace, not a redesign. It is not ratified. It is a print-parody name for a real
+  product, which is fine for a design system and possibly wrong for a brand — that
+  judgement belongs to the owner. **Trigger to revisit:** before any real user sees the
+  app, and definitely before T34 (deploy). If it changes, it is one token, not a refactor.
 - **D27 — Density is now rule-governed, not taste.** 64px table rows, `nowrap` on badges
   and actions, fixed-width action columns, one money format per context, aligned stat
    cards, rating bars normalised to visible min–max. These came from defects observed in
   the renders, and they are in `ui-tokens.md` so they apply to every table, not just the
   one that was wrong.
-- **D28 — Maps are undecided.** `/hotels/[id]` has a Location section; the references use
-  a map screenshot carrying third-party attribution, which is not shippable. Build a
-  static styled placeholder with a link out to directions, keep the component seam, and
-  do not invent a provider decision. Flagged rather than silently assumed.
+- **D28 — Maps: placeholder only, no provider chosen.** `/hotels/[id]` has a Location
+  section; the design references use a map screenshot carrying third-party attribution,
+  which is not shippable. **Default adopted:** a static styled placeholder with the
+  address and a link out to directions, with the component seam kept so a provider can be
+  dropped in. No provider is named until someone has an API key and a reason to want
+  one. `T6` builds the placeholder; the seam is the deliverable, not the map.
 - **D29 — Three research findings invalidated parts of the spec. Corrected before T1.**
   Parallel agents verified against installed packages rather than docs indexes, and in
   three cases the docs were stale or wrong. Recorded here because each is a hard error
@@ -232,18 +238,33 @@
   NestJS 12 behaviours survive and are real: `@Optional()` is no longer inherited by
   subclasses (re-declare it), and lifecycle hook order now follows the component
   hierarchy, so do not assume an `onModuleInit` ordering.
-- **D33 — Prefer `@nuxt/fonts` over `@nuxtjs/google-fonts`.** The latter is unmaintained
-  (~2 years stale, advertises Nuxt 3 only). `@nuxt/fonts` is actively developed and
-  self-hosts with automatic metric fallbacks. **Open question** — worth revisiting at T2,
-  and a judgement call, not a documented "use X instead of Y".
-- **D34 — Tailwind v4 content detection is a real risk in this workspace layout.** v4
-  auto-detects from the *current working directory*, and in an npm-workspaces monorepo
-  that is the repo root, not `frontend/`. May require `@import "tailwindcss" source("../")`
-  or an explicit `@source`. **Verify at T2 with a real build** — do not assume.
+- **D33 — `@nuxt/fonts` 0.14, and it is ZERO-CONFIG.** Confirmed by inspecting the
+  installed package: it augments no `NuxtConfig` key at all, so the `fonts: { families:
+  [...] }` block suggested by the docs index **does not exist** and fails typecheck.
+  It reads the families declared in the CSS `@theme` block, downloads them at build
+  time, self-hosts them, and applies automatic metric fallbacks. All four families
+  (Fraunces, Archivo, Archivo Narrow, IBM Plex Mono) download and appear in the built
+  CSS. `@nuxtjs/google-fonts` remains unmaintained and was not used. Note this makes
+  the build **network-dependent** — it fetches from `fonts.gstatic.com` unless cached.
+- **D34 — RESOLVED at T2, by measurement not by inference. `@theme` tokens work in this
+  layout.** The build was run and the emitted CSS inspected. Two findings:
+  1. **The `@source` directives in `main.css` are what make it work.** Tailwind v4
+     auto-detects from the CWD, which in a nested project is ambiguous, so `main.css`
+     declares `@source '../app'` and friends explicitly. Do not delete them as
+     "redundant" — that is the whole reason the tokens compiled.
+  2. **Tailwind v4 tree-shakes unused theme variables.** `--color-rule`,
+     `--color-surface-alt`, and `--font-display` were absent from the first build
+     because nothing referenced them yet. They appeared the moment a component used
+     them. This is correct behaviour, not a broken config — but it means a token can
+     look "missing" in the output when it is merely unused. **Never reference a
+     `var(--color-*)` token in hand-written CSS unless a utility also uses it**, or the
+     variable will not be emitted and the declaration silently falls back to nothing.
 - **D35 — Dynamic class construction breaks Tailwind v4 detection.** `bg-${color}-600`
   is invisible to the scanner. Map props to complete static class names, or use
   `@source inline(...)` to safelist. This affects every `BaseButton` variant and is the
-  most likely cause of a missing style that only shows up in production.
+  most likely cause of a missing style that only shows up in production. **Applied at
+  T2:** `BaseButton` and `BaseBadge` both hold a `Record<Variant, string>` of complete
+  class strings rather than assembling them.
 - **D36 — The repo is two independent projects, not a workspace.** `backend/` and
   `frontend/`, each with its own `package.json`, `node_modules`, and lockfile. No
   `packages/shared`, no workspace. The root `package.json` holds delegating scripts only.
