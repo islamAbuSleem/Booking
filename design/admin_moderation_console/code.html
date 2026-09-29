@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "surface-tint": "#a43c21", "error-container": "#ffdad6", "on-error": "#ffffff", "surface-variant": "#e5e2dd", "surface-dim": "#dcdad5", "surface-container-high": "#ebe8e3", "on-secondary-container": "#3c687a", "on-tertiary-fixed": "#1f1b16", "surface-container-highest": "#e5e2dd", "error": "#ba1a1a", "tertiary-fixed": "#eae1d8", "background": "#fcf9f4", "tertiary-fixed-dim": "#cec5bd", "on-surface-variant": "#57423d", "on-primary-fixed": "#3c0800", "secondary-fixed-dim": "#a0cde1", "primary": "#86260c", "surface-container-low": "#f6f3ee", "on-tertiary-container": "#e3dad1", "surface": "#fcf9f4", "outline": "#8b716b", "primary-container": "#a63d22", "surface-container-lowest": "#ffffff", "on-surface": "#1c1c19", "outline-variant": "#dec0b9", "inverse-primary": "#ffb4a2", "primary-fixed-dim": "#ffb4a2", "on-primary": "#ffffff", "secondary": "#376476", "inverse-on-surface": "#f3f0eb", "surface-bright": "#fcf9f4", "on-primary-container": "#ffd0c4", "inverse-surface": "#31302d", "tertiary": "#4d4741", "on-secondary-fixed-variant": "#1d4c5d", "secondary-fixed": "#bce9fe", "on-error-container": "#93000a", "on-tertiary": "#ffffff", "on-tertiary-fixed-variant": "#4b4640", "primary-fixed": "#ffdbd2", "on-secondary-fixed": "#001f29", "on-secondary": "#ffffff", "on-background": "#1c1c19", "tertiary-container": "#655f58", "on-primary-fixed-variant": "#84250b", "secondary-container": "#b9e6fb", "surface-container": "#f0ede9" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "gutter-mobile": "1rem", "space-sm": "0.5rem", "margin": "3rem", "gutter": "1.5rem", "space-xl": "2.5rem", "space-md": "1rem", "space-xs": "0.25rem", "space-lg": "1.5rem", "margin-mobile": "1rem" }, "fontFamily": { "code-mono": [ "Courier Prime" ], "headline-lg": [ "Fraunces" ], "label-caps": [ "Archivo Narrow" ], "headline-sm": [ "Fraunces" ], "body-lead": [ "Archivo Narrow" ], "headline-md": [ "Fraunces" ], "body-sm": [ "Archivo Narrow" ], "display-xl": [ "Fraunces" ], "display-xl-mobile": [ "Fraunces" ], "headline-lg-mobile": [ "Fraunces" ], "body-md": [ "Archivo Narrow" ] }, "fontSize": { "code-mono": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "headline-lg": [ "36px", { "lineHeight": "44px", "letterSpacing": "-0.01em", "fontWeight": "400" } ], "label-caps": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "600" } ], "headline-sm": [ "20px", { "lineHeight": "26px", "fontWeight": "500" } ], "body-lead": [ "18px", { "lineHeight": "28px", "fontWeight": "400" } ], "headline-md": [ "26px", { "lineHeight": "32px", "fontWeight": "400" } ], "body-sm": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "display-xl": [ "56px", { "lineHeight": "64px", "letterSpacing": "-0.02em", "fontWeight": "400" } ], "display-xl-mobile": [ "38px", { "lineHeight": "44px", "letterSpacing": "-0.01em", "fontWeight": "400" } ], "headline-lg-mobile": [ "28px", { "lineHeight": "34px", "fontWeight": "400" } ], "body-md": [ "15px", { "lineHeight": "24px", "fontWeight": "400" } ] } } } }</script></head><body class="bg-surface font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-60 bg-inverse-surface text-inverse-on-surface z-50 flex flex-col justify-between border-r border-outline-variant/20"><div class="flex flex-col"><div class="h-20 px-space-md border-b border-outline-variant/20 flex items-center gap-space-sm"><img alt="A refined editorial wordmark for a boutique hotel guide reading 'GRAND TOUR' or 'VOYAGEUR' set in an elegant, high-contrast serif typography with a minimalist architectural key/compass emblem beside it, warm black ink #1F1B16 on transparent background. Clean hairline lines, luxury print travel guide aesthetic.. Design context: - Primary color: #a63d22
+- Font: publicSans
+- Mode: light
+- Roundness: rounded-lg
+. The logo should be visually consistent with these brand tokens." class="h-7 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1X6vs7mAx3IgUE4wrIcb923Ij0bqa5lYYvkziM57AEu3ZGcPcG7tKMD2TQPZbzp33_gLCm1QAaz89Bb6D_FqOoZckS8HL95PhUcntm1zP06jfuCpwZi_LTYemcIc4UUcU6zIqKH_jeYGUv1yuuCxvjrdMAok1LOJWdgfVzoWZXjOicEX2bgQ5gCK9tzw0Bcq0PFBvREK-_MXzAfyapc522IXxUcZoydha_ugaS1YCYDucd9gEIV_O7OMvQ"/><div class="flex flex-col"><span class="font-headline-sm text-[18px] leading-5 text-inverse-on-surface tracking-tight">The Gazette</span><span class="font-code-mono text-[11px] text-tertiary-fixed-dim uppercase tracking-widest">Desk &amp; Ledger</span></div></div><div class="px-space-md pt-space-lg pb-space-xs"><span class="font-code-mono text-[11px] uppercase tracking-widest text-outline">Operations</span></div><nav class="flex flex-col px-space-sm gap-1" data-active-classes="bg-tertiary-container text-on-tertiary font-bold"><a class="flex items-center gap-space-sm px-space-sm py-space-sm text-surface-variant hover:bg-tertiary-container hover:text-on-tertiary rounded-[2px] transition-colors font-label-caps text-label-caps uppercase tracking-wider" data-path="host-dashboard" href="#"><span class="material-symbols-outlined text-[18px]">holiday_village</span>Properties</a><a class="flex items-center gap-space-sm px-space-sm py-space-sm text-surface-variant hover:bg-tertiary-container hover:text-on-tertiary rounded-[2px] transition-colors font-label-caps text-label-caps uppercase tracking-wider" data-path="host-bookings" href="#"><span class="material-symbols-outlined text-[18px]">calendar_month</span>Bookings</a><a class="flex items-center gap-space-sm px-space-sm py-space-sm text-surface-variant hover:bg-tertiary-container hover:text-on-tertiary rounded-[2px] transition-colors font-label-caps text-label-caps uppercase tracking-wider" data-path="host-analytics" href="#"><span class="material-symbols-outlined text-[18px]">monitoring</span>Analytics</a><a class="flex items-center gap-space-sm px-space-sm py-space-sm text-surface-variant hover:bg-tertiary-container hover:text-on-tertiary rounded-[2px] transition-colors font-label-caps text-label-caps uppercase tracking-wider" data-path="host-listings" href="#"><span class="material-symbols-outlined text-[18px]">auto_stories</span>Listings</a><a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-[2px] transition-colors uppercase tracking-wider bg-tertiary-container text-on-tertiary font-bold" data-path="admin-ledger" href="#"><span class="material-symbols-outlined text-[18px]">verified</span>Moderation</a></nav></div><div class="p-space-md border-t border-outline-variant/20 flex flex-col gap-space-sm"><div class="flex items-center gap-space-sm"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="flex flex-col min-w-0"><span class="font-label-caps text-label-caps uppercase text-inverse-on-surface truncate">C. Saint-Laurent</span><span class="font-code-mono text-[11px] text-tertiary-fixed-dim uppercase">Host &amp; Curator</span></div></div><div class="flex items-center justify-between pt-space-xs"><a class="font-code-mono text-[11px] text-surface-variant hover:text-inverse-on-surface transition-colors flex items-center gap-1" data-path="home" href="#"><span class="material-symbols-outlined text-[14px]">arrow_back</span>Public View</a><a class="font-code-mono text-[11px] text-surface-variant hover:text-inverse-on-surface transition-colors" data-path="sign-in" href="#">Exit</a></div></div></aside><div class="pl-60"><header class="fixed top-0 left-60 right-0 h-20 bg-surface/95 border-b border-outline-variant/30 z-40 px-gutter flex items-center justify-between"><div class="flex items-center gap-space-md"><span class="font-code-mono text-code-mono text-outline uppercase">Registry Ref: #LDG-8820</span></div><div class="flex items-center gap-space-md"><a class="font-label-caps text-label-caps uppercase text-secondary hover:text-secondary-fixed-dim underline underline-offset-4" data-path="stays" href="#">View Live Directory</a><span class="font-code-mono text-code-mono text-outline">|</span><div class="flex items-center gap-space-xs font-code-mono text-code-mono text-on-surface"><span class="w-2 h-2 rounded-full bg-primary-container"></span>Online</div></div></header><main class="w-full pt-20 bg-surface"><div class="flex flex-col w-full">
+<div class="px-margin py-space-xl flex flex-col gap-space-xl max-w-[1440px] mx-auto w-full">
+<!-- Top Action & Ledger Bar -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-space-md pb-space-lg border-b border-surface-variant">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="font-code-mono text-code-mono text-outline uppercase tracking-widest">Protocol 04 // Custodial Ledger</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Listings moderation</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Vetting architectural integrity, custodial compliance, and guest correspondence.</p>
+</div>
+<div class="flex items-center gap-space-md shrink-0">
+<div class="relative inline-block text-left" id="statusFilterDropdown">
+<button class="bg-surface-container-lowest text-on-surface px-space-md py-space-sm rounded-[2px] font-label-caps text-label-caps uppercase flex items-center gap-space-sm hover:bg-surface-container-low transition-colors shadow-sm" onclick="document.getElementById('filterMenu').classList.toggle('hidden')" type="button">
+<span class="font-code-mono text-outline uppercase">Filter:</span>
+<span class="font-semibold text-on-surface">Pending review (5)</span>
+<span class="material-symbols-outlined text-[18px] text-outline">expand_more</span>
+</button>
+<div class="hidden absolute right-0 mt-space-xs w-56 bg-surface-container-lowest shadow-xl rounded-[2px] py-space-xs z-30" id="filterMenu">
+<a class="block px-space-md py-space-xs font-label-caps text-label-caps uppercase text-primary font-bold bg-surface-container-low" href="#">Pending review (5)</a>
+<a class="block px-space-md py-space-xs font-label-caps text-label-caps uppercase text-on-surface hover:bg-surface-container-low" href="#">Escalated to Council (2)</a>
+<a class="block px-space-md py-space-xs font-label-caps text-label-caps uppercase text-on-surface hover:bg-surface-container-low" href="#">Approved archive (142)</a>
+<a class="block px-space-md py-space-xs font-label-caps text-label-caps uppercase text-on-surface hover:bg-surface-container-low" href="#">Declined / Delisted (18)</a>
+</div>
+</div>
+<button class="bg-surface-container-high hover:bg-surface-container-highest text-on-surface px-space-md py-space-sm rounded-[2px] font-label-caps text-label-caps uppercase flex items-center gap-space-xs transition-colors">
+<span class="material-symbols-outlined text-[16px]">file_download</span>
+          Export Audit Log
+        </button>
+</div>
+</div>
+<!-- Stat Metrics Cards Row -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+<!-- Stat 1 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-[2px] flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-container"></div>
+<div class="flex items-center justify-between pb-space-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Pending Review</span>
+<span class="font-code-mono text-code-mono text-outline">QUEUE #01</span>
+</div>
+<div class="my-space-xs">
+<span class="font-headline-lg text-display-xl text-on-surface font-normal">7</span>
+</div>
+<div class="pt-space-sm flex items-center gap-space-xs text-on-surface-variant font-code-mono text-code-mono">
+<span class="material-symbols-outlined text-[15px] text-secondary">schedule</span>
+<span>Avg review turnaround: <strong class="text-on-surface font-semibold">18h</strong></span>
+</div>
+</div>
+<!-- Stat 2 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-[2px] flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-secondary"></div>
+<div class="flex items-center justify-between pb-space-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Active Users</span>
+<span class="font-code-mono text-code-mono text-outline">PLATFORM</span>
+</div>
+<div class="my-space-xs">
+<span class="font-headline-lg text-display-xl text-on-surface font-normal">1,204</span>
+</div>
+<div class="pt-space-sm flex items-center gap-space-xs text-on-surface-variant font-code-mono text-code-mono">
+<span class="material-symbols-outlined text-[15px] text-primary">trending_up</span>
+<span><strong class="text-on-surface font-semibold">+64</strong> enrolled this week</span>
+</div>
+</div>
+<!-- Stat 3 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-[2px] flex flex-col justify-between shadow-sm relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-error"></div>
+<div class="flex items-center justify-between pb-space-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Reports Open</span>
+<span class="font-code-mono text-code-mono text-outline">FLAGGED</span>
+</div>
+<div class="my-space-xs flex items-baseline gap-space-sm">
+<span class="font-headline-lg text-display-xl text-on-surface font-normal">2</span>
+<span class="font-code-mono text-[11px] uppercase tracking-wider px-space-xs py-0.5 bg-error-container text-error rounded-[2px]">Action Req.</span>
+</div>
+<div class="pt-space-sm flex items-center gap-space-xs text-error font-code-mono text-code-mono">
+<span class="material-symbols-outlined text-[15px]">priority_high</span>
+<span class="font-medium">1 urgent compliance audit</span>
+</div>
+</div>
+</div>
+<!-- Moderation Data Table Section -->
+<div class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-baseline gap-space-sm">
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Submissions Awaiting Sanction</h2>
+<span class="font-code-mono text-code-mono text-outline">5 items requiring editorial decision</span>
+</div>
+<span class="font-code-mono text-[11px] text-tertiary uppercase">Batch Select: <span class="cursor-pointer underline text-secondary hover:text-secondary-fixed-dim" onclick="toggleSelectAll()">All</span></span>
+</div>
+<div class="bg-surface-container-lowest rounded-[2px] shadow-sm overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider">
+<th class="py-space-sm px-space-md w-12 text-center">
+<input class="w-4 h-4 rounded-none accent-on-surface cursor-pointer" id="selectAllCheckbox" onchange="handleSelectAll(this)" type="checkbox"/>
+</th>
+<th class="py-space-sm px-space-md">Property &amp; Provenance</th>
+<th class="py-space-sm px-space-md">Host</th>
+<th class="py-space-sm px-space-md">Location</th>
+<th class="py-space-sm px-space-md">Submitted</th>
+<th class="py-space-sm px-space-md">Status</th>
+<th class="py-space-sm px-space-md text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-variant font-body-md text-body-md text-on-surface">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors group">
+<td class="py-space-md px-space-md text-center">
+<input class="listing-checkbox w-4 h-4 rounded-none accent-on-surface cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-md">
+<img class="w-12 h-12 rounded-[2px] object-cover shrink-0" data-alt="Restored 19th century stone manor in Tbilisi with ornate wrought iron balconies, tall arched wooden windows, warm sunlit stone facade, classical European editorial photography aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlu4o2WZaqZQoICZGIeYYOstwHLX9YUEM2z3WZuA0plQs9-zPxyyu3wwRYEENZ2M2sqquYu-F6xgCD-A1orUB8iPYP36tFAtRpHp63dUqmM2rW7vKHVbCe7E0sAPAmpyu_a9Zt4PoGMARLN7A4ZZCpANUbIZMqW1g7E_gbbg1QVjCz3GNPRKPsK7DKpmzUl0JjuH0FZSdSA6JhHDcRIE0CA2sS-OcZITz07F0CkIzfrJYy-3UZftdt"/>
+<div class="flex flex-col min-w-0">
+<a class="font-headline-sm text-[16px] leading-5 text-on-surface hover:text-primary transition-colors truncate" href="#">Villa Aurora</a>
+<span class="font-code-mono text-code-mono text-tertiary truncate">Restored 19th c. stone manor</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Nino Chavchavadze</span>
+<span class="font-code-mono text-[11px] text-outline uppercase">Tier II Verified</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-1 font-body-md text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-outline">location_on</span>
+<span>Tbilisi, Georgia</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-code-mono text-code-mono text-on-surface-variant">2 days ago</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-[2px] bg-tertiary-fixed text-on-tertiary-fixed font-code-mono text-[11px] uppercase tracking-wider font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                    Pending review
+                  </span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="inline-flex items-center gap-space-xs justify-end">
+<button class="px-space-sm py-1.5 bg-[#3F6B4A] hover:bg-[#32563b] text-surface-container-lowest font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Villa Aurora', 'Approved')">
+<span class="material-symbols-outlined text-[14px]">check</span>
+                      Approve
+                    </button>
+<button class="px-space-sm py-1.5 bg-surface-container-lowest hover:bg-error-container text-[#8C2F22] hover:text-error font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Villa Aurora', 'Rejected')">
+<span class="material-symbols-outlined text-[14px]">close</span>
+                      Reject
+                    </button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors group">
+<td class="py-space-md px-space-md text-center">
+<input class="listing-checkbox w-4 h-4 rounded-none accent-on-surface cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-md">
+<img class="w-12 h-12 rounded-[2px] object-cover shrink-0" data-alt="Rustic timber and flint converted barn in rural Norfolk England with deep thatch roof, framed by wild meadow flora under soft overcast diffused light, architectural print magazine style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtdns3d1HtP4vq3Ie7sF1yygklGF05rdksF-0LGyzkiebGvqTUR0GEZwcB4g4DoObYIsaUMosl1CDfJlUZXOkcp8iejdXZ2umsdbAA0RlLDWKTiGNQauYGWHnDAcGSw_MMNvjH3chZqwaP2FjzzAJ_1wuiljMucmiDanMRQ8UayjizYBHGwI735HsMeWD_9YLW-loxAM22Y2wF4D0rykHfvjjOcW3_Ck40zpr28BbD-kfMgVkZbspX"/>
+<div class="flex flex-col min-w-0">
+<a class="font-headline-sm text-[16px] leading-5 text-on-surface hover:text-primary transition-colors truncate" href="#">The Barn at Fen End</a>
+<span class="font-code-mono text-code-mono text-tertiary truncate">Timber-frame conversion, 1780</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Arthur Pendelton</span>
+<span class="font-code-mono text-[11px] text-outline uppercase">Tier I Provenance</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-1 font-body-md text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-outline">location_on</span>
+<span>Norfolk, UK</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-code-mono text-code-mono text-on-surface-variant">3 days ago</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-[2px] bg-tertiary-fixed text-on-tertiary-fixed font-code-mono text-[11px] uppercase tracking-wider font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                    Pending review
+                  </span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="inline-flex items-center gap-space-xs justify-end">
+<button class="px-space-sm py-1.5 bg-[#3F6B4A] hover:bg-[#32563b] text-surface-container-lowest font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('The Barn at Fen End', 'Approved')">
+<span class="material-symbols-outlined text-[14px]">check</span>
+                      Approve
+                    </button>
+<button class="px-space-sm py-1.5 bg-surface-container-lowest hover:bg-error-container text-[#8C2F22] hover:text-error font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('The Barn at Fen End', 'Rejected')">
+<span class="material-symbols-outlined text-[14px]">close</span>
+                      Reject
+                    </button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors group">
+<td class="py-space-md px-space-md text-center">
+<input class="listing-checkbox w-4 h-4 rounded-none accent-on-surface cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-md">
+<img class="w-12 h-12 rounded-[2px] object-cover shrink-0" data-alt="Oaxaca Mexico modernist colonial boutique annex, washed lime plaster terracotta tiles, shaded courtyard with native cactus and clay urns in deep shadow." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD9ZX7NJNNOC0xXp8BBxtro7XvalOGVxf89g-yZy4JaOSd6MiEMSCbIF9Aa2Mo4XM0jH4_eB564EpengIjodNPzG5SYRNfEDafI7haogyb64Nxb6__qTjg7u8kAWrIo1Q9uLuyZLG2uh4qY3GjirPvlWiJujl5s5As2vIu5WXAjMwddqQATxsl7W_TkyTVrza0trz_W-vseDVXB70-I9jnJbAeVHBSkT86wqVgnf4t_cVLAfaubBNzN"/>
+<div class="flex flex-col min-w-0">
+<a class="font-headline-sm text-[16px] leading-5 text-on-surface hover:text-primary transition-colors truncate" href="#">Hotel Casa Verde Annex</a>
+<span class="font-code-mono text-code-mono text-tertiary truncate">Earthen plaster &amp; cedar studio</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Mateo Morales</span>
+<span class="font-code-mono text-[11px] text-outline uppercase">Tier II Verified</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-1 font-body-md text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-outline">location_on</span>
+<span>Oaxaca, Mexico</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-code-mono text-code-mono text-on-surface-variant">4 days ago</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-[2px] bg-tertiary-fixed text-on-tertiary-fixed font-code-mono text-[11px] uppercase tracking-wider font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                    Pending review
+                  </span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="inline-flex items-center gap-space-xs justify-end">
+<button class="px-space-sm py-1.5 bg-[#3F6B4A] hover:bg-[#32563b] text-surface-container-lowest font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Hotel Casa Verde Annex', 'Approved')">
+<span class="material-symbols-outlined text-[14px]">check</span>
+                      Approve
+                    </button>
+<button class="px-space-sm py-1.5 bg-surface-container-lowest hover:bg-error-container text-[#8C2F22] hover:text-error font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Hotel Casa Verde Annex', 'Rejected')">
+<span class="material-symbols-outlined text-[14px]">close</span>
+                      Reject
+                    </button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors group">
+<td class="py-space-md px-space-md text-center">
+<input class="listing-checkbox w-4 h-4 rounded-none accent-on-surface cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-md">
+<img class="w-12 h-12 rounded-[2px] object-cover shrink-0" data-alt="Traditional Marrakech riad interior courtyard with intricate zellij mosaic tiling, quiet turquoise plunge pool and hand-carved cedar wooden doors, dappled high-contrast morning sunlight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuUU2e3TBu7bQkF_ECsNNQ2BvtAVHgILdk1_-czNWWouFQQ82RR0u3e6DE47Nzh91cZw6T9HGp_E5e4S6Tq4M7raP-VIn2MBETurI6LuBl9kVeJpxchEf51dA2JgkFQdb3MXQQk9HblG1AX3RwL-DLRyMKTgn23nogkICzKvHSgWVpSlVmSA7PYEVOz9Ci6YrR-RGhCUFn41uP1blCt1DQjiTzeaTVcIpHOxWC0GMLtBGkD6pJEB-w"/>
+<div class="flex flex-col min-w-0">
+<a class="font-headline-sm text-[16px] leading-5 text-on-surface hover:text-primary transition-colors truncate" href="#">Riad Al Jazira</a>
+<span class="font-code-mono text-code-mono text-tertiary truncate">Medina sanctuary with plunge pool</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Leila Benjelloun</span>
+<span class="font-code-mono text-[11px] text-outline uppercase">Tier III Master</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-1 font-body-md text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-outline">location_on</span>
+<span>Marrakech, Morocco</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-code-mono text-code-mono text-on-surface-variant">5 days ago</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-[2px] bg-tertiary-fixed text-on-tertiary-fixed font-code-mono text-[11px] uppercase tracking-wider font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                    Pending review
+                  </span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="inline-flex items-center gap-space-xs justify-end">
+<button class="px-space-sm py-1.5 bg-[#3F6B4A] hover:bg-[#32563b] text-surface-container-lowest font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Riad Al Jazira', 'Approved')">
+<span class="material-symbols-outlined text-[14px]">check</span>
+                      Approve
+                    </button>
+<button class="px-space-sm py-1.5 bg-surface-container-lowest hover:bg-error-container text-[#8C2F22] hover:text-error font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Riad Al Jazira', 'Rejected')">
+<span class="material-symbols-outlined text-[14px]">close</span>
+                      Reject
+                    </button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container-low/70 transition-colors group">
+<td class="py-space-md px-space-md text-center">
+<input class="listing-checkbox w-4 h-4 rounded-none accent-on-surface cursor-pointer" type="checkbox"/>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-space-md">
+<img class="w-12 h-12 rounded-[2px] object-cover shrink-0" data-alt="Minimalist alpine timber lodge situated on the crystalline edge of Lake Wakatipu Queenstown New Zealand, snow-capped jagged mountain reflections, moody atmospheric tone." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBf_9fWXIPJHNDOZnvFHFuJTa8RCk4wTYucpNq6XqtpmI-xXcSRlEkc6azIMXvVhWgY4jmIS32zZdGH__PbmzvVT5GvNceOELV7aNajjfBOHaQCglcknXcZi299OTj0Rw8MKlMDjicC2CNxmYZN7hweZq9hWkFnX-Za1zVU9g3Ag8yrVn-zhj_7TpkVzmIsAruAwiF_Qegx2Tsa6r6FbAyEP3FvafUZuzTvVsyf3mPwRQnD0z90Qy1m"/>
+<div class="flex flex-col min-w-0">
+<a class="font-headline-sm text-[16px] leading-5 text-on-surface hover:text-primary transition-colors truncate" href="#">Lakeside Lodge</a>
+<span class="font-code-mono text-code-mono text-tertiary truncate">Larch clad architectural retreat</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex flex-col">
+<span class="font-body-md text-on-surface">Callum Macleod</span>
+<span class="font-code-mono text-[11px] text-outline uppercase">Tier II Verified</span>
+</div>
+</td>
+<td class="py-space-md px-space-md">
+<div class="flex items-center gap-1 font-body-md text-on-surface">
+<span class="material-symbols-outlined text-[15px] text-outline">location_on</span>
+<span>Queenstown, NZ</span>
+</div>
+</td>
+<td class="py-space-md px-space-md font-code-mono text-code-mono text-on-surface-variant">6 days ago</td>
+<td class="py-space-md px-space-md">
+<span class="inline-flex items-center gap-1.5 px-space-sm py-0.5 rounded-[2px] bg-tertiary-fixed text-on-tertiary-fixed font-code-mono text-[11px] uppercase tracking-wider font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+                    Pending review
+                  </span>
+</td>
+<td class="py-space-md px-space-md text-right">
+<div class="inline-flex items-center gap-space-xs justify-end">
+<button class="px-space-sm py-1.5 bg-[#3F6B4A] hover:bg-[#32563b] text-surface-container-lowest font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Lakeside Lodge', 'Approved')">
+<span class="material-symbols-outlined text-[14px]">check</span>
+                      Approve
+                    </button>
+<button class="px-space-sm py-1.5 bg-surface-container-lowest hover:bg-error-container text-[#8C2F22] hover:text-error font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center gap-1" onclick="recordAction('Lakeside Lodge', 'Rejected')">
+<span class="material-symbols-outlined text-[14px]">close</span>
+                      Reject
+                    </button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Pagination Bar -->
+<div class="bg-surface-container-low px-space-md py-space-sm flex items-center justify-between font-code-mono text-code-mono text-outline">
+<span>Showing 5 of 7 pending submissions</span>
+<div class="flex items-center gap-space-xs">
+<button class="px-space-sm py-1 bg-surface-container-lowest text-on-surface hover:bg-surface-variant rounded-[2px] font-label-caps text-label-caps uppercase">Prev</button>
+<span class="px-space-xs text-on-surface">Page 1 / 2</span>
+<button class="px-space-sm py-1 bg-surface-container-lowest text-on-surface hover:bg-surface-variant rounded-[2px] font-label-caps text-label-caps uppercase">Next</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Flagged Reviews Moderation Panel -->
+<div class="flex flex-col gap-space-md pt-space-md">
+<div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-space-xs">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Flagged Dispatches &amp; Testimonials</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Automated sentiment flag and guest reports flagged for off-protocol compliance.</p>
+</div>
+<span class="font-code-mono text-[11px] text-error uppercase font-medium">Attention: 2 active community flags</span>
+</div>
+<div class="grid grid-cols-1 gap-space-md" id="flaggedReviewsContainer">
+<!-- Flagged Card 1 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-[2px] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-lg transition-all" id="reviewCard1">
+<div class="flex flex-col gap-space-xs max-w-3xl">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-[2px] bg-error-container text-error font-code-mono text-[11px] uppercase tracking-wider font-semibold">
+<span class="material-symbols-outlined text-[13px]">flag</span>
+                Reported
+              </span>
+<span class="font-code-mono text-code-mono text-outline">Ref: REV-4902</span>
+<span class="font-code-mono text-code-mono text-outline">•</span>
+<span class="font-code-mono text-code-mono text-on-surface-variant">Guest: M. Vane (Stayed 14 Oct 2024)</span>
+</div>
+<p class="font-headline-sm text-[17px] leading-relaxed text-on-surface italic mt-space-xs">
+              “The host offered to rebook off-platform for a 15% discount if we cancelled via the Gazette desk directly before arrival...”
+            </p>
+<div class="flex items-center gap-space-xs mt-space-xs text-error font-code-mono text-code-mono">
+<span class="material-symbols-outlined text-[15px]">report_problem</span>
+<span>Reported for containing off-platform solicitation</span>
+</div>
+</div>
+<div class="flex md:flex-col items-center sm:items-end justify-end gap-space-xs shrink-0 pt-space-xs md:pt-0">
+<button class="w-full sm:w-auto px-space-md py-2 bg-error text-on-error font-label-caps text-label-caps uppercase rounded-[2px] hover:bg-primary transition-colors flex items-center justify-center gap-space-xs" onclick="dismissReview('reviewCard1', 'Hidden')">
+<span class="material-symbols-outlined text-[16px]">visibility_off</span>
+              Hide Review
+            </button>
+<button class="w-full sm:w-auto px-space-md py-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center justify-center gap-space-xs" onclick="dismissReview('reviewCard1', 'Kept')">
+<span class="material-symbols-outlined text-[16px]">verified</span>
+              Keep Published
+            </button>
+</div>
+</div>
+<!-- Flagged Card 2 -->
+<div class="bg-surface-container-lowest p-space-lg rounded-[2px] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-space-lg transition-all" id="reviewCard2">
+<div class="flex flex-col gap-space-xs max-w-3xl">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="inline-flex items-center gap-1 px-space-sm py-0.5 rounded-[2px] bg-error-container text-error font-code-mono text-[11px] uppercase tracking-wider font-semibold">
+<span class="material-symbols-outlined text-[13px]">flag</span>
+                Reported
+              </span>
+<span class="font-code-mono text-code-mono text-outline">Ref: REV-8812</span>
+<span class="font-code-mono text-code-mono text-outline">•</span>
+<span class="font-code-mono text-code-mono text-on-surface-variant">Profile: Auto-Bot-9 (Created yesterday)</span>
+</div>
+<p class="font-headline-sm text-[17px] leading-relaxed text-on-surface italic mt-space-xs">
+              “Spam advertising local car hire company contact@trans-atlas-rentals.ma with 20% voucher code AUTUMN24 for all airport shuttle needs...”
+            </p>
+<div class="flex items-center gap-space-xs mt-space-xs text-error font-code-mono text-code-mono">
+<span class="material-symbols-outlined text-[15px]">report_problem</span>
+<span>Automated promotional content</span>
+</div>
+</div>
+<div class="flex md:flex-col items-center sm:items-end justify-end gap-space-xs shrink-0 pt-space-xs md:pt-0">
+<button class="w-full sm:w-auto px-space-md py-2 bg-error text-on-error font-label-caps text-label-caps uppercase rounded-[2px] hover:bg-primary transition-colors flex items-center justify-center gap-space-xs" onclick="dismissReview('reviewCard2', 'Hidden')">
+<span class="material-symbols-outlined text-[16px]">visibility_off</span>
+              Hide Review
+            </button>
+<button class="w-full sm:w-auto px-space-md py-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-caps text-label-caps uppercase rounded-[2px] transition-colors flex items-center justify-center gap-space-xs" onclick="dismissReview('reviewCard2', 'Kept')">
+<span class="material-symbols-outlined text-[16px]">verified</span>
+              Keep Published
+            </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Notification Toast Container -->
+<div class="fixed bottom-space-lg right-space-lg z-50 bg-inverse-surface text-inverse-on-surface px-space-lg py-space-sm rounded-[2px] shadow-2xl flex items-center gap-space-sm font-code-mono text-code-mono translate-y-24 opacity-0 transition-all duration-300" id="custodianToast">
+<span class="material-symbols-outlined text-primary-fixed text-[18px]">gavel</span>
+<span id="toastMessage">Sanction recorded in audit ledger.</span>
+</div>
+</div>
+</div>
+<script>
+  function recordAction(propertyName, action) {
+    const toast = document.getElementById('custodianToast');
+    const msg = document.getElementById('toastMessage');
+    msg.textContent = `${action}: ${propertyName} recorded in custodial ledger.`;
+    toast.classList.remove('translate-y-24', 'opacity-0');
+    setTimeout(() => {
+      toast.classList.add('translate-y-24', 'opacity-0');
+    }, 3200);
+  }
+
+  function dismissReview(cardId, action) {
+    const card = document.getElementById(cardId);
+    card.style.opacity = '0.35';
+    card.style.pointerEvents = 'none';
+    const toast = document.getElementById('custodianToast');
+    const msg = document.getElementById('toastMessage');
+    msg.textContent = `Review marked as [${action}] and archived.`;
+    toast.classList.remove('translate-y-24', 'opacity-0');
+    setTimeout(() => {
+      toast.classList.add('translate-y-24', 'opacity-0');
+    }, 3200);
+  }
+
+  function handleSelectAll(master) {
+    const boxes = document.querySelectorAll('.listing-checkbox');
+    boxes.forEach(cb => cb.checked = master.checked);
+  }
+
+  function toggleSelectAll() {
+    const master = document.getElementById('selectAllCheckbox');
+    master.checked = !master.checked;
+    handleSelectAll(master);
+  }
+
+  // Close status filter dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('statusFilterDropdown');
+    const menu = document.getElementById('filterMenu');
+    if (dropdown && !dropdown.contains(e.target)) {
+      menu.classList.add('hidden');
+    }
+  });
+</script></main></div></body></html>

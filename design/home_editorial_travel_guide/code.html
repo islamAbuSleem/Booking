@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:ital,wght@0,400..700;1,400..700&amp;family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&amp;family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-tertiary-fixed": "#3b0900", "secondary-container": "#b9e6fb", "surface-container-highest": "#eae1d8", "on-primary-container": "#ffd0c4", "on-secondary-fixed-variant": "#1d4c5d", "on-tertiary": "#ffffff", "on-secondary-container": "#3c687a", "tertiary": "#882403", "surface-variant": "#eae1d8", "error-container": "#ffdad6", "surface-container-high": "#f0e7de", "surface-bright": "#fff8f3", "tertiary-fixed-dim": "#ffb5a0", "on-surface-variant": "#57423d", "on-surface": "#1f1b16", "surface-tint": "#a43c21", "outline": "#8b716b", "on-primary": "#ffffff", "surface": "#fff8f3", "on-primary-fixed": "#3c0800", "secondary": "#376476", "secondary-fixed-dim": "#a0cde1", "background": "#fff8f3", "on-tertiary-fixed-variant": "#862202", "tertiary-fixed": "#ffdbd1", "inverse-on-surface": "#f9efe6", "primary": "#86260c", "inverse-surface": "#34302a", "on-primary-fixed-variant": "#84250b", "on-secondary": "#ffffff", "on-error": "#ffffff", "surface-container": "#f6ece4", "outline-variant": "#dec0b9", "inverse-primary": "#ffb4a2", "error": "#ba1a1a", "surface-dim": "#e2d8d0", "surface-container-lowest": "#ffffff", "primary-container": "#a63d22", "on-secondary-fixed": "#001f29", "on-background": "#1f1b16", "tertiary-container": "#a93b1a", "secondary-fixed": "#bce9fe", "on-error-container": "#93000a", "surface-container-low": "#fcf2e9", "on-tertiary-container": "#ffd1c4", "primary-fixed": "#ffdbd2", "primary-fixed-dim": "#ffb4a2" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xs": "0.25rem", "space-lg": "1.5rem", "margin": "1rem", "space-xl": "2.5rem", "space-md": "1rem", "margin-desktop": "4rem", "margin-tablet": "2rem", "gutter": "1.5rem", "gutter-desktop": "2.5rem", "space-sm": "0.5rem" }, "fontFamily": { "display": [ "Newsreader" ], "body-sm": [ "Archivo Narrow" ], "headline-xl-mobile": [ "Newsreader" ], "headline-sm": [ "Newsreader" ], "label-caps": [ "Archivo Narrow" ], "code-mono": [ "JetBrains Mono" ], "headline-xl": [ "Newsreader" ], "body-lg": [ "Archivo Narrow" ], "display-mobile": [ "Newsreader" ], "headline-md": [ "Newsreader" ], "body-md": [ "Archivo Narrow" ], "headline-lg": [ "Newsreader" ], "label-md": [ "Archivo Narrow" ] }, "fontSize": { "display": [ "4.5rem", { "lineHeight": "4.75rem", "letterSpacing": "-0.02em", "fontWeight": "400" } ], "body-sm": [ "0.8125rem", { "lineHeight": "1.25rem", "fontWeight": "400" } ], "headline-xl-mobile": [ "2.25rem", { "lineHeight": "2.5rem", "letterSpacing": "-0.01em", "fontWeight": "400" } ], "headline-sm": [ "1.25rem", { "lineHeight": "1.625rem", "fontWeight": "500" } ], "label-caps": [ "0.75rem", { "lineHeight": "1rem", "letterSpacing": "0.08em", "fontWeight": "600" } ], "code-mono": [ "0.8125rem", { "lineHeight": "1.25rem", "fontWeight": "400" } ], "headline-xl": [ "3.25rem", { "lineHeight": "3.5rem", "letterSpacing": "-0.015em", "fontWeight": "400" } ], "body-lg": [ "1.125rem", { "lineHeight": "1.75rem", "fontWeight": "400" } ], "display-mobile": [ "2.75rem", { "lineHeight": "3rem", "letterSpacing": "-0.015em", "fontWeight": "400" } ], "headline-md": [ "1.75rem", { "lineHeight": "2.125rem", "letterSpacing": "-0.005em", "fontWeight": "400" } ], "body-md": [ "0.9375rem", { "lineHeight": "1.5rem", "fontWeight": "400" } ], "headline-lg": [ "2.25rem", { "lineHeight": "2.625rem", "letterSpacing": "-0.01em", "fontWeight": "400" } ], "label-md": [ "0.875rem", { "lineHeight": "1.25rem", "fontWeight": "500" } ] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased selection:bg-primary selection:text-on-primary"><header class="fixed top-0 left-0 right-0 z-50 bg-background border-b border-outline-variant"><div class="h-16 max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop flex items-center justify-between"><div class="flex items-center gap-8 lg:gap-12"><a class="font-headline-md text-headline-md tracking-tight text-on-surface hover:text-primary transition-colors" data-path="explore-stays" href="#">ESTATE &amp; STAY</a><nav class="hidden md:flex items-center gap-8" data-active-classes="underline underline-offset-[6px] decoration-1 decoration-primary font-semibold text-primary"><a aria-current="page" class="uppercase tracking-wider transition-all underline underline-offset-[6px] decoration-1 decoration-primary font-semibold text-primary" data-path="explore-stays" href="#">Stays</a><a class="font-label-caps text-label-caps uppercase tracking-wider text-on-surface-variant hover:text-on-surface hover:underline hover:underline-offset-[6px] hover:decoration-1 hover:decoration-on-surface transition-all" data-path="destinations-index" href="#">Destinations</a><a class="font-label-caps text-label-caps uppercase tracking-wider text-on-surface-variant hover:text-on-surface hover:underline hover:underline-offset-[6px] hover:decoration-1 hover:decoration-on-surface transition-all" data-path="curatorial-dispatch" href="#">Dispatches</a><a class="font-label-caps text-label-caps uppercase tracking-wider text-on-surface-variant hover:text-on-surface hover:underline hover:underline-offset-[6px] hover:decoration-1 hover:decoration-on-surface transition-all" data-path="about-archive" href="#">About</a></nav></div><div class="flex items-center gap-6 lg:gap-8"><a class="hidden sm:inline-block font-label-md text-label-md text-secondary underline underline-offset-[3px] decoration-1 decoration-secondary hover:text-on-secondary-fixed-variant transition-colors" data-path="property-intake" href="#">List your property</a><a class="inline-flex items-center justify-center h-10 px-5 bg-primary-container text-surface-container-lowest font-label-caps text-label-caps uppercase tracking-wider rounded-[2px] hover:bg-primary transition-colors" data-path="guest-portal" href="#">Sign in</a><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-16 bg-background"><div class="flex flex-col w-full">
+<!-- Folio Header Bar -->
+<div class="w-full bg-surface-container-low border-b border-outline-variant">
+<div class="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-space-xs flex items-center justify-between font-code-mono text-code-mono text-on-surface-variant">
+<div class="flex items-center gap-space-md">
+<span>ARCHITECTURAL REGISTER</span>
+<span class="text-outline-variant">/</span>
+<span class="text-primary font-semibold">ISSUE VOL. XXVIII</span>
+</div>
+<div class="hidden md:flex items-center gap-space-lg text-body-sm font-body-sm">
+<span>AUTHENTICATED STAYS ONLY</span>
+<span>•</span>
+<span>LAT: 38.7223° N, 9.1393° W</span>
+</div>
+</div>
+</div>
+<!-- Hero Section -->
+<section class="w-full bg-background border-b border-outline-variant overflow-hidden">
+<div class="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop pt-space-xl pb-space-xl lg:pb-28">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter lg:gap-gutter-desktop items-start">
+<!-- Hero Left Column (5 Cols) -->
+<div class="lg:col-span-5 flex flex-col justify-between z-10">
+<div class="space-y-space-md">
+<div class="flex items-center gap-space-xs">
+<span class="inline-block w-2 h-2 bg-primary"></span>
+<span class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant">Curated Residences &amp; Inns</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight leading-[1.08] max-w-md">
+              Find a place worth staying in.
+            </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-[48ch] leading-relaxed">
+              Selected architectural sanctuaries, coastal hideaways, and storied city addresses documented for the deliberate traveler.
+            </p>
+</div>
+<!-- Integrated Spec Inset Callout -->
+<div class="mt-space-lg p-space-md bg-surface-container border border-outline-variant">
+<div class="flex items-center justify-between font-label-caps text-label-caps text-on-surface-variant uppercase pb-space-xs border-b border-outline-variant">
+<span>Curatorial Standard</span>
+<span class="font-code-mono text-code-mono text-primary">SEC. 01 / VERIFIED</span>
+</div>
+<p class="mt-space-xs font-body-sm text-body-sm text-on-surface leading-normal">
+              Every address undergoes on-site inspection for natural illumination, acoustic isolation, and architectural provenance.
+            </p>
+</div>
+</div>
+<!-- Hero Right Column (7 Cols Asymmetric Imagery) -->
+<div class="lg:col-span-7 relative -mr-margin md:-mr-margin-tablet lg:-mr-margin-desktop lg:pl-space-md">
+<div class="relative w-full aspect-[16/10] bg-surface-container border-l border-t border-b border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Sun-drenched Mediterranean monastery courtyard turned boutique inn, classical limestone arches, weathered terracotta urns with olive saplings, warm afternoon raking sunlight casting geometric shadows on stone flags, muted ochre and bone tones, quiet architectural editorial photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPFO5ueSzG4RjV6zxYfC_QAm_Gue6zfExKeUCf0vxsgAjF4fTFv6TtU0FlrdgIxYZVuQtfCHfB7d5gjtPYxEiXCc_xSFr3IDuSJUXCS6SOTclTsJhsjGosrlau0q22kji2qX8CNf2TYQXQ3O8XW3hX1za9sm4Xbh7rYNB9RyeDM5c_XunPb3ab72lAFFZfjI9Svj3q2CrkBumzixK3PanqZUiJ3a65i_f7r4OdMglH3u070D3vKk4A"/>
+<!-- Architectural Spec Badge Overlay -->
+<div class="absolute bottom-0 left-0 bg-surface text-on-surface border-t border-r border-outline-variant px-space-md py-space-xs flex items-center gap-space-md">
+<span class="font-code-mono text-code-mono text-primary font-semibold">FIG. 04</span>
+<span class="font-label-caps text-label-caps uppercase text-on-surface-variant">Convento de Santa Cruz, Alentejo</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Broadsheet Search Ledger (Anchored Below Hero Text & Visual) -->
+<div class="mt-space-xl w-full bg-surface-container-lowest border border-outline-variant p-2 md:p-space-md shadow-none">
+<form class="grid grid-cols-1 md:grid-cols-12 gap-0 border border-outline-variant divide-y md:divide-y-0 md:divide-x divide-outline-variant" onsubmit="event.preventDefault();">
+<!-- Destination Field -->
+<div class="md:col-span-4 p-space-sm bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1" for="dest-input">
+              Destination or Property
+            </label>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">location_on</span>
+<input class="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface placeholder:text-outline focus:outline-none" id="dest-input" placeholder="Where to?" type="text" value="Lisbon, Portugal"/>
+</div>
+</div>
+<!-- Check-in Field -->
+<div class="md:col-span-2 p-space-sm bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1" for="checkin-input">
+              Check-In
+            </label>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">calendar_today</span>
+<input class="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none" id="checkin-input" type="text" value="Oct 14, 2025"/>
+</div>
+</div>
+<!-- Check-out Field -->
+<div class="md:col-span-2 p-space-sm bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1" for="checkout-input">
+              Check-Out
+            </label>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">calendar_today</span>
+<input class="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none" id="checkout-input" type="text" value="Oct 19, 2025"/>
+</div>
+</div>
+<!-- Guests Field -->
+<div class="md:col-span-2 p-space-sm bg-surface-container-lowest hover:bg-surface-container-low transition-colors">
+<label class="block font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider mb-1" for="guests-input">
+              Occupancy
+            </label>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[18px]">group</span>
+<input class="w-full bg-transparent font-headline-sm text-headline-sm text-on-surface focus:outline-none" id="guests-input" type="text" value="2 Guests, 1 Room"/>
+</div>
+</div>
+<!-- Submit Action -->
+<div class="md:col-span-2 p-space-xs flex items-center justify-center bg-surface-container-lowest">
+<button class="w-full h-full min-h-[50px] bg-primary text-on-primary font-label-caps text-label-caps uppercase tracking-widest rounded-[2px] hover:bg-primary-container transition-colors flex items-center justify-center gap-2 px-6" type="submit">
+<span>Search Registry</span>
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Search Metadata Subline -->
+<div class="mt-space-xs px-1 flex flex-wrap items-center justify-between text-body-sm font-body-sm text-on-surface-variant">
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Curated direct inventory</span>
+<span>•</span>
+<span>Complimentary breakfast guaranteed on private suites</span>
+</div>
+<a class="font-code-mono text-code-mono text-secondary hover:text-on-secondary-fixed-variant underline underline-offset-2" href="#">ADVANCED ARCHITECTURAL CRITERIA →</a>
+</div>
+</div>
+</div>
+</section>
+<!-- Curated Indices Bar -->
+<div class="w-full border-b border-outline-variant bg-surface-container-high">
+<div class="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-space-sm flex flex-wrap items-center justify-between gap-4">
+<div class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant">Filter by Archetype:</div>
+<div class="flex flex-wrap items-center gap-space-sm">
+<button class="px-space-sm py-1 bg-surface border border-outline-variant font-body-sm text-body-sm text-on-surface hover:bg-surface-container transition-colors">Coastal Bastions (18)</button>
+<button class="px-space-sm py-1 bg-primary text-on-primary font-body-sm text-body-sm">Restored Monasteries (24)</button>
+<button class="px-space-sm py-1 bg-surface border border-outline-variant font-body-sm text-body-sm text-on-surface hover:bg-surface-container transition-colors">Highland Sanctuaries (9)</button>
+<button class="px-space-sm py-1 bg-surface border border-outline-variant font-body-sm text-body-sm text-on-surface hover:bg-surface-container transition-colors">Canal Townhouses (31)</button>
+<button class="px-space-sm py-1 bg-surface border border-outline-variant font-body-sm text-body-sm text-on-surface hover:bg-surface-container transition-colors">Brutalist Pavilions (12)</button>
+</div>
+<div class="font-code-mono text-code-mono text-on-surface-variant">INDEX Nº 892-A</div>
+</div>
+</div>
+<!-- Featured Stays Section -->
+<section class="w-full bg-background py-24 border-b border-outline-variant">
+<div class="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop">
+<!-- Section Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-space-xl pb-space-md border-b border-outline-variant">
+<div>
+<!-- Terracotta rule above title -->
+<div class="w-6 h-[2px] bg-primary mb-space-sm"></div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Featured stays</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">A weekly survey of residential architecture open for private reservation.</p>
+</div>
+<div class="mt-4 md:mt-0 flex items-center gap-space-lg">
+<span class="font-code-mono text-code-mono text-on-surface-variant">SHOWING 3 OF 142 ENTRIES</span>
+<a class="font-label-caps text-label-caps uppercase tracking-wider text-secondary underline underline-offset-4 hover:text-on-secondary-fixed-variant" href="#">View Entire Register →</a>
+</div>
+</div>
+<!-- 3-Column Hotel Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Hotel Card 1 -->
+<article class="bg-surface-container-lowest border border-outline-variant flex flex-col group">
+<!-- Image Container (3:2) -->
+<div class="relative w-full aspect-[3/2] bg-surface-container border-b border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" data-alt="Intimate sunlit courtyard of a renovated Lisbon palacete, white lime-plastered walls, green glazed ceramic tiles, narrow lap pool reflecting morning light, minimal iron outdoor furniture, high architectural photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeKmwoFdoa6aQwU5viaMYOke42ldgS0wIPdj670eprqK9z2iR6kU67QNscYUDOy6HrSjLpfP07VtERFuLZQMABDYEKmR8mMsYVdv3ZkAvIunr_IBmVgN8PRSLARhOgwRvD-hjEBCY2PwhCHklI0JKxaXCmMYy1oUSZV0FsSxSqL2sI6KTk1yjf2MYRyj9WZDmil3bg1J1pnA_rYUNHMG4NlG6jFWqrR4GskkpPtKsGjuWbbEeYbP4R"/>
+<!-- Guest Favourite Badge -->
+<div class="absolute top-3 left-3 bg-surface text-on-surface border border-outline-variant font-label-caps text-[0.6875rem] uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+              Guest favourite
+            </div>
+<!-- Heart Button (44px target) -->
+<button aria-label="Save The Larkspur Hotel" class="absolute top-2 right-2 w-11 h-11 flex items-center justify-center bg-surface/90 hover:bg-surface border border-outline-variant transition-colors text-on-surface" onclick="this.classList.toggle('text-primary')" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+</button>
+</div>
+<!-- Card Content Body -->
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<!-- Location Eyebrow -->
+<div class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant">
+                LISBON, PORTUGAL
+              </div>
+<!-- Hotel Headline -->
+<h3 class="font-headline-md text-headline-md text-on-surface mt-1 group-hover:text-primary transition-colors">
+                The Larkspur Hotel
+              </h3>
+<!-- Architectural Amenity Matrix -->
+<p class="mt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+                Courtyard pool · Library · Breakfast included <span class="text-secondary font-medium">+2 more</span>
+</p>
+</div>
+<div class="mt-space-lg pt-space-sm border-t border-outline-variant">
+<!-- Rating & Reviews -->
+<div class="flex items-baseline justify-between">
+<div class="flex items-baseline gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold">9.4</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Excellent (342 reviews)</span>
+</div>
+<!-- Price Display in Tabular Figures -->
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold font-code-mono">$214</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant block -mt-1">per night</span>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Hotel Card 2 -->
+<article class="bg-surface-container-lowest border border-outline-variant flex flex-col group">
+<!-- Image Container (3:2) -->
+<div class="relative w-full aspect-[3/2] bg-surface-container border-b border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" data-alt="Modernist adobe retreat in Oaxaca with earthy terracotta render, indigenous desert flora, woven palm partitions, geometric skylight, dramatic shadows, editorial interior travel architecture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_y_Rm4Q2TfjuDxuM7a2CrD7KUARFZO7GuigtQgUL_E-rmY5QxLuHeRtl6yRfWQSjs0oX_y2R0xV6EYnC2yIuNMQaOyHUi2JWPbSyY6uG7XX5o_U_QxuLigjS99EiWhx8zuTcgB_tlDaWOIVQeESqPoLdQbnMFayR_MsL6125SUd6BmtdJ6oz_Y8Vjmzeln5cGBzFgAhgNYeyLz5PUn0fbfoFu956Qau4fRYIQDkKexxEggeWVReui"/>
+<!-- Guest Favourite Badge -->
+<div class="absolute top-3 left-3 bg-surface text-on-surface border border-outline-variant font-label-caps text-[0.6875rem] uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+              Curator selection
+            </div>
+<!-- Heart Button (44px target) -->
+<button aria-label="Save Casa Verde" class="absolute top-2 right-2 w-11 h-11 flex items-center justify-center bg-surface/90 hover:bg-surface border border-outline-variant transition-colors text-on-surface" onclick="this.classList.toggle('text-primary')" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+</button>
+</div>
+<!-- Card Content Body -->
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<!-- Location Eyebrow -->
+<div class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant">
+                OAXACA, MEXICO
+              </div>
+<!-- Hotel Headline -->
+<h3 class="font-headline-md text-headline-md text-on-surface mt-1 group-hover:text-primary transition-colors">
+                Casa Verde, Oaxaca
+              </h3>
+<!-- Architectural Amenity Matrix -->
+<p class="mt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+                Garden terrace · Mezcaleria · Organic breakfast
+              </p>
+</div>
+<div class="mt-space-lg pt-space-sm border-t border-outline-variant">
+<!-- Rating & Reviews -->
+<div class="flex items-baseline justify-between">
+<div class="flex items-baseline gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold">9.6</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Excellent (218 reviews)</span>
+</div>
+<!-- Price Display in Tabular Figures -->
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold font-code-mono">$189</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant block -mt-1">per night</span>
+</div>
+</div>
+</div>
+</div>
+</article>
+<!-- Hotel Card 3 -->
+<article class="bg-surface-container-lowest border border-outline-variant flex flex-col group">
+<!-- Image Container (3:2) -->
+<div class="relative w-full aspect-[3/2] bg-surface-container border-b border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.02]" data-alt="Danish canal-side warehouse converted into a Nordic minimalist hotel, dark weathered timber beams, exposed brick, large industrial paned windows looking out to quiet gray water, Scandinavian wool accents" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0CgsYXb0fcpIgCj9FkqexHvVwQ6QFgEYhTjzNzfFNKLKWUCzcHJjl0cejmrKdMKxyr7Xm1JUFWBS9MaFgJ72V_B4cjWKynWye_32lrjgb7U1nit5dqZMJaeAi3t_n7nWUuO-d5VxrrXP_kLaccj7YauQEEbBd8eqCKAzDdxeLqq41W41koMhWzTzkLz7UJhzATYudqOT1VyfLBm6A0cYdUwHRQP-OD5EaSnSahaAgaHPQhxl7Fsyl"/>
+<!-- Availability Badge -->
+<div class="absolute top-3 left-3 bg-surface-container-low text-on-secondary-fixed-variant border border-outline-variant font-label-caps text-[0.6875rem] uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+              Limited autumn dates
+            </div>
+<!-- Heart Button (44px target) -->
+<button aria-label="Save Hotel Nord" class="absolute top-2 right-2 w-11 h-11 flex items-center justify-center bg-surface/90 hover:bg-surface border border-outline-variant transition-colors text-on-surface" onclick="this.classList.toggle('text-primary')" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path>
+</svg>
+</button>
+</div>
+<!-- Card Content Body -->
+<div class="p-space-md flex-1 flex flex-col justify-between">
+<div>
+<!-- Location Eyebrow -->
+<div class="font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant">
+                COPENHAGEN, DENMARK
+              </div>
+<!-- Hotel Headline -->
+<h3 class="font-headline-md text-headline-md text-on-surface mt-1 group-hover:text-primary transition-colors">
+                Hotel Nord, Copenhagen
+              </h3>
+<!-- Architectural Amenity Matrix -->
+<p class="mt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+                Sauna · Bicycles · Waterfront view
+              </p>
+</div>
+<div class="mt-space-lg pt-space-sm border-t border-outline-variant">
+<!-- Rating & Reviews -->
+<div class="flex items-baseline justify-between">
+<div class="flex items-baseline gap-1.5">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold">9.2</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Excellent (184 reviews)</span>
+</div>
+<!-- Price Display in Tabular Figures -->
+<div class="text-right">
+<span class="font-headline-sm text-headline-sm text-on-surface font-semibold font-code-mono">$342</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant block -mt-1">per night</span>
+</div>
+</div>
+</div>
+</div>
+</article>
+</div>
+<!-- Architectural Spec Inset Table -->
+<div class="mt-space-xl border border-outline-variant bg-surface-container-low p-space-md">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-gutter divide-y md:divide-y-0 md:divide-x divide-outline-variant">
+<div class="p-2">
+<span class="font-label-caps text-label-caps uppercase text-on-surface-variant block">Inventory Protocol</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-1 block">Maximum 30 Keys</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1 block">Preserves personal privacy and staff-to-guest attention ratio.</span>
+</div>
+<div class="p-2 md:pl-space-md">
+<span class="font-label-caps text-label-caps uppercase text-on-surface-variant block">Culinary Standard</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-1 block">Zero Industrial Buffets</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1 block">À la carte provenance sourced within a 40km perimeter.</span>
+</div>
+<div class="p-2 md:pl-space-md">
+<span class="font-label-caps text-label-caps uppercase text-on-surface-variant block">Spatial Integrity</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-1 block">Natural Cross-Breeze</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1 block">Prioritizing operable apertures over continuous HVAC dependence.</span>
+</div>
+<div class="p-2 md:pl-space-md">
+<span class="font-label-caps text-label-caps uppercase text-on-surface-variant block">Curator's Guarantee</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-1 block">Best Price Direct</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-1 block">Negotiated parity with hotel direct books plus daily estate credit.</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Field Notes & Destinations Section -->
+<section class="w-full bg-surface-container py-24 border-b border-outline-variant">
+<div class="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop">
+<!-- Section Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-space-xl pb-space-md border-b border-outline-variant">
+<div>
+<div class="font-code-mono text-code-mono text-primary font-semibold mb-space-xs">REGIONAL DISPATCHES • ARCHIVE VOL. 4</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Field Notes &amp; Destinations</h2>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-sm mt-2 md:mt-0">
+          Geographic narratives focused on light quality, regional masonry, and local walking routes.
+        </p>
+</div>
+<!-- Asymmetric Editorial Grid (6 cols / 3 cols / 3 cols) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Destination 1: Lisbon (Span 6) -->
+<a class="lg:col-span-6 group block relative aspect-[4/3] bg-surface-container-highest border border-outline-variant overflow-hidden" href="#">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Editorial landscape of historic Lisbon rooftops in golden late-afternoon sun, terracotta tile roofs, Chiado neighborhood architecture, Tagus river in distance, warm atmospheric haze, muted color grading" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDWCAcMnmcj4iB5X3I8pIENnQWv3uMWDmOy5hegPLZKO1dMy8gUXtVcM7CwRV9wn_zPchYAGPudCnMn1-R_uXqkvhNmKOVSWWC2PVUj1BcNTt-u6pcOgpku6t1mqLiLuqw-UmaVGcKSQtbxxi2aabfMqTYVIjwMN2aheQiDQGC5zKzKOawnSPRHHDTPUKnNZqk8QUi6232EFaKXsn5G1_TXvE2NG_85q3QrZjWJeErVorrtFeuwaBN8"/>
+<!-- Gradient Scrim for Editorial Typography Readability -->
+<div class="absolute inset-0 bg-gradient-to-t from-on-surface/90 via-on-surface/30 to-transparent"></div>
+<!-- Top Classification Tag -->
+<div class="absolute top-4 left-4 font-code-mono text-code-mono text-surface-container-lowest bg-on-surface/80 px-2 py-0.5 border border-surface-container-highest/20">
+            DISPATCH 01 • IBERIAN PENINSULA
+          </div>
+<!-- Bottom Text Overlay -->
+<div class="absolute bottom-0 left-0 right-0 p-space-lg text-surface-container-lowest">
+<span class="font-label-caps text-label-caps uppercase tracking-widest text-primary-fixed block mb-1">08 Documented Stays</span>
+<h3 class="font-headline-lg text-headline-lg text-surface-container-lowest tracking-tight">
+              Lisbon — The Atlantic light of Chiado
+            </h3>
+<p class="font-body-md text-body-md text-surface-container-highest mt-2 max-w-lg opacity-90 line-clamp-2">
+              Ascending calcada stones beneath high maritime cloud cover, where 18th-century palacetes hide secluded lemon groves behind austere facade walls.
+            </p>
+</div>
+</a>
+<!-- Destination 2: Oaxaca (Span 3) -->
+<a class="lg:col-span-3 group block relative aspect-[4/3] lg:aspect-auto lg:h-full min-h-[380px] bg-surface-container-highest border border-outline-variant overflow-hidden" href="#">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Monolithic stone and adobe alleyway in historic Oaxaca city center, deep clay tones, green cantera stone details, quiet morning atmosphere with dramatic sidelight, refined cultural travel aesthetics" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeYw633U_1I2jS-rMbxt0KbUTdv9IBUS6D1UuCMGJ-OS233ui6-fGO43X6s1zlVX5X5v6ZUbEjILu1neX-4v6vKNTym6EaJBOalFTzZuL7UIVrxG3oq_7zZeAzbneEifcHFOREfyUPdtKrJb3VT8_jwcqquwmnwjzFBQD48molcUqoDN_YJznlJz8Q9iuiWhd-qVn7F_wTn9ekcUpAyKtB3p4jIM8hTKMv_a3Oel0paqealiXijFkC"/>
+<div class="absolute inset-0 bg-gradient-to-t from-on-surface/90 via-on-surface/30 to-transparent"></div>
+<div class="absolute top-4 left-4 font-code-mono text-code-mono text-surface-container-lowest bg-on-surface/80 px-2 py-0.5 border border-surface-container-highest/20">
+            DISPATCH 02
+          </div>
+<div class="absolute bottom-0 left-0 right-0 p-space-md text-surface-container-lowest">
+<span class="font-label-caps text-label-caps uppercase tracking-widest text-primary-fixed block mb-1">05 Documented Stays</span>
+<h3 class="font-headline-md text-headline-md text-surface-container-lowest tracking-tight">
+              Oaxaca — Historic courtyards and clay
+            </h3>
+<p class="font-body-sm text-body-sm text-surface-container-highest mt-1 opacity-90 line-clamp-2">
+              Deep volcanic mortar and private mezcal gardens in the Central Valleys.
+            </p>
+</div>
+</a>
+<!-- Destination 3: Copenhagen (Span 3) -->
+<a class="lg:col-span-3 group block relative aspect-[4/3] lg:aspect-auto lg:h-full min-h-[380px] bg-surface-container-highest border border-outline-variant overflow-hidden" href="#">
+<img class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="Reflective harbor water in Christianshavn Copenhagen, dark timber house facades, quiet morning light reflecting off still gray canal water, Nordic serenity and architectural discipline" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEEtJxl5jcFTbIKoIdSwfMJ_BPHQRddLnURt4sgaltQxTUwnHZulBohPaRPyuOvWzAKqs6w0MZZpNdBq2RHOcMvkr4ggKh3qgANzqyZjATYHIgbAIzNoyg83ncJd1tX7MIGfuL_MfF6YrkIyTTqMRogFhfZtWZfeuZIRBXHNOhVSsHzJjtlAE2fgQpc6rNgHsYehhI4_BKCPwG9zZoSLwgmxKZzc3_7SYeqIjQj417m_6xwZTZ3vJw"/>
+<div class="absolute inset-0 bg-gradient-to-t from-on-surface/90 via-on-surface/30 to-transparent"></div>
+<div class="absolute top-4 left-4 font-code-mono text-code-mono text-surface-container-lowest bg-on-surface/80 px-2 py-0.5 border border-surface-container-highest/20">
+            DISPATCH 03
+          </div>
+<div class="absolute bottom-0 left-0 right-0 p-space-md text-surface-container-lowest">
+<span class="font-label-caps text-label-caps uppercase tracking-widest text-primary-fixed block mb-1">11 Documented Stays</span>
+<h3 class="font-headline-md text-headline-md text-surface-container-lowest tracking-tight">
+              Copenhagen — Quiet canal harbors
+            </h3>
+<p class="font-body-sm text-body-sm text-surface-container-highest mt-1 opacity-90 line-clamp-2">
+              Tactile woodcraft and cold-water harbor saunas tucked behind maritime quays.
+            </p>
+</div>
+</a>
+</div>
+</div>
+</section>
+<!-- Editorial Newsletter Subscription / Manifest Colophon -->
+<section class="w-full bg-surface-container-low py-space-xl border-b border-outline-variant">
+<div class="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-center">
+<div class="lg:col-span-6 space-y-space-xs">
+<div class="font-label-caps text-label-caps uppercase tracking-widest text-primary">The Weekly Dispatch</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Delivered without promotional haste.</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-lg">
+            One architectural profile every Thursday dawn. No surge pricing notices, no urgency timers, no sponsored placements.
+          </p>
+</div>
+<div class="lg:col-span-6">
+<form class="flex flex-col sm:flex-row gap-2" onsubmit="event.preventDefault(); alert('Subscribed to the Gazette.');">
+<input class="flex-1 bg-surface-container-lowest border border-outline-variant px-space-md py-3 text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:border-on-surface rounded-[2px]" placeholder="Your professional or personal email..." required="" type="email"/>
+<button class="bg-primary hover:bg-primary-container text-on-primary font-label-caps text-label-caps uppercase tracking-widest px-8 py-3 rounded-[2px] transition-colors shrink-0" type="submit">
+              Join Reader Registry
+            </button>
+</form>
+<span class="font-body-sm text-body-sm text-on-surface-variant block mt-2">
+            Read by 44,000 architects, writers, and custodians across 72 countries. Unsubscribe with one click.
+          </span>
+</div>
+</div>
+</div>
+</section>
+</div></main><footer class="w-full bg-on-surface text-surface border-t border-outline-variant/20"><div class="max-w-[1440px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-space-xl"><div class="grid grid-cols-1 md:grid-cols-12 gap-gutter-desktop pb-space-xl border-b border-outline-variant/10"><div class="md:col-span-4 flex flex-col justify-between pr-0 lg:pr-space-lg"><div class="space-y-space-sm"><div class="font-headline-lg text-headline-lg tracking-tight text-surface">ESTATE &amp; STAY</div><p class="font-body-md text-body-md text-surface-container-highest max-w-sm">An unhurried registry of architectural residences, heritage inns, and cultural retreats for discerning travelers.</p></div><div class="mt-space-lg font-code-mono text-code-mono text-surface-variant/70">ISSUE Nº 24 • AUTUMN / WINTER REGISTER</div></div><div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-gutter"><div class="flex flex-col space-y-space-sm"><span class="font-label-caps text-label-caps uppercase tracking-wider text-surface-variant/60">Collection</span><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="explore-stays" href="#">All Properties</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="destinations-index" href="#">Regional Archives</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="curatorial-dispatch" href="#">Curator's Ledger</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="property-intake" href="#">Architectural Submissions</a></div><div class="flex flex-col space-y-space-sm"><span class="font-label-caps text-label-caps uppercase tracking-wider text-surface-variant/60">Anthology</span><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="about-archive" href="#">The Manifesto</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="editorial-guidelines" href="#">Editorial Standards</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="print-edition" href="#">Annual Gazette</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="patron-fellowship" href="#">Fellowship</a></div><div class="flex flex-col space-y-space-sm"><span class="font-label-caps text-label-caps uppercase tracking-wider text-surface-variant/60">Inquiries</span><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="guest-portal" href="#">Concierge Desk</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="press-office" href="#">Press Office</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="privacy-ledger" href="#">Privacy &amp; Terms</a><a class="font-body-md text-body-md text-surface-container-highest hover:text-surface hover:underline hover:underline-offset-4 transition-colors" data-path="provenance" href="#">Colophon</a></div></div></div><div class="pt-space-lg flex flex-col md:flex-row items-baseline justify-between gap-space-sm text-surface-variant/60 font-body-sm text-body-sm"><div>© 2024 Estate &amp; Stay Press Ltd. Typeset in Newsreader and Archivo. Printed on digital bone paper.</div><div class="font-code-mono text-code-mono">FOLIO REF: 8492-STAY-EST</div></div></div></footer></body></html>
