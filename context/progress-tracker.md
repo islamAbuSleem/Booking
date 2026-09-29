@@ -43,7 +43,7 @@
 ### Phase 1 — Foundation
 - [x] T1 Project scaffold and tooling
 - [x] T2 Design system and app shell
-- [ ] T3 Mock data layer
+- [x] T3 Mock data layer
 - [ ] T4 Home page
 - [ ] T5 Hotels list + filters
 - [ ] T6 Hotel detail
