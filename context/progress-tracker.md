@@ -44,7 +44,7 @@
 - [x] T1 Project scaffold and tooling
 - [x] T2 Design system and app shell
 - [x] T3 Mock data layer
-- [ ] T4 Home page
+- [x] T4 Home page
 - [ ] T5 Hotels list + filters
 - [ ] T6 Hotel detail
 - [ ] T7 Booking flow
@@ -296,6 +296,15 @@
   `npm audit fix --force` proposes `@nestjs/mau@0.0.6`, a **downgrade** from 0.2.6. Not
   applied. `mau` is only used by `nest deploy` and never ships. Revisit if it is ever
   used in CI.
+- **D42 — Subagents are unusable in this environment; the parallel FE/BE plan is on
+  hold.** Three attempts, including a no-tools probe, all failed with the same
+  opencode session-store insert error. So `/project-build` is being executed **solely**,
+  sequentially, ticket by ticket. The FE/BE fan-out the restructure would have enabled
+  (D36) is still sound in principle — the two directories share no files — but it needs
+  a working subagent runtime, and one agent must own `context/` and all verification
+  regardless, because both would otherwise fight over the same progress file and the same
+  build caches. **Do not assume parallel work is safe here just because the directories
+  are separate; verify the runtime works first.**
 
 ## Notes
 

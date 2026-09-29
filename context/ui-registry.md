@@ -27,7 +27,12 @@ Every component built, one row each. Add a row when the component is created.
 
 ## Domain components
 
-Populated as later tickets build them — T4 home, T5 list, T6 detail, T7 booking, T8 trips,
+| Component | Path | Type | Ticket | Status |
+|---|---|---|---|---|
+| `HotelCard` | `app/components/HotelCard.vue` | display | T4 | built |
+| `SearchWidget` | `app/components/SearchWidget.vue` | form | T4 | built |
+
+Remaining, as their tickets build them — T5 list, T6 detail, T7 booking, T8 trips,
 T10 host dashboard, T11 admin.
 
 **Type** — `display` (presentational) / `form` (input handling) / `layout` (page shell).

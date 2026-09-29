@@ -30,7 +30,19 @@
     "guestsMany": "{count} guests, 1 room",
     "submit": "Search",
     "invalidRange": "Check-out must be after check-in",
-    "useMyLocation": "Use my location"
+    "useMyLocation": "Use my location",
+    "freeCancellationNote": "Free cancellation on most stays · No booking fees"
+  },
+  "home": {
+    "eyebrow": "Curated lodgings",
+    "title": "Find a place worth staying in",
+    "subtitle": "We bypass algorithmically boosted listings in pursuit of spatial stillness, sovereign architecture, and proprietors who treat genuine hospitality as high literature.",
+    "featured": "Featured stays",
+    "featuredHint": "Examined for provenance, proportion, and location",
+    "browseAll": "Browse all stays",
+    "destinations": "Autumn escapes",
+    "destinationsHint": "Regions selected for temperate light, harvested tables, and uncrowded architectural walks during the shoulder months",
+    "nights": "nights"
   },
   "hotel": {
     "perNight": "per night",
@@ -42,9 +54,12 @@
     "reviews": "reviews",
     "review": "review",
     "amenities": "Amenities",
+    "amenitiesMore": "+{count} more",
     "rooms": "Rooms",
     "location": "Location",
-    "getDirections": "Get directions"
+    "getDirections": "Get directions",
+    "sleeps": "Sleeps {count}",
+    "selectRoom": "Select room"
   },
   "status": {
     "published": "Published",
