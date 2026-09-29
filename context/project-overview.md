@@ -1,4 +1,4 @@
-# Project Overview
+﻿# Project Overview
 
 ## About
 A hotel booking platform. Guests discover hotels, check availability, book rooms, and pay.
@@ -104,7 +104,7 @@ depends on booking data that only exists once the core flow works.
 
 ## Success Criteria
 1. `npm run build` passes at repo root (typecheck + build both apps).
-2. `npm run test` passes (Jest unit tests for API services).
+2. `npm run test` passes (Vitest unit tests for API services).
 3. A guest can complete a Stripe test-mode booking end-to-end and see it in `/bookings`.
 4. A host can create a listing with a photo and a room type, and it becomes publicly
    searchable once approved.

@@ -3,7 +3,7 @@
 Single source of truth for colour and type values. **No hardcoded hex, rgb(), or hsl() in
 component or template code.** New colour → add it here first.
 
-Defined in `apps/web/app/assets/css/main.css` inside a Tailwind v4 `@theme` block, which
+Defined in `frontend/app/assets/css/main.css` inside a Tailwind v4 `@theme` block, which
 turns each `--color-*` into a utility (`bg-surface`, `text-fg`).
 
 Aesthetic direction and everything not expressible as a token lives in

@@ -10,15 +10,24 @@
 | Frontend | Nuxt 4.5.x (Vue 3, SSR), Tailwind CSS 4.3.x via `@tailwindcss/vite` | yes |
 | Backend | NestJS 12.1.x | yes |
 | Database | Neon Postgres via Prisma 7.10.x, pooled URL at runtime + direct URL for migrations | yes |
-| ORM | Prisma | yes |
-| Monorepo | npm workspaces: `apps/web`, `apps/api`, `packages/shared`, `context/` | yes |
-| Auth | Email/password (bcrypt) + Google OAuth + GitHub OAuth, JWT in httpOnly cookie | yes |
+| ORM | Prisma 7.10.x, Neon adapter, `prisma-client` generator | yes |
+| Repository | Two independent projects: `backend/` (NestJS 12) + `frontend/` (Nuxt 4), one repo, one branch (D36) | yes |
+| Deploy | Two units, separate builds and lockfiles | yes |
+| Deploy | Two units, separate builds and lockfiles | yes |
+| Auth | Email/password (**Argon2id**) + Google OAuth + GitHub OAuth, JWT in httpOnly cookie | yes |
 | Roles | `GUEST`, `HOST`, `ADMIN` — enforced by NestJS guards | yes |
 | Images | Cloudinary, signed direct upload, folder scoped per host | yes |
 | Payments | Stripe test mode, PaymentIntent + webhook confirmation | yes |
-| Validation | Zod schemas in `packages/shared`, single source of truth | yes |
+| Validation | Zod 4, backend-owned; frontend types generated from `openapi.json` (D38) | yes |
 | Styling | Tailwind v4 + CSS custom properties in `@theme`, no hardcoded hex | yes |
-| Verify command | `npm run build && npm run test` from the repo root | yes |
+| Monorepo | **None** — `backend/` and `frontend/` are independent projects, no workspace (D36) | yes |
+| Shared package | **None.** API contract generated from `openapi.json` (D38) | yes |
+| BE module system | ESM / `nodenext`, as scaffolded by `nest new` (D37) | yes |
+| BE tests | **Vitest** 4.1.x, not Jest (D37) | yes |
+| BE lint | **oxlint** `--type-aware` (D37) | yes |
+| FE lint | **ESLint** via `@nuxt/eslint` (D37) | yes |
+| TypeScript | 6.0.x, as scaffolded (D37) | yes |
+| Verify command | `npm run verify` from the repo root | yes |
 | Aesthetic | Editorial Travel Guide — paper/ink/terracotta, hairline rules, square corners, asymmetric grid | yes |
 | Type | Fraunces (display) · Archivo (UI) · IBM Plex Mono (references) | yes |
 | Dark mode | Not in the MVP (D22) | yes |
@@ -32,7 +41,7 @@
 ## Ticket Checklist
 
 ### Phase 1 — Foundation
-- [ ] T1 Monorepo scaffold and tooling
+- [x] T1 Project scaffold and tooling
 - [ ] T2 Design system and app shell
 - [ ] T3 Mock data layer
 - [ ] T4 Home page
@@ -47,6 +56,7 @@
 ### Phase 2 — Domain
 - [ ] T12 Database schema, migration, seed
 - [ ] T13 API foundation
+- [ ] T13a OpenAPI contract and frontend type generation
 - [ ] T14 Auth: email/password
 - [ ] T15 Auth: Google and GitHub OAuth
 - [ ] T16 Hotels read API
@@ -196,6 +206,75 @@
   a map screenshot carrying third-party attribution, which is not shippable. Build a
   static styled placeholder with a link out to directions, keep the component seam, and
   do not invent a provider decision. Flagged rather than silently assumed.
+- **D29 — Three research findings invalidated parts of the spec. Corrected before T1.**
+  Parallel agents verified against installed packages rather than docs indexes, and in
+  three cases the docs were stale or wrong. Recorded here because each is a hard error
+  that would have surfaced as a confusing runtime failure:
+  1. **Prisma 7 removed `datasource.url` and `directUrl`.** The upgrade guide calls it
+     "deprecated"; 7.10.0 rejects it with `P1012`. URLs now live in `prisma.config.ts`
+     (CLI, `DIRECT_URL`) and a `PrismaNeon` adapter (runtime, pooled `DATABASE_URL`).
+  2. **`prisma-client-js` is deprecated and `output` is required.** A driver adapter is
+     now mandatory for all databases. The Neon adapter takes a **config object**, not a
+     `pg.Pool` — the widely-shown `new PrismaNeon(pool)` form is stale.
+  3. **`@Body({ bodyParser: false })` is not a real API.** It is absent from every
+     published `@nestjs/common` from 5.4.0 to 12.1.1. It is a hallucinated pattern copied
+     across blog posts. The correct approach is `rawBody: true` at the app level.
+- **D30 — Pin `prisma@7.10.0` exactly.** The npm `latest` dist-tag points at
+  `8.0.0-rc`. An unpinned install pulls a prerelease of the ORM into a booking system.
+- **D31 — Argon2id replaces bcrypt.** OWASP now scopes bcrypt to legacy systems. bcrypt
+  is CPU-hard only and **silently truncates at 72 bytes**, so the 72-char cap is not
+  even enforceable from the user's side. 19 MiB / t=2 / p=1.
+- **D32 — Superseded by D37, kept because the underlying NestJS 12 facts still hold.**
+  NestJS 12's core packages are ESM-only. There used to be a risk here: a CommonJS build
+  would need `require(esm)`, which needs Node ≥20.19, and Jest on top of that needed
+  Node ≥24.9 or it failed with `ERR_REQUIRE_ASYNC_MODULE` — an error pointing nowhere near
+  its cause. `nest new` scaffolds ESM, so **the whole class of problem is gone**. Two
+  NestJS 12 behaviours survive and are real: `@Optional()` is no longer inherited by
+  subclasses (re-declare it), and lifecycle hook order now follows the component
+  hierarchy, so do not assume an `onModuleInit` ordering.
+- **D33 — Prefer `@nuxt/fonts` over `@nuxtjs/google-fonts`.** The latter is unmaintained
+  (~2 years stale, advertises Nuxt 3 only). `@nuxt/fonts` is actively developed and
+  self-hosts with automatic metric fallbacks. **Open question** — worth revisiting at T2,
+  and a judgement call, not a documented "use X instead of Y".
+- **D34 — Tailwind v4 content detection is a real risk in this workspace layout.** v4
+  auto-detects from the *current working directory*, and in an npm-workspaces monorepo
+  that is the repo root, not `frontend/`. May require `@import "tailwindcss" source("../")`
+  or an explicit `@source`. **Verify at T2 with a real build** — do not assume.
+- **D35 — Dynamic class construction breaks Tailwind v4 detection.** `bg-${color}-600`
+  is invisible to the scanner. Map props to complete static class names, or use
+  `@source inline(...)` to safelist. This affects every `BaseButton` variant and is the
+  most likely cause of a missing style that only shows up in production.
+- **D36 — The repo is two independent projects, not a workspace.** `backend/` and
+  `frontend/`, each with its own `package.json`, `node_modules`, and lockfile. No
+  `packages/shared`, no workspace. The root `package.json` holds delegating scripts only.
+  A frontend change cannot break the API build, and the two deploy independently.
+- **D37 — Both projects are generated by their official CLIs and the generated toolchain
+  is kept, not overridden.** `nest new` and `nuxi init` produce specific choices that
+  differ from the earlier hand-written spec: **ESM** (`nodenext`), **Vitest** (not Jest),
+  **oxlint** on the backend, **ESLint** via `@nuxt/eslint` on the frontend, and
+  **TypeScript 6**. Overriding these buys tidiness at the cost of friction in every
+  `nest generate` and every framework doc lookup. Two linters coexist on purpose.
+- **D38 — There is no shared package, so the API contract is generated.** This was the
+  genuine cost of D36 and it needed a real answer. `packages/shared` was the single source
+  of truth for Zod schemas; removing it reopens the drift problem. The replacement is
+  **contract-first**: the backend owns all schemas and DTOs, `@nestjs/swagger` emits
+  `openapi.json`, and the frontend's types are *generated* from it (T13a). This is
+  strictly better than the shared package it replaces — the spec is machine-checkable,
+  the frontend cannot drift without a visible diff, and no import crosses the deploy
+  boundary.
+- **D39 — Two `rawBody`/`ValidationPipe`/CORS settings were applied at scaffold, not
+  retrofitted.** `rawBody: true` in particular: forgetting it until T27 means a signature
+  verification failure whose error message points nowhere near the cause. Cheap now,
+  expensive later.
+- **D40 — The frontend has no test runner, and that is recorded rather than papered over.**
+  A `test` script that trivially passes would report green while testing nothing, which
+  is worse than a missing script. Frontend testing arrives with the contract ticket
+  (T13a) and T17d.
+- **D41 — `@nestjs/mau` carries 5 transitive advisories and is not force-fixed.** All five
+  trace to one dev-only dependency via `inquirer`→`external-editor`→`tmp` and `undici`.
+  `npm audit fix --force` proposes `@nestjs/mau@0.0.6`, a **downgrade** from 0.2.6. Not
+  applied. `mau` is only used by `nest deploy` and never ships. Revisit if it is ever
+  used in CI.
 
 ## Notes
 

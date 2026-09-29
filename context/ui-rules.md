@@ -69,8 +69,10 @@
 - No hardcoded user-facing strings in templates — use `$t('...')`.
 
 ## Forms
-- One schema per form in `app/composables/` or co-located, validated by the same Zod
-  schemas in `packages/shared` that the API uses.
+- One schema per form, co-located with the form. The **API is authoritative**: its Zod
+  schemas define what is valid, and the frontend's rules exist only for instant feedback.
+  They may be looser than the API's, never stricter — a form that rejects something the
+  API accepts teaches users to distrust it.
 - Show field-level errors from the API response; do not rely on client-side validation
   alone.
 - Disable submit while in flight. Every submit is idempotent from the UI's perspective.
