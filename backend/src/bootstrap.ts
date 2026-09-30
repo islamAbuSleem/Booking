@@ -23,7 +23,7 @@ export function configureApp(app: INestApplication): OpenAPIObject {
   app.setGlobalPrefix(API_PREFIX);
 
   app.enableCors({
-    origin: process.env['FRONTEND_ORIGIN'] ?? 'http://localhost:3000',
+    origin: allowedOrigins(process.env['FRONTEND_ORIGIN']),
     credentials: true,
   });
 
@@ -60,4 +60,20 @@ export function logListening(port: number): void {
   new Logger('bootstrap').log(
     `[bootstrap] api listening on :${port} — ${OPENAPI_JSON_PATH}, ${OPENAPI_UI_PATH}`,
   );
+}
+
+const DEFAULT_ORIGIN = 'http://localhost:3000';
+
+/**
+ * `FRONTEND_ORIGIN` is a comma-separated list (config/env.ts validates it that way), and
+ * `cors` compares its `origin` option against the request header as a whole. Handing it
+ * the raw string would make `http://a.test,https://b.test` a single origin that matches
+ * nothing, so the list is split and the entries trimmed before it reaches the middleware.
+ */
+export function allowedOrigins(raw: string | undefined): string[] {
+  const origins = (raw ?? DEFAULT_ORIGIN)
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+  return origins.length > 0 ? origins : [DEFAULT_ORIGIN];
 }
