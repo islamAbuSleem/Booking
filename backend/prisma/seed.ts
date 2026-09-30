@@ -96,16 +96,54 @@ const AMENITIES = [
 ];
 
 /** One account per role, plus the authors the seeded reviews need. */
-const USERS: Array<{ email: string; name: string; role: UserRole }> = [
-  { email: 'admin@booking.test', name: 'Platform Admin', role: 'ADMIN' },
-  { email: 'host@booking.test', name: 'Beatriz Salgueiro', role: 'HOST' },
-  { email: 'guest@booking.test', name: 'Eleanor Caradus', role: 'GUEST' },
-  { email: 'marc.roussel@booking.test', name: 'Marc Roussel', role: 'GUEST' },
-  { email: 'goren.vold@booking.test', name: 'Goren Vold', role: 'GUEST' },
+const USERS: Array<{
+  email: string;
+  name: string;
+  role: UserRole;
+  oauthProvider: string;
+  oauthAccountId: string;
+}> = [
+  {
+    email: 'admin@booking.test',
+    name: 'Platform Admin',
+    role: 'ADMIN',
+    oauthProvider: 'github',
+    oauthAccountId: 'seed-1001',
+  },
+  {
+    email: 'host@booking.test',
+    name: 'Beatriz Salgueiro',
+    role: 'HOST',
+    oauthProvider: 'github',
+    oauthAccountId: 'seed-1002',
+  },
+  {
+    email: 'guest@booking.test',
+    name: 'Eleanor Caradus',
+    role: 'GUEST',
+    oauthProvider: 'google',
+    oauthAccountId: 'seed-1003',
+  },
+  {
+    email: 'marc.roussel@booking.test',
+    name: 'Marc Roussel',
+    role: 'GUEST',
+    oauthProvider: 'google',
+    oauthAccountId: 'seed-1004',
+  },
+  {
+    email: 'goren.vold@booking.test',
+    name: 'Goren Vold',
+    role: 'GUEST',
+    oauthProvider: 'google',
+    oauthAccountId: 'seed-1005',
+  },
   {
     email: 'sofia.lindqvist@booking.test',
     name: 'Sofia Lindqvist',
     role: 'GUEST',
+    oauthProvider: 'github',
+    oauthAccountId: 'seed-1006',
   },
 ];
 
@@ -787,8 +825,15 @@ async function main(): Promise<void> {
     for (const user of USERS) {
       const row = await prisma.user.upsert({
         where: { email: user.email },
+        // Every seeded row carries an OAuth identity: a user with neither a password nor
+        // an OAuth link could never sign in, and the seed should not model that.
         create: { ...user, passwordHash: null },
-        update: { name: user.name, role: user.role },
+        update: {
+          name: user.name,
+          role: user.role,
+          oauthProvider: user.oauthProvider,
+          oauthAccountId: user.oauthAccountId,
+        },
         select: { id: true },
       });
       userIds.set(user.email, row.id);

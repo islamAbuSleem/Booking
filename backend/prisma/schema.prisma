@@ -68,6 +68,12 @@ model User {
   avatarUrl String? @map("avatar_url")
 
   /// Null for OAuth-only accounts (T15).
+  ///
+  /// An account needs a way in: either this or `oauthProvider` + `oauthAccountId` must be
+  /// set, or nobody can ever sign in as this user. Prisma cannot express that as a CHECK
+  /// constraint and no migration is committed in this phase, so T14 enforces it where users
+  /// are actually created. The seed gives every row an OAuth identity so it never models
+  /// the unrecoverable case.
   passwordHash String? @map("password_hash")
 
   role UserRole @default(GUEST)
