@@ -210,15 +210,15 @@ export class PrismaHotelsRepository implements HotelsRepository {
     });
     if (!row) return null;
 
-    const [reviews, count] = await Promise.all([
-      this.prisma.review.aggregate({
-        where: { hotelId: row.id, status: 'VISIBLE' },
-        _avg: { rating: true },
-      }),
-      this.reviewCount(row.id),
-    ]);
+    // One aggregate, not two: `_avg` and `_count` are the same scan, and a second query
+    // for the count was a whole extra round trip per detail page view.
+    const reviews = await this.prisma.review.aggregate({
+      where: { hotelId: row.id, status: 'VISIBLE' },
+      _avg: { rating: true },
+      _count: { _all: true },
+    });
     return this.toDetail(row, currency, {
-      count,
+      count: reviews._count._all,
       average: reviews._avg.rating,
     });
   }
@@ -239,10 +239,6 @@ export class PrismaHotelsRepository implements HotelsRepository {
         { count: row._count._all, average: row._avg.rating },
       ]),
     );
-  }
-
-  private reviewCount(hotelId: string): Promise<number> {
-    return this.prisma.review.count({ where: { hotelId, status: 'VISIBLE' } });
   }
 
   private toCard(
