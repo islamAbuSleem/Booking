@@ -202,6 +202,13 @@ useHead({
     <!-- 7/5. The booking panel is the sticky half; the photography is the airy half. -->
     <section class="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-8">
       <div class="lg:col-span-7">
+        <div class="mb-4 flex justify-end">
+          <FavoriteToggle
+            :hotel-id="hotel.id"
+            :hotel-name="hotel.name"
+          />
+        </div>
+
         <HotelGallery
           :images="hotel.images"
           @open="openLightbox"

@@ -14,5 +14,12 @@ export default defineConfig({
     // the scaffold collects unit tests only. Both are listed here so `npm run test` runs
     // every suite and a green report cannot mean "the e2e tests were never collected".
     include: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
+    // The e2e suites hash an Argon2id password in `beforeAll`, and Argon2id is
+    // deliberately expensive — roughly a second of CPU per hash. Vitest runs the suites in
+    // parallel, so three files hashing at once while the machine is also finishing a Nuxt
+    // build can cross the 10s default and fail a suite that is not actually broken. The
+    // budget is raised rather than the hash cost lowered: weakening the parameters to make
+    // a test faster is how a test stops testing the thing that matters.
+    hookTimeout: 60_000,
   },
 });

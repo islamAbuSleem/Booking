@@ -33,8 +33,21 @@ const ratingLabel = computed(() =>
   <BaseCard
     as="article"
     interactive
-    class="group flex h-full flex-col"
+    class="group relative flex h-full flex-col"
   >
+    <!--
+      A sibling of the link, not inside it: a <button> nested in an <a> is invalid HTML and
+      assistive tech announces one control where there are two. Absolute, so it sits over
+      the cover's top-right without touching the link's box. First in the DOM because the
+      heart is above the card visually and tab order should follow the eye.
+    -->
+    <div class="absolute right-3 top-3">
+      <FavoriteToggle
+        :hotel-id="hotel.id"
+        :hotel-name="hotel.name"
+      />
+    </div>
+
     <NuxtLink
       :to="`/hotels/${hotel.slug}`"
       class="flex h-full flex-col"
