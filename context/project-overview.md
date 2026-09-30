@@ -93,6 +93,11 @@ depends on booking data that only exists once the core flow works.
   requests, plus per-user notification preferences
 - **Host analytics** — revenue, occupancy rate, ADR, top rooms, trends
 
+## Working notes
+Operational knowledge that is not domain spec — the parallel-agent ownership fence,
+environment tooling traps, and corrections already made — lives in
+context/working-notes.md. Read it alongside this file.
+
 ## Out of Scope (still not planned)
 - Mobile native apps
 - Multi-language content beyond EN

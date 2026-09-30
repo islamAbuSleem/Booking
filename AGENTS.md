@@ -17,11 +17,18 @@ frontend's types are generated from it. Never import across the boundary.
 
 ## Before you touch anything
 1. Read `context/project-overview.md`, `context/architecture.md`, `context/code-standards.md`.
-2. Read the ticket in `context/build-plan.md` you are about to build.
-3. Check `context/progress-tracker.md` for decisions already made. Do not re-litigate them.
-4. Update `context/ui-registry.md` when you add a component.
-5. Do not fight the generators — `nest new` and `nuxi init` set ESM, Vitest, oxlint and
+2. Read `context/working-notes.md` — operational traps, the parallel-agent ownership
+   fence, and corrections already made. Saves rediscovering them.
+3. Read the ticket in `context/build-plan.md` you are about to build.
+4. Check `context/progress-tracker.md` for decisions already made. Do not re-litigate them.
+5. Update `context/ui-registry.md` when you add a component.
+6. Do not fight the generators — `nest new` and `nuxi init` set ESM, Vitest, oxlint and
    TypeScript 6 on purpose. Read `context/architecture.md` before adding tooling.
+
+## A green verify is not a finished ticket
+`npm run verify` passing means it compiles, tests pass, and lint is clean. It does not
+mean the ticket meets its acceptance criteria. Check the ticket text — T3 shipped half its
+specified fixtures behind a green build once.
 
 ## Verify
 `npm run verify` from the repo root — builds both projects, tests the backend, lints both.
