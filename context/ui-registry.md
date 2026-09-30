@@ -42,9 +42,13 @@ Every component built, one row each. Add a row when the component is created.
 | `RatingBreakdown` | `app/components/RatingBreakdown.vue` | display | T6 | built |
 | `ReviewCard` | `app/components/ReviewCard.vue` | display | T6 | built |
 | `RoomCard` | `app/components/RoomCard.vue` | display | T6 | built |
+| `OrderSummary` | `app/components/OrderSummary.vue` | display | T7 | built |
+| `BookingStatusBadge` | `app/components/BookingStatusBadge.vue` | display | T8 | built |
+| `OAuthButtons` | `app/components/OAuthButtons.vue` | form | T9 | built |
+| `StatCard` | `app/components/StatCard.vue` | display | T10 | built |
+| `HotelStatusBadge` | `app/components/HotelStatusBadge.vue` | display | T10 | built |
 
-Remaining, as their tickets build them — T7 booking flow, T8 trips, T9 auth,
-T10 host dashboard, T11 admin.
+Remaining, as their tickets build them — Phase 2 domain components and Phase 5 additions.
 
 **Type** — `display` (presentational) / `form` (input handling) / `layout` (page shell).
 **Status** — `planned` / `built` / `verified`.

@@ -44,7 +44,7 @@ const nav = computed(() => [
 
         <div class="flex items-center gap-5">
           <NuxtLink
-            to="/host"
+            to="/dashboard/host/new"
             class="text-link text-sm underline-offset-4 hover:underline"
           >
             {{ $t('nav.listYourProperty') }}

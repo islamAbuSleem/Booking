@@ -1,9 +1,22 @@
 <script setup lang="ts">
-const nav = [
-  { to: '/host', label: 'Properties' },
-  { to: '/host/bookings', label: 'Bookings' },
-  { to: '/host/analytics', label: 'Analytics' },
-]
+/**
+ * Dashboard shell shared by the host (T10) and admin (T11) sections. The nav
+ * is route-aware because the two sections own different pages; the API (not
+ * this sidebar) is what enforces who may see them.
+ */
+const route = useRoute()
+const { t } = useI18n()
+
+const isAdmin = computed(() => route.path.startsWith('/dashboard/admin'))
+
+const nav = computed(() =>
+  isAdmin.value
+    ? [{ to: '/dashboard/admin', label: t('dashboard.navOverview') }]
+    : [
+        { to: '/dashboard/host', label: t('dashboard.navProperties') },
+        { to: '/dashboard/host/new', label: t('dashboard.navNew') },
+      ],
+)
 </script>
 
 <template>

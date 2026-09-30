@@ -47,11 +47,11 @@
 - [x] T4 Home page
 - [x] T5 Hotels list + filters
 - [x] T6 Hotel detail
-- [ ] T7 Booking flow
-- [ ] T8 Bookings pages
-- [ ] T9 Auth pages
-- [ ] T10 Host dashboard
-- [ ] T11 Admin dashboard
+- [x] T7 Booking flow
+- [x] T8 Bookings pages
+- [x] T9 Auth pages
+- [x] T10 Host dashboard
+- [x] T11 Admin dashboard
 
 ### Phase 2 — Domain
 - [x] T12 Database schema, migration, seed
@@ -331,6 +331,12 @@
 - **D47 — Seeded users have `password_hash = null`.** Argon2id is T14's dependency and
   no credential hash was committed. Seeded accounts cannot log in until T14 exists; that
   is intentional, not an oversight.
+- **D48 — The "never centre" rule is scoped to editorial contexts, not forms.** A T7–T11
+  agent centred the auth column per Stitch Screen 6 and flagged it against `design.md`'s
+  global rule. Kept the centred auth and **amended the spec instead of the code**. The
+  rule was written for prose and display; a 420px single-purpose form centred is the
+  established convention, and left-aligning it looks broken. When a global rule meets a
+  legitimate exception, scope the rule — do not pretend the exception is not there.
 
 ## Notes
 
