@@ -33,8 +33,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const { status, body } = this.resolve(exception);
 
     if (status >= 500) {
+      // `path`, never `url`: a query string carries the search terms, and a bad request
+      // can carry a token, and neither belongs in a log line.
       this.logger.error(
-        `[errors] ${request.method} ${request.url} -> ${status} ${body.code}`,
+        `[errors] ${request.method} ${request.path} -> ${status} ${body.code}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
