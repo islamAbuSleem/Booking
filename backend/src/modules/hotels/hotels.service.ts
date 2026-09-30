@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { z } from 'zod';
 import { notFound } from '../../common/errors/api-error.js';
 import {
   DEFAULT_CURRENCY,
@@ -62,11 +63,16 @@ export class HotelsService {
    * 404s on anything that is not visible to the caller. `viewerId` is the host whose own
    * draft may be read; it is `undefined` until the auth guard lands in T14, so today
    * every caller is a non-owner and every non-`PUBLISHED` hotel is a 404.
+   *
+   * Anything that is not a uuid is treated as no viewer rather than passed to the
+   * comparison: a value reaching this method from a request must never be the thing that
+   * decides ownership, and a malformed one can only ever match nothing.
    */
   async findOne(id: string, viewerId?: string): Promise<HotelDetail> {
+    const viewer = parseViewerId(viewerId);
     const hotel = await this.hotels.findById(id, DEFAULT_CURRENCY);
     if (!hotel) throw notFound('HOTEL_NOT_FOUND', 'Hotel not found');
-    if (hotel.status !== 'PUBLISHED' && hotel.host?.id !== viewerId) {
+    if (hotel.status !== 'PUBLISHED' && hotel.host?.id !== viewer) {
       throw notFound('HOTEL_NOT_FOUND', 'Hotel not found');
     }
     return hotel;
@@ -122,4 +128,11 @@ function ratingScore(card: HotelCard): number {
  */
 function toCents(amount: number): number {
   return Math.round((amount + Number.EPSILON * amount) * 100);
+}
+
+/** `users.id` is a uuid column, so anything else is not a viewer. */
+function parseViewerId(viewerId: string | undefined): string | undefined {
+  return viewerId !== undefined && z.uuid().safeParse(viewerId).success
+    ? viewerId
+    : undefined;
 }

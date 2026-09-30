@@ -259,6 +259,9 @@ describe('HotelsService.findAll', () => {
 });
 
 describe('HotelsService.findOne', () => {
+  /** `users.id` is a uuid column, so a viewer id in a test has to look like one. */
+  const HOST_ID = '3f2504e0-4f89-41d3-9a0c-0305e82c3301';
+
   it('returns a published hotel', async () => {
     const details = new Map([['the-larkspur-hotel', detail()]]);
     const service = new HotelsService(new FakeHotelsRepository([], details));
@@ -296,12 +299,12 @@ describe('HotelsService.findOne', () => {
     const details = new Map([
       [
         'the-barn-at-fen-end',
-        detail({ status: 'PENDING', host: { id: 'host-1', name: 'Beatriz' } }),
+        detail({ status: 'PENDING', host: { id: HOST_ID, name: 'Beatriz' } }),
       ],
     ]);
     const service = new HotelsService(new FakeHotelsRepository([], details));
 
-    const found = await service.findOne('the-barn-at-fen-end', 'host-1');
+    const found = await service.findOne('the-barn-at-fen-end', HOST_ID);
 
     expect(found.status).toBe('PENDING');
   });
@@ -313,7 +316,24 @@ describe('HotelsService.findOne', () => {
     const service = new HotelsService(new FakeHotelsRepository([], details));
 
     await expect(
-      service.findOne('the-barn-at-fen-end', 'some-other-host'),
+      service.findOne('the-barn-at-fen-end', '22222222-2222-4222-8222-222222222222'),
+    ).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  it('404s a draft for a viewer id that is not a uuid', async () => {
+    const details = new Map([
+      [
+        'the-barn-at-fen-end',
+        detail({ status: 'PENDING', host: { id: HOST_ID, name: 'Beatriz' } }),
+      ],
+    ]);
+    const service = new HotelsService(new FakeHotelsRepository([], details));
+
+    // A malformed viewer is no viewer at all, so it can never match the owner.
+    await expect(
+      service.findOne('the-barn-at-fen-end', 'host-1'),
     ).rejects.toMatchObject({
       status: 404,
     });
