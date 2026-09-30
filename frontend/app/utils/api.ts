@@ -12,7 +12,7 @@
  *
  * A transport failure (`code === 'NETWORK_ERROR'`) or a 2xx from a foreign
  * response on a port the API is not on means there is no backend to talk to.
- * Pages treat those as the mock-fallback signal via `isEnvelopeError`; a real
+ * Pages treat those as the mock-fallback signal via `isApiFailure`; a real
  * failure — an envelope error (validation, 404, …) or an HTTP error status — is
  * rethrown so the error state renders instead.
  */
@@ -63,7 +63,7 @@ const LOCAL_FAILURES = new Set(['NETWORK_ERROR', 'BAD_RESPONSE'])
  * a foreign service (`BAD_RESPONSE`) means there is no backend here, and those
  * are the mock-fallback signal.
  */
-export function isEnvelopeError(error: unknown): boolean {
+export function isApiFailure(error: unknown): boolean {
   if (!(error instanceof ApiRequestError)) return false
   return !LOCAL_FAILURES.has(error.code)
 }

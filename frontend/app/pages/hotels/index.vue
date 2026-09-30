@@ -21,7 +21,7 @@ import {
 } from '~/utils/hotels'
 import type { HotelFilterState, HotelSort } from '~/utils/hotels'
 import { localToday } from '~/utils/date'
-import { fetchHotels, isEnvelopeError, toHotelListParams } from '~/utils/api'
+import { fetchHotels, isApiFailure, toHotelListParams } from '~/utils/api'
 import type { ApiHotelCard } from '~/utils/api'
 import { mockHotelToCard } from '~/utils/hotelAdapters'
 import { formatShortStayDate, wholeNumber } from '~/utils/format'
@@ -132,7 +132,7 @@ const {
       return { items, total: starFilteredTotal(items, first.total, filters.stars), live: true, page: page.value }
     }
     catch (fetchError: unknown) {
-      if (isEnvelopeError(fetchError)) throw fetchError
+      if (isApiFailure(fetchError)) throw fetchError
       const matched = searchHotels(filters, sort)
       const pages = Math.max(1, Math.ceil(matched.total / HOTEL_PAGE_SIZE))
       const current = Math.min(Math.max(page.value, 1), pages)
