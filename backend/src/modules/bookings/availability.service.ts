@@ -1,5 +1,9 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { ApiError, badRequest, notFound } from '../../common/errors/api-error.js';
+import {
+  ApiError,
+  badRequest,
+  notFound,
+} from '../../common/errors/api-error.js';
 import {
   AVAILABILITY_REPOSITORY,
   type AvailabilityRepository,
@@ -136,10 +140,10 @@ export class AvailabilityService {
     // Checked here rather than in the schema because the bound is per room, and a 400 with
     // the room's own limit is more use to a client than a generic validation failure.
     if (request.guests > room.maxGuests) {
-      throw badRequest(
-        `This room sleeps at most ${room.maxGuests} guest(s)`,
-        { maxGuests: room.maxGuests, guests: request.guests },
-      );
+      throw badRequest(`This room sleeps at most ${room.maxGuests} guest(s)`, {
+        maxGuests: room.maxGuests,
+        guests: request.guests,
+      });
     }
 
     const nights = stayNights(request.checkIn, request.checkOut);

@@ -38,8 +38,12 @@ describe('buildOverlappingBookingsWhere', () => {
   it('overlaps with strict bounds, so back-to-back stays never double-count', () => {
     // A stay that leaves on the 4th does not touch a night of a stay starting on the 4th,
     // and a stay arriving on the 1st does not touch a night of one ending on the 1st.
-    expect(where().checkIn).toEqual({ lt: new Date('2026-06-04T00:00:00.000Z') });
-    expect(where().checkOut).toEqual({ gt: new Date('2026-06-01T00:00:00.000Z') });
+    expect(where().checkIn).toEqual({
+      lt: new Date('2026-06-04T00:00:00.000Z'),
+    });
+    expect(where().checkOut).toEqual({
+      gt: new Date('2026-06-01T00:00:00.000Z'),
+    });
   });
 
   it('builds the day bounds in UTC, so a local timezone cannot shift a night', () => {
@@ -65,11 +69,15 @@ describe('buildOverlappingBlackoutsWhere', () => {
   it('excludes a blackout that starts on the checkout day, which is not a night', () => {
     // A hotel that reopens on the day a guest leaves is not closed for any night of that
     // stay, and checkOut is not one of its nights.
-    expect(where().startsOn).toEqual({ lt: new Date('2026-06-04T00:00:00.000Z') });
+    expect(where().startsOn).toEqual({
+      lt: new Date('2026-06-04T00:00:00.000Z'),
+    });
   });
 
   it('includes a blackout that ends on the first night, because endsOn is inclusive', () => {
-    expect(where().endsOn).toEqual({ gte: new Date('2026-06-01T00:00:00.000Z') });
+    expect(where().endsOn).toEqual({
+      gte: new Date('2026-06-01T00:00:00.000Z'),
+    });
   });
 
   it('builds the day bounds in UTC, so a local timezone cannot shift a night', () => {

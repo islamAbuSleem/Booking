@@ -155,7 +155,10 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     }));
   }
 
-  async findRoomPrice(roomId: string, currency: string): Promise<RoomPrice | null> {
+  async findRoomPrice(
+    roomId: string,
+    currency: string,
+  ): Promise<RoomPrice | null> {
     const row = await this.prisma.roomPrice.findUnique({
       where: { roomId_currency: { roomId, currency } },
       select: { priceCents: true, currency: true },

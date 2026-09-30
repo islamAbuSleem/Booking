@@ -39,11 +39,13 @@ const guestsSchema = z.coerce
  * enforces the ordering is not, because the two endpoints are parsed independently.
  */
 const nightRangeBase = z.object({
-  checkIn: z
-    .iso.date()
-    .describe('First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp.'),
-  checkOut: z
-    .iso.date()
+  checkIn: z.iso
+    .date()
+    .describe(
+      'First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp.',
+    ),
+  checkOut: z.iso
+    .date()
     .describe(
       'Last day the guest leaves, `YYYY-MM-DD`. Strictly after `checkIn`. The stay is ' +
         'half-open, so a checkout equal to another booking check-in never overlaps.',
@@ -128,7 +130,9 @@ const hotelAvailabilityDataSchema = z.object({
 
 const quoteNightSchema = z.object({
   date: z.iso.date().describe('The night this price covers, `YYYY-MM-DD`.'),
-  priceCents: z.int().describe('Integer cents for this night. Never major units.'),
+  priceCents: z
+    .int()
+    .describe('Integer cents for this night. Never major units.'),
 });
 
 const quoteDataSchema = z.object({
@@ -146,7 +150,9 @@ const quoteDataSchema = z.object({
     ),
 });
 
-export const hotelAvailabilityEnvelopeSchema = envelopeSchema(hotelAvailabilityDataSchema);
+export const hotelAvailabilityEnvelopeSchema = envelopeSchema(
+  hotelAvailabilityDataSchema,
+);
 export const quoteEnvelopeSchema = envelopeSchema(quoteDataSchema);
 
 export type HotelAvailabilityData = z.infer<typeof hotelAvailabilityDataSchema>;

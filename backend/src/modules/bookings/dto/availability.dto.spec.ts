@@ -1,4 +1,7 @@
-import { availabilityQuerySchema, quoteRequestSchema } from './availability.dto.js';
+import {
+  availabilityQuerySchema,
+  quoteRequestSchema,
+} from './availability.dto.js';
 
 /**
  * Both endpoints share the same half-open range, so both are checked here. Query values and
@@ -67,9 +70,9 @@ describe('availabilityQuerySchema', () => {
   it('rejects a party size outside 1-20', () => {
     const range = { checkIn: '2026-06-01', checkOut: '2026-06-04' };
 
-    expect(availabilityQuerySchema.safeParse({ ...range, guests: '0' }).success).toBe(
-      false,
-    );
+    expect(
+      availabilityQuerySchema.safeParse({ ...range, guests: '0' }).success,
+    ).toBe(false);
     expect(
       availabilityQuerySchema.safeParse({ ...range, guests: '21' }).success,
     ).toBe(false);
@@ -95,9 +98,9 @@ describe('quoteRequestSchema', () => {
   });
 
   it('upper-cases the currency code', () => {
-    expect(quoteRequestSchema.parse({ ...valid, currency: 'eur' }).currency).toBe(
-      'EUR',
-    );
+    expect(
+      quoteRequestSchema.parse({ ...valid, currency: 'eur' }).currency,
+    ).toBe('EUR');
   });
 
   it('rejects a non-ISO currency', () => {
@@ -125,7 +128,8 @@ describe('quoteRequestSchema', () => {
 
   it('rejects a same-day stay', () => {
     expect(
-      quoteRequestSchema.safeParse({ ...valid, checkOut: '2026-06-01' }).success,
+      quoteRequestSchema.safeParse({ ...valid, checkOut: '2026-06-01' })
+        .success,
     ).toBe(false);
   });
 
@@ -139,13 +143,16 @@ describe('quoteRequestSchema', () => {
   });
 
   it('rejects a body missing the range entirely', () => {
-    expect(quoteRequestSchema.safeParse({ roomId: ROOM_ID, guests: 2 }).success).toBe(
-      false,
-    );
+    expect(
+      quoteRequestSchema.safeParse({ roomId: ROOM_ID, guests: 2 }).success,
+    ).toBe(false);
   });
 
   it('accepts a single-night stay, which is one night and not zero', () => {
-    const parsed = quoteRequestSchema.parse({ ...valid, checkOut: '2026-06-02' });
+    const parsed = quoteRequestSchema.parse({
+      ...valid,
+      checkOut: '2026-06-02',
+    });
 
     expect(parsed.checkOut).toBe('2026-06-02');
   });

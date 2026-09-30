@@ -30,7 +30,8 @@ export class BookingsController {
   // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`
   // (see PrismaService), so inference would break the OpenAPI preview.
   constructor(
-    @Inject(AvailabilityService) private readonly availability: AvailabilityService,
+    @Inject(AvailabilityService)
+    private readonly availability: AvailabilityService,
   ) {}
 
   @Post('quote')
@@ -52,7 +53,8 @@ export class BookingsController {
   })
   @ApiResponse({
     status: 400,
-    description: 'The body failed validation, or the room sleeps fewer guests than asked.',
+    description:
+      'The body failed validation, or the room sleeps fewer guests than asked.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   @ApiResponse({
@@ -62,7 +64,8 @@ export class BookingsController {
   })
   @ApiResponse({
     status: 409,
-    description: 'The room is sold out, blacked out, or too small for the party.',
+    description:
+      'The room is sold out, blacked out, or too small for the party.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   @ApiResponse({
@@ -70,7 +73,9 @@ export class BookingsController {
     description: 'The room has no price in the requested currency.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
-  quote(@Body(zodPipe(quoteRequestSchema)) body: QuoteRequest): Promise<QuoteData> {
+  quote(
+    @Body(zodPipe(quoteRequestSchema)) body: QuoteRequest,
+  ): Promise<QuoteData> {
     return this.availability.quote(body);
   }
 }

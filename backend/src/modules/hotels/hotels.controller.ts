@@ -24,7 +24,8 @@ export class HotelsController {
   // (see PrismaService), so inference would break the OpenAPI preview.
   constructor(
     @Inject(HotelsService) private readonly hotels: HotelsService,
-    @Inject(AvailabilityService) private readonly availability: AvailabilityService,
+    @Inject(AvailabilityService)
+    private readonly availability: AvailabilityService,
   ) {}
 
   @Get()
