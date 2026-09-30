@@ -363,6 +363,18 @@
   no longer run in parallel on separate branches** — the pair becomes sequential, one
   ticket branch at a time. If parallel agents become valuable again, the answer is a
   second `git worktree` per agent, not a shared branch.
+- **D52 — The availability rule in `architecture.md` was off by one and has been
+  corrected in the spec, not worked around in code.** It read
+  `confirmed bookings + blackouts <= total_inventory`, which makes a room with
+  `total_inventory: 2` and two overlapping bookings **bookable**. T18's own text
+  contradicts this twice — "the total is below `total_inventory`" and "every night has
+  inventory above zero" — and the ticket's two conditions agree with each other, so the
+  spec sentence was the outlier. The rule is now per night: a room is bookable only when
+  every night in `[checkIn, checkOut)` has `total_inventory - overlappingBookings >= 1`
+  and no blackout covers it. `PENDING` bookings count as overlaps, not just `CONFIRMED`:
+  T20 creates a booking `PENDING` before Stripe confirms payment, so a `CONFIRMED`-only
+  rule would oversell the first pending hold. The "exact-fit" case in T18's verify list
+  is therefore **not bookable** — that test is the one that pins this decision.
 
 ## Notes
 
