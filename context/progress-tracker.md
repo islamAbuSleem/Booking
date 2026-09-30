@@ -11,7 +11,8 @@
 | Backend | NestJS 12.1.x | yes |
 | Database | Neon Postgres via Prisma 7.10.x, pooled URL at runtime + direct URL for migrations | yes |
 | ORM | Prisma 7.10.x, Neon adapter, `prisma-client` generator | yes |
-| Repository | Two independent projects: `backend/` (NestJS 12) + `frontend/` (Nuxt 4), one repo, one branch (D36) | yes |
+| Repository | Two independent projects: `backend/` (NestJS 12) + `frontend/` (Nuxt 4), one repo (D36) | yes |
+| Branching | One branch per ticket off `feature/full-build` (D51) | yes |
 | Deploy | Two units, separate builds and lockfiles | yes |
 | Deploy | Two units, separate builds and lockfiles | yes |
 | Auth | Email/password (**Argon2id**) + Google OAuth + GitHub OAuth, JWT in httpOnly cookie | yes |
@@ -350,6 +351,18 @@
   mapped `>= 9` to "Excellent", so every real hotel (max 5.0) fell through to "Mixed".
   Fixed to 4.5 / 4.0 / 3.5 / 3.0 thresholds. A display bug that no typecheck, build, or
   lint can see — only reading the rendered values catches it.
+- **D51 — One branch per ticket, not one branch for the build.** `feature/full-build` is
+  the **integration branch**: it is always green and never carries feature work that has
+  not been verified on its own branch. Every ticket gets `feat/T<n>-<slug>` cut from
+  `feature/full-build`, is built, tested and committed there, is pushed as its own branch,
+  and is then fast-forward merged back. The history of T1–T17 is batched onto
+  `feature/full-build` and is **not** rewritten — that branch has been pushed and rebased
+  against remote work already, and force-pushing a shared branch to retroactively split
+  past commits risks losing someone else's work for no gain. The rule applies from T18
+  forward. **Consequence: a worktree can only be on one branch, so the FE and BE agents
+  no longer run in parallel on separate branches** — the pair becomes sequential, one
+  ticket branch at a time. If parallel agents become valuable again, the answer is a
+  second `git worktree` per agent, not a shared branch.
 
 ## Notes
 
