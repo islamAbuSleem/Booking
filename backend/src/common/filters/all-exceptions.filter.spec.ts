@@ -2,6 +2,7 @@ import {
   type ArgumentsHost,
   HttpException,
   HttpStatus,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ApiError } from '../errors/api-error.js';
@@ -15,7 +16,13 @@ import { AllExceptionsFilter } from './all-exceptions.filter.js';
  * The cast is deliberate: `ArgumentsHost` is generic and its three transport variants
  * (http / rpc / ws) are not what is under test.
  */
-function hostFor() {
+function hostFor(
+  request: { method: string; url: string; path: string } = {
+    method: 'GET',
+    url: '/api/hotels?city=Lisbon&token=secret',
+    path: '/api/hotels',
+  },
+) {
   const json = vi.fn();
   const status = vi.fn().mockReturnValue({ json });
   const response = { status, json };
@@ -23,7 +30,7 @@ function hostFor() {
   const host = {
     switchToHttp: () => ({
       getResponse: () => response,
-      getRequest: () => ({ method: 'GET', url: '/api/hotels' }),
+      getRequest: () => request,
     }),
   } as unknown as ArgumentsHost;
 
@@ -32,6 +39,17 @@ function hostFor() {
 
 describe('AllExceptionsFilter', () => {
   const filter = new AllExceptionsFilter();
+  let errorLogSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    errorLogSpy = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockReturnValue(undefined);
+  });
+
+  afterEach(() => {
+    errorLogSpy.mockRestore();
+  });
 
   it('keeps a domain code chosen by the service', () => {
     const { host, response } = hostFor();
@@ -118,5 +136,16 @@ describe('AllExceptionsFilter', () => {
     const serialised = JSON.stringify(response.json.mock.calls[0]?.[0]);
     expect(serialised).not.toContain('stack');
     expect(serialised).not.toContain('at ');
+  });
+
+  it('logs the path but never the query string', () => {
+    const { host } = hostFor();
+
+    filter.catch(new Error('boom'), host);
+
+    const logged = errorLogSpy.mock.calls.flat().join(' ');
+    expect(logged).toContain('/api/hotels');
+    expect(logged).not.toContain('token=secret');
+    expect(logged).not.toContain('Lisbon');
   });
 });
