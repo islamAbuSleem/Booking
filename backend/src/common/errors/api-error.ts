@@ -32,6 +32,11 @@ export const ERROR_CODES = [
   // T18 — the room exists but has no `room_prices` row in the requested currency. A missing
   // price is an error, never a zero (context/architecture.md, "Pricing").
   'PRICE_UNAVAILABLE',
+  // T19 — the caller already has this hotel in their favourites. It needs its own code
+  // rather than a bare `CONFLICT` because the client branches on it: an optimistic toggle
+  // reads this 409 as "already on, keep the filled heart" instead of as a failure to roll
+  // back. `translatePrismaError`'s generic P2002 -> CONFLICT cannot express that.
+  'FAVORITE_EXISTS',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

@@ -243,6 +243,13 @@
     "notFoundTitle": "That booking is not here",
     "notFoundBody": "The link is broken, or the booking was made under a different account."
   },
+  "favorites": {
+    "saveLabel": "Save {name} to favorites",
+    "removeLabel": "Remove {name} from favorites",
+    "signInPrompt": "Sign in to save {name}.",
+    "signIn": "Sign in",
+    "saveFailed": "Could not save {name}. Try again."
+  },
   "auth": {
     "loginTitle": "Welcome back",
     "loginSubtitle": "Sign in to manage trips and properties.",

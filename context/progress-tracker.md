@@ -65,7 +65,7 @@
 - [x] T17b Hotels list wiring
 - [x] T17c Hotel detail wiring
 - [x] T18 Availability and quote
-- [ ] T19 Favorites
+- [x] T19 Favorites
 - [ ] T20 Bookings API
 - [ ] T21 Cloudinary upload
 - [ ] T22 Host listing management API
@@ -392,6 +392,36 @@
   - Each feature branch is pushed as its own ref. Nothing is force-pushed, and the T1–T17
     batched history is never rewritten.
   - `context/` is orchestrator-owned, so the ticket commit carries its own checkbox.
+- **D54 — "The toggle is idempotent" and "409 on a duplicate insert" are different
+  claims, so the endpoints are split rather than the ticket being satisfied halfway.**
+  The *toggle* a guest performs is idempotent; the *endpoints* are not, and the composite
+  primary key on `favorites` is the only thing that makes that true. The sequence a client
+  toggle is written against, pinned by a test: **POST → 201, POST → 409, DELETE → 204,
+  DELETE → 204, POST → 201**. `DELETE` returns 204 even when the row was never there,
+  because un-favouriting something you never favourited is something a toggle does on
+  purpose, and a 404 there would raise an error for a state the guest caused. Three
+  consequences worth keeping:
+  - A duplicate insert needs its **own** error code, `FAVORITE_EXISTS`, not the generic
+    `CONFLICT` that `translatePrismaError` gives every `P2002`. Without it the frontend
+    cannot tell "already saved, keep the heart filled" from a real failure, and a double
+    tap looks broken. The P2002 is read in the repository and mapped to `null`; the service
+    raises the 409.
+  - **There is no Zod union of error codes.** `errorBodySchema.code` is `z.string()`, so
+    `ApiErrorEnvelope.code` is a plain `string` in the generated frontend types and the
+    frontend branches on an untyped literal. Switching it to `z.enum(ERROR_CODES)` is a
+    type change for every endpoint's consumer and is deliberately deferred to its own
+    ticket rather than smuggled into a feature commit.
+  - `POST /favorites` checks **bare** hotel existence, so a draft hotel's id is favouritable
+    and answers 201. Accepted rather than fixed: no guest can *discover* a draft's uuid,
+    because both public hotel reads 404 anything not `PUBLISHED`, so the only caller who
+    could is the host who already owns it. Favouriting your own draft is harmless.
+- **The `favourite` heart is un-hydrated by design.** T19 ships writes only, so there is no
+  read to ask "is this heart filled?", and the frontend keeps the state in memory and
+  renders un-pressed on every load. It is deliberately **not** persisted to
+  `localStorage`: a stored `pressed: true` outlives the reload and tells a guest their
+  shortlist has a hotel in it when the row may never have been written. The list endpoint
+  is the later ticket that fixes this, and hydration belongs there. Until then a heart can
+  read empty when it is filled — visible, logged, and the cheapest honest option.
 
 ## Notes
 
