@@ -26,6 +26,7 @@ export const ERROR_CODES = [
   'EMAIL_TAKEN',
   // T15 — OAuth profile has no usable email, provider error, or link failure.
   'OAUTH_FAILED',
+  'OAUTH_LINK_CONFLICT',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
