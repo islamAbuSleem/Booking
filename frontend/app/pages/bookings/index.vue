@@ -1,0 +1,244 @@
+<script setup lang="ts">
+/**
+ * /bookings — the guest's trips. Calm and scannable: two status-driven tabs,
+ * a data table on desktop (64px rows, tabular right-aligned totals) and
+ * stacked label-above-value cards on mobile. Tabs filter the mock bookings.
+ */
+import { HOTEL_BY_ID } from '~/utils/mock'
+import { formatStayDate, usdCents, wholeNumber } from '~/utils/format'
+
+const { t } = useI18n()
+const { upcoming, past } = useBookings()
+
+type Tab = 'upcoming' | 'past'
+
+const tab = ref<Tab>('upcoming')
+const page = ref(1)
+const PAGE_SIZE = 5
+
+const rows = computed(() => (tab.value === 'upcoming' ? upcoming.value : past.value))
+
+const total = computed(() => rows.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+
+const visible = computed(() => {
+  const current = Math.min(page.value, totalPages.value)
+  return rows.value.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+})
+
+function hotelName(hotelId: string): string {
+  return HOTEL_BY_ID.get(hotelId)?.name ?? hotelId
+}
+
+function select(next: Tab): void {
+  tab.value = next
+  page.value = 1
+}
+
+useSeoMeta({
+  title: () => `${t('bookings.title')} · ${t('common.brand')}`,
+  description: () => t('bookings.metaDescription'),
+  robots: 'noindex, nofollow',
+})
+</script>
+
+<template>
+  <div class="mx-auto max-w-[1280px] px-6 py-10 lg:py-14">
+    <h1 class="font-display text-display-l">
+      {{ $t('bookings.title') }}
+    </h1>
+    <div class="border-rule mt-4 border-b" />
+
+    <div
+      role="tablist"
+      class="border-rule flex gap-8 border-b"
+      :aria-label="$t('bookings.title')"
+    >
+      <button
+        v-for="entry in (['upcoming', 'past'] as const)"
+        :key="entry"
+        type="button"
+        role="tab"
+        :aria-selected="tab === entry"
+        class="text-label border-b-2 px-1 py-3 uppercase transition-colors duration-150"
+        :class="tab === entry ? 'border-accent text-fg' : 'text-fg-muted hover:text-fg border-transparent'"
+        @click="select(entry)"
+      >
+        {{
+          entry === 'upcoming'
+            ? $t('bookings.upcoming', { count: wholeNumber(upcoming.length) })
+            : $t('bookings.past', { count: wholeNumber(past.length) })
+        }}
+      </button>
+    </div>
+
+    <BaseEmptyState
+      v-if="!rows.length"
+      :title="$t('bookings.emptyTitle')"
+      :hint="$t('bookings.emptyHint')"
+      class="mt-8"
+    >
+      <BaseButton
+        to="/hotels"
+        variant="primary"
+        size="md"
+      >
+        {{ $t('detail.browseStays') }}
+      </BaseButton>
+    </BaseEmptyState>
+
+    <template v-else>
+      <!-- Desktop: data table. No vertical borders, hairline row rules only. -->
+      <table class="mt-2 hidden w-full border-collapse md:table">
+        <caption class="sr-only">
+          {{ $t('bookings.title') }}
+        </caption>
+        <thead>
+          <tr class="bg-surface-alt text-fg-muted text-left text-label uppercase">
+            <th
+              scope="col"
+              class="px-4 py-3 font-medium"
+            >
+              {{ $t('bookings.colBooking') }}
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 font-medium"
+            >
+              {{ $t('bookings.colHotel') }}
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 font-medium"
+            >
+              {{ $t('bookings.colCheckIn') }}
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 font-medium"
+            >
+              {{ $t('bookings.colCheckOut') }}
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 text-right font-medium"
+            >
+              {{ $t('bookings.colGuests') }}
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 font-medium"
+            >
+              {{ $t('bookings.colStatus') }}
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 text-right font-medium"
+            >
+              {{ $t('bookings.colTotal') }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="booking in visible"
+            :key="booking.id"
+            class="border-rule h-16 border-b"
+          >
+            <td class="px-4 py-2">
+              <NuxtLink
+                :to="`/bookings/${booking.id}`"
+                class="text-link font-mono text-sm underline-offset-4 hover:underline"
+              >
+                {{ booking.reference }}
+              </NuxtLink>
+            </td>
+            <td class="max-w-[240px] truncate px-4 py-2 font-display text-lg">
+              {{ hotelName(booking.hotelId) }}
+            </td>
+            <td class="tabular px-4 py-2 text-sm">
+              {{ formatStayDate(booking.checkIn) }}
+            </td>
+            <td class="tabular px-4 py-2 text-sm">
+              {{ formatStayDate(booking.checkOut) }}
+            </td>
+            <td class="tabular px-4 py-2 text-right text-sm">
+              {{ wholeNumber(booking.guestsCount) }}
+            </td>
+            <td class="px-4 py-2">
+              <BookingStatusBadge :status="booking.status" />
+            </td>
+            <td class="tabular px-4 py-2 text-right text-sm font-medium">
+              {{ usdCents(booking.totalCents) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Mobile: one stacked card per booking. -->
+      <ul class="flex flex-col md:hidden">
+        <li
+          v-for="booking in visible"
+          :key="booking.id"
+          class="border-rule border-b py-5"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <NuxtLink
+              :to="`/bookings/${booking.id}`"
+              class="text-link font-mono text-sm underline-offset-4 hover:underline"
+            >
+              {{ booking.reference }}
+            </NuxtLink>
+            <BookingStatusBadge :status="booking.status" />
+          </div>
+          <p class="font-display mt-2 text-xl">
+            {{ hotelName(booking.hotelId) }}
+          </p>
+          <dl class="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <dt class="text-fg-muted text-label uppercase">
+                {{ $t('bookings.colCheckIn') }}
+              </dt>
+              <dd class="tabular mt-1 text-sm">
+                {{ formatStayDate(booking.checkIn) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-fg-muted text-label uppercase">
+                {{ $t('bookings.colCheckOut') }}
+              </dt>
+              <dd class="tabular mt-1 text-sm">
+                {{ formatStayDate(booking.checkOut) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-fg-muted text-label uppercase">
+                {{ $t('bookings.colGuests') }}
+              </dt>
+              <dd class="tabular mt-1 text-sm">
+                {{ wholeNumber(booking.guestsCount) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-fg-muted text-label uppercase">
+                {{ $t('bookings.colTotal') }}
+              </dt>
+              <dd class="tabular mt-1 text-sm font-medium">
+                {{ usdCents(booking.totalCents) }}
+              </dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
+
+      <div class="mt-8 flex justify-center">
+        <BasePagination
+          :page="Math.min(page, totalPages)"
+          :page-size="PAGE_SIZE"
+          :total="total"
+          @update:page="page = $event"
+        />
+      </div>
+    </template>
+  </div>
+</template>

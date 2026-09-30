@@ -21,8 +21,10 @@ Four commitments:
 2. **Hairlines, not shadows.** Separation is `--color-rule` and whitespace. This alone
    removes most of the generic look — the shadow-on-every-card habit is a strong tell.
 3. **Asymmetric, content-driven layout.** Text columns do not centre and paragraphs never
-   centre. The hero is off-balance on purpose. Dense utility panels sit beside airy
-   editorial blocks so the contrast in rhythm tells you where to look.
+   centre — **in editorial and listing contexts**. A narrow, single-purpose form (auth,
+   a 420px column) is centred, because left-aligning it looks broken and centred is the
+   established convention there. The rule constrains prose and display, not forms. See
+   D48.
 4. **Every space carries a number, a name, or a rate.** Never a decorative index.
 
 The Gazette wordmark (`The Gazette` + `EST. 2024`) is kept — it is the one piece of

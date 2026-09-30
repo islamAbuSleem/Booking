@@ -1,15 +1,27 @@
 # Code Standards
 
 ## Language & types
-- TypeScript `strict: true` in both apps. No `any`. Use `unknown` and narrow.
+- TypeScript `strict: true` in both projects. No `any`. Use `unknown` and narrow.
 - No non-null assertions (`!`) outside of tests. Prefer `??` defaults and guards.
-- Named exports. No default exports, except in files that must interop with a
-  framework entry point (`nuxt.config.ts`, `main.ts`).
-- Zod schemas in `packages/shared` are the single source of truth for input types.
-  API DTOs are `z.infer<typeof Schema>`; do not hand-write a parallel interface.
+- Named exports. No default exports, except where a framework entry point requires it
+  (`nuxt.config.ts`, `backend/src/main.ts`).
+- The API is **ESM** (`"type": "module"`, `module: nodenext`). Relative imports require
+  explicit `.js` extensions. Getting this wrong compiles and then fails at runtime.
 - Money is always integer cents in a `number`, formatted only at the edges.
 - Dates crossing the API boundary are ISO 8601 strings; convert to `Date` at the call
   site. Hotel stay dates are date-only (`YYYY-MM-DD`).
+
+## Project boundaries
+- `backend/` and `frontend/` are **separate projects**. Separate `package.json`, separate
+  `node_modules`, separate lockfiles, separate deploys.
+- **Never import across the boundary.** No `import from '../../backend/...'`, no relative
+  reach into the other project, no `file:` dependency. The only contract between them is
+  the HTTP API, described by the OpenAPI document.
+- The backend is the single source of truth for the API shape. The frontend's types are
+  **generated** from `openapi.json` — never hand-written to match a DTO.
+- If both sides need the same literal (a status string, a role name), it is defined in
+  the backend and consumed in the frontend through the generated types. Duplicating the
+  literal is a defect, not a workaround.
 
 ## NestJS API
 - One module per domain in `src/modules/`. Each has `controller.ts`, `service.ts`,
@@ -75,19 +87,29 @@ Every response from the API uses one envelope:
 # Additional rules (from intake)
 
 ## Testing
-- Jest for the API. One `*.spec.ts` per service, colocated.
+- **Vitest** for the API, as scaffolded by `nest new`. One `*.spec.ts` per service,
+  colocated.
 - Cover, at minimum: availability math (overlap, inventory, blackout), the pricing
   breakdown, role guards, and the Stripe webhook signature check.
 - Pure functions get the most thorough unit tests. Controllers get route-level tests
   only when a branch is security-relevant.
-- `npm run test` must pass with no skipped suites.
+- `npm run test` must pass with no skipped suites. The frontend has **no test runner
+  yet** — see the contract-testing ticket in `build-plan.md`. Do not add a `test` script
+  that trivially passes; a green no-op is worse than a missing script, because it hides
+  the absence of tests.
+- Prefer testing pure domain logic over HTTP round trips. It is faster and the failures
+  point at the actual defect.
 
 ## Lint & format
-- ESLint flat config in both apps, extending `eslint:recommended` +
-  `typescript-eslint` strict presets. Prettier for formatting.
-- `npm run lint` and `npm run format:check` run in CI and before any commit.
-- `@typescript-eslint/no-floating-promises` and `no-misused-promises` are errors — an
-  unhandled promise in a route handler is a real bug.
+- **`oxlint --type-aware`** in the backend (what `nest new` scaffolds) and
+  **`eslint`** via `@nuxt/eslint` in the frontend. Two linters, because each is the
+  framework's own default — do not unify them, and do not fight the generators.
+- `npm run lint` and `npm run format:check` run in CI and before any commit, from the
+  repo root.
+- `@typescript-eslint/no-floating-promises` and `no-misused-promises` are errors in the
+  frontend — an unhandled promise in a route handler is a real bug.
+- Keep the generators' own config files working. Running `nest new` or `nuxi init` in
+  future must not produce a config that fights the committed one.
 
 ## SEO
 - SSR meta on all public pages via `useSeoMeta`. Unique title and description per page.
@@ -133,7 +155,7 @@ build. Where a rule is a judgement call, the test for whether it was followed is
   places, extract it immediately. Waiting for a third occurrence is the usual reason
   refactoring gets skipped and the duplication compounds.
 - Register every component in `context/ui-registry.md` when it is created.
-- **Check:** `rg "^\s*const\s+\w+\s*=\s*defineComponent" ` in `apps/web/app` returns one
+- **Check:** `rg "^\s*const\s+\w+\s*=\s*defineComponent" ` in `frontend/app` returns one
   hit per file. Or a component file containing two `defineComponent`/`export default`.
 
 ## No props drilling
@@ -167,17 +189,19 @@ Rules:
   merely textually similar. Two price formatters that happen to look alike but model
   different concepts should stay separate. Wrong extraction is more expensive than
   duplication.
-- Where shared code goes:
-  - Pure domain logic, Zod schemas, shared types → `packages/shared`. No framework
-    imports, no `process.env`, no server SDKs.
-  - Vue-specific reusable logic → `apps/web/app/composables/`, auto-imported.
-  - API logic shared by two or more modules → `apps/api/src/common/`. Not by creating a
-    cross-module import.
+- Where shared code goes. **Within** a project, extract; **across** projects, generate:
+  - Backend logic needed by two or more API modules → `backend/src/common/`. Not by
+    creating a cross-module import.
+  - Vue-specific reusable logic → `frontend/app/composables/`, auto-imported.
+  - Needed by both the API and the frontend → it is an **API contract**, not shared code.
+    Put it in the backend's DTOs, expose it on the endpoint, and generate the frontend
+    type from the OpenAPI document. Do not create a shared folder to hold it.
 - A module may import from `common/` and from other modules. A module may **not** be
   imported sideways by a sibling module's internals — go through the owning module's
   public surface or lift the code to `common/`.
 - **Check:** `rg` for a snippet that already exists before writing it. Duplicated logic
-  is found by search, not by review.
+  is found by search, not by review. If the snippet is in the *other* project, stop — you
+  need a contract, not a copy.
 
 ## SOLID
 Applied at module and service boundaries. Not applied inside a single function — one
@@ -252,6 +276,14 @@ Performance is a requirement, not a later optimisation pass. Budgets:
   interpolate user input into a query — Prisma parameterizes, raw SQL does not. Never log
   a token, password, or card number. Ownership is a query filter, never a client-supplied
   id. Authorization is enforced server-side on every route; frontend middleware is UX.
+- **Passwords use Argon2id, not bcrypt** — 19 MiB / t=2 / p=1, the OWASP minimum. The
+  OWASP cheat sheet now scopes bcrypt to legacy systems; it is CPU-hard only, cheap to
+  parallelise on GPUs, and silently truncates at 72 bytes. Rehash opportunistically via
+  `argon2.needsRehash` on login, and run a dummy verify on a miss so response timing does
+  not leak account existence.
+- **Cookie `maxAge` units differ between APIs.** Express `res.cookie()` takes
+  **milliseconds**; Nest 12.1's `httpAdapter.setCookie()` takes **seconds**. Copying a
+  value between them makes the cookie live 1000× too long. Pick one and stay in it.
 - **Consistency.** State changes that span tables run in a transaction. A state change
   and its side effect (an email enqueue, a refund row) are in the *same* transaction or
   neither happens.

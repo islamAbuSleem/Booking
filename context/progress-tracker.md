@@ -10,49 +10,60 @@
 | Frontend | Nuxt 4.5.x (Vue 3, SSR), Tailwind CSS 4.3.x via `@tailwindcss/vite` | yes |
 | Backend | NestJS 12.1.x | yes |
 | Database | Neon Postgres via Prisma 7.10.x, pooled URL at runtime + direct URL for migrations | yes |
-| ORM | Prisma | yes |
-| Monorepo | npm workspaces: `apps/web`, `apps/api`, `packages/shared`, `context/` | yes |
-| Auth | Email/password (bcrypt) + Google OAuth + GitHub OAuth, JWT in httpOnly cookie | yes |
+| ORM | Prisma 7.10.x, Neon adapter, `prisma-client` generator | yes |
+| Repository | Two independent projects: `backend/` (NestJS 12) + `frontend/` (Nuxt 4), one repo (D36) | yes |
+| Branching | One branch per ticket off `feature/full-build` (D51) | yes |
+| Deploy | Two units, separate builds and lockfiles | yes |
+| Deploy | Two units, separate builds and lockfiles | yes |
+| Auth | Email/password (**Argon2id**) + Google OAuth + GitHub OAuth, JWT in httpOnly cookie | yes |
 | Roles | `GUEST`, `HOST`, `ADMIN` — enforced by NestJS guards | yes |
 | Images | Cloudinary, signed direct upload, folder scoped per host | yes |
 | Payments | Stripe test mode, PaymentIntent + webhook confirmation | yes |
-| Validation | Zod schemas in `packages/shared`, single source of truth | yes |
+| Validation | Zod 4, backend-owned; frontend types generated from `openapi.json` (D38) | yes |
 | Styling | Tailwind v4 + CSS custom properties in `@theme`, no hardcoded hex | yes |
-| Verify command | `npm run build && npm run test` from the repo root | yes |
+| Monorepo | **None** — `backend/` and `frontend/` are independent projects, no workspace (D36) | yes |
+| Shared package | **None.** API contract generated from `openapi.json` (D38) | yes |
+| BE module system | ESM / `nodenext`, as scaffolded by `nest new` (D37) | yes |
+| BE tests | **Vitest** 4.1.x, not Jest (D37) | yes |
+| BE lint | **oxlint** `--type-aware` (D37) | yes |
+| FE lint | **ESLint** via `@nuxt/eslint` (D37) | yes |
+| TypeScript | 6.0.x, as scaffolded (D37) | yes |
+| Verify command | `npm run verify` from the repo root | yes |
 | Aesthetic | Editorial Travel Guide — paper/ink/terracotta, hairline rules, square corners, asymmetric grid | yes |
 | Type | Fraunces (display) · Archivo (UI) · IBM Plex Mono (references) | yes |
 | Dark mode | Not in the MVP (D22) | yes |
 | Corner radius | 2px max everywhere; **no pills** (D23) | yes |
 | Functional typeface | Archivo Narrow (tables, labels, UI); Archivo (prose) (D24) | yes |
 | Table density | 64px rows, nowrap badges, fixed action columns (D27) | yes |
-| Wordmark | "The Gazette · EST. 2024" — **proposal, unconfirmed** (D26) | no |
-| Maps | Undecided; placeholder for now (D28) | no |
+| Wordmark | "The Gazette · EST. 2024" — **provisional**, unratified (D26) | no |
+| Maps | Placeholder only, no provider yet (D28) | no |
 | Spec files | `context/*.md` (this directory) | yes |
 
 ## Ticket Checklist
 
 ### Phase 1 — Foundation
-- [ ] T1 Monorepo scaffold and tooling
-- [ ] T2 Design system and app shell
-- [ ] T3 Mock data layer
-- [ ] T4 Home page
-- [ ] T5 Hotels list + filters
-- [ ] T6 Hotel detail
-- [ ] T7 Booking flow
-- [ ] T8 Bookings pages
-- [ ] T9 Auth pages
-- [ ] T10 Host dashboard
-- [ ] T11 Admin dashboard
+- [x] T1 Project scaffold and tooling
+- [x] T2 Design system and app shell
+- [x] T3 Mock data layer
+- [x] T4 Home page
+- [x] T5 Hotels list + filters
+- [x] T6 Hotel detail
+- [x] T7 Booking flow
+- [x] T8 Bookings pages
+- [x] T9 Auth pages
+- [x] T10 Host dashboard
+- [x] T11 Admin dashboard
 
 ### Phase 2 — Domain
-- [ ] T12 Database schema, migration, seed
-- [ ] T13 API foundation
-- [ ] T14 Auth: email/password
-- [ ] T15 Auth: Google and GitHub OAuth
-- [ ] T16 Hotels read API
-- [ ] T17a API client and home page wiring
-- [ ] T17b Hotels list wiring
-- [ ] T17c Hotel detail wiring
+- [x] T12 Database schema, migration, seed
+- [x] T13 API foundation
+- [x] T13a OpenAPI contract and frontend type generation
+- [x] T14 Auth: email/password
+- [x] T15 Auth: Google and GitHub OAuth
+- [x] T16 Hotels read API
+- [x] T17a API client and home page wiring
+- [x] T17b Hotels list wiring
+- [x] T17c Hotel detail wiring
 - [ ] T18 Availability and quote
 - [ ] T19 Favorites
 - [ ] T20 Bookings API
@@ -184,18 +195,174 @@
   hairlines, and a serif *are* the aesthetic; invented institutional history is noise that
   displaces the real navigation. `The Gazette · EST. 2024` is kept as the one piece of
   masthead theatre that is actually the brand.
-- **D26 — "The Gazette" is a proposal, not a decision.** The model invented the name and
-  reused it in 6 of 10 generations. It is the owner's call. Renaming is one token, not a
-  redesign — do not let it harden into the codebase before it is confirmed.
+- **D26 — "The Gazette" is provisional, not decided.** The model invented the name and
+  reused it in 6 of 10 generations. **Default adopted so the build is not blocked:** keep
+  it, because all 10 design references say it and renaming is a single-token find-and-
+  replace, not a redesign. It is not ratified. It is a print-parody name for a real
+  product, which is fine for a design system and possibly wrong for a brand — that
+  judgement belongs to the owner. **Trigger to revisit:** before any real user sees the
+  app, and definitely before T34 (deploy). If it changes, it is one token, not a refactor.
 - **D27 — Density is now rule-governed, not taste.** 64px table rows, `nowrap` on badges
   and actions, fixed-width action columns, one money format per context, aligned stat
    cards, rating bars normalised to visible min–max. These came from defects observed in
   the renders, and they are in `ui-tokens.md` so they apply to every table, not just the
   one that was wrong.
-- **D28 — Maps are undecided.** `/hotels/[id]` has a Location section; the references use
-  a map screenshot carrying third-party attribution, which is not shippable. Build a
-  static styled placeholder with a link out to directions, keep the component seam, and
-  do not invent a provider decision. Flagged rather than silently assumed.
+- **D28 — Maps: placeholder only, no provider chosen.** `/hotels/[id]` has a Location
+  section; the design references use a map screenshot carrying third-party attribution,
+  which is not shippable. **Default adopted:** a static styled placeholder with the
+  address and a link out to directions, with the component seam kept so a provider can be
+  dropped in. No provider is named until someone has an API key and a reason to want
+  one. `T6` builds the placeholder; the seam is the deliverable, not the map.
+- **D29 — Three research findings invalidated parts of the spec. Corrected before T1.**
+  Parallel agents verified against installed packages rather than docs indexes, and in
+  three cases the docs were stale or wrong. Recorded here because each is a hard error
+  that would have surfaced as a confusing runtime failure:
+  1. **Prisma 7 removed `datasource.url` and `directUrl`.** The upgrade guide calls it
+     "deprecated"; 7.10.0 rejects it with `P1012`. URLs now live in `prisma.config.ts`
+     (CLI, `DIRECT_URL`) and a `PrismaNeon` adapter (runtime, pooled `DATABASE_URL`).
+  2. **`prisma-client-js` is deprecated and `output` is required.** A driver adapter is
+     now mandatory for all databases. The Neon adapter takes a **config object**, not a
+     `pg.Pool` — the widely-shown `new PrismaNeon(pool)` form is stale.
+  3. **`@Body({ bodyParser: false })` is not a real API.** It is absent from every
+     published `@nestjs/common` from 5.4.0 to 12.1.1. It is a hallucinated pattern copied
+     across blog posts. The correct approach is `rawBody: true` at the app level.
+- **D30 — Pin `prisma@7.10.0` exactly.** The npm `latest` dist-tag points at
+  `8.0.0-rc`. An unpinned install pulls a prerelease of the ORM into a booking system.
+- **D31 — Argon2id replaces bcrypt.** OWASP now scopes bcrypt to legacy systems. bcrypt
+  is CPU-hard only and **silently truncates at 72 bytes**, so the 72-char cap is not
+  even enforceable from the user's side. 19 MiB / t=2 / p=1.
+- **D32 — Superseded by D37, kept because the underlying NestJS 12 facts still hold.**
+  NestJS 12's core packages are ESM-only. There used to be a risk here: a CommonJS build
+  would need `require(esm)`, which needs Node ≥20.19, and Jest on top of that needed
+  Node ≥24.9 or it failed with `ERR_REQUIRE_ASYNC_MODULE` — an error pointing nowhere near
+  its cause. `nest new` scaffolds ESM, so **the whole class of problem is gone**. Two
+  NestJS 12 behaviours survive and are real: `@Optional()` is no longer inherited by
+  subclasses (re-declare it), and lifecycle hook order now follows the component
+  hierarchy, so do not assume an `onModuleInit` ordering.
+- **D33 — `@nuxt/fonts` 0.14, and it is ZERO-CONFIG.** Confirmed by inspecting the
+  installed package: it augments no `NuxtConfig` key at all, so the `fonts: { families:
+  [...] }` block suggested by the docs index **does not exist** and fails typecheck.
+  It reads the families declared in the CSS `@theme` block, downloads them at build
+  time, self-hosts them, and applies automatic metric fallbacks. All four families
+  (Fraunces, Archivo, Archivo Narrow, IBM Plex Mono) download and appear in the built
+  CSS. `@nuxtjs/google-fonts` remains unmaintained and was not used. Note this makes
+  the build **network-dependent** — it fetches from `fonts.gstatic.com` unless cached.
+- **D34 — RESOLVED at T2, by measurement not by inference. `@theme` tokens work in this
+  layout.** The build was run and the emitted CSS inspected. Two findings:
+  1. **The `@source` directives in `main.css` are what make it work.** Tailwind v4
+     auto-detects from the CWD, which in a nested project is ambiguous, so `main.css`
+     declares `@source '../app'` and friends explicitly. Do not delete them as
+     "redundant" — that is the whole reason the tokens compiled.
+  2. **Tailwind v4 tree-shakes unused theme variables.** `--color-rule`,
+     `--color-surface-alt`, and `--font-display` were absent from the first build
+     because nothing referenced them yet. They appeared the moment a component used
+     them. This is correct behaviour, not a broken config — but it means a token can
+     look "missing" in the output when it is merely unused. **Never reference a
+     `var(--color-*)` token in hand-written CSS unless a utility also uses it**, or the
+     variable will not be emitted and the declaration silently falls back to nothing.
+- **D35 — Dynamic class construction breaks Tailwind v4 detection.** `bg-${color}-600`
+  is invisible to the scanner. Map props to complete static class names, or use
+  `@source inline(...)` to safelist. This affects every `BaseButton` variant and is the
+  most likely cause of a missing style that only shows up in production. **Applied at
+  T2:** `BaseButton` and `BaseBadge` both hold a `Record<Variant, string>` of complete
+  class strings rather than assembling them.
+- **D36 — The repo is two independent projects, not a workspace.** `backend/` and
+  `frontend/`, each with its own `package.json`, `node_modules`, and lockfile. No
+  `packages/shared`, no workspace. The root `package.json` holds delegating scripts only.
+  A frontend change cannot break the API build, and the two deploy independently.
+- **D37 — Both projects are generated by their official CLIs and the generated toolchain
+  is kept, not overridden.** `nest new` and `nuxi init` produce specific choices that
+  differ from the earlier hand-written spec: **ESM** (`nodenext`), **Vitest** (not Jest),
+  **oxlint** on the backend, **ESLint** via `@nuxt/eslint` on the frontend, and
+  **TypeScript 6**. Overriding these buys tidiness at the cost of friction in every
+  `nest generate` and every framework doc lookup. Two linters coexist on purpose.
+- **D38 — There is no shared package, so the API contract is generated.** This was the
+  genuine cost of D36 and it needed a real answer. `packages/shared` was the single source
+  of truth for Zod schemas; removing it reopens the drift problem. The replacement is
+  **contract-first**: the backend owns all schemas and DTOs, `@nestjs/swagger` emits
+  `openapi.json`, and the frontend's types are *generated* from it (T13a). This is
+  strictly better than the shared package it replaces — the spec is machine-checkable,
+  the frontend cannot drift without a visible diff, and no import crosses the deploy
+  boundary.
+- **D39 — Two `rawBody`/`ValidationPipe`/CORS settings were applied at scaffold, not
+  retrofitted.** `rawBody: true` in particular: forgetting it until T27 means a signature
+  verification failure whose error message points nowhere near the cause. Cheap now,
+  expensive later.
+- **D40 — The frontend has no test runner, and that is recorded rather than papered over.**
+  A `test` script that trivially passes would report green while testing nothing, which
+  is worse than a missing script. Frontend testing arrives with the contract ticket
+  (T13a) and T17d.
+- **D41 — `@nestjs/mau` carries 5 transitive advisories and is not force-fixed.** All five
+  trace to one dev-only dependency via `inquirer`→`external-editor`→`tmp` and `undici`.
+  `npm audit fix --force` proposes `@nestjs/mau@0.0.6`, a **downgrade** from 0.2.6. Not
+  applied. `mau` is only used by `nest deploy` and never ships. Revisit if it is ever
+  used in CI.
+- **D42 — Subagents work, but only after an opencode restart.** Three attempts failed with
+  an opencode session-store insert error; a restart fixed it immediately. The FE/BE
+  fan-out is therefore viable, and the ownership fence is what makes it safe: the FE
+  agent owns `frontend/`, the BE agent owns `backend/`, and the orchestrator owns
+  `context/`, root `package.json`, and all verification. **Neither agent runs the root
+  build** — `npm run verify` builds both projects and the two agents would fight over
+  the same caches. Verified in practice at T5/T6 + T12/T13/T13a/T16.
+- **D43 — Ratings are stored and displayed on a 1–5 scale. Resolved after a real
+  contradiction between the two agents.** `context/architecture.md` specifies
+  `reviews.rating` as 1–5 and the backend followed it; the T3 frontend fixtures used
+  1–10 (9.4, 1,284 reviews). Only one is right. **Decision: 1–5 everywhere, no
+  transform layer.** Displaying "9.4" when the review input range is 1–5 misstates the
+  scale, and a hidden ×2 in a display helper is exactly the kind of thing that drifts.
+  Fixtures rescaled; review counts were NOT rescaled (a first attempt halved them too and
+  was reverted — counts are a different quantity entirely). If a 1–10 display is ever
+  wanted, it is a deliberate, documented product decision, not a formatting preference.
+- **D44 — `minPrice` and `maxPrice` are MAJOR units (150 = $150), the one place in the
+  API where money is not integer cents.** Everything else money-shaped is integer cents.
+  Kept because a user typing a price filter means dollars, and converting their input is
+  more surprising than the internal inconsistency. Documented in the OpenAPI description
+  for both params. **This is a known sharp edge** — if it ever causes confusion, convert
+  at the edge rather than making it a second convention.
+- **D45 — `null` is never `0` in API money and rating fields.** `priceFrom`,
+  `rooms[].price`, and `rating.average` are all nullable: a hotel with no price row in
+  the requested currency returns `null`, and a hotel with no visible reviews returns
+  `rating: { average: null, totalReviews: 0 }`. A missing price must render as "—", not
+  "$0", because free is a real state and null is a real state and they are not the same.
+- **D46 — Hotels search sorts and paginates in memory.** "Cheapest room that fits N
+  guests" and "average rating" are derived values, not columns, so the filter reads all
+  matching rows and cuts the page in the service. Correct and narrow for MVP, but it
+  will not scale. The seam is marked in the code. Needs a SQL view or a denormalised
+  column before the result set outgrows memory — not before.
+- **D47 — Seeded users have `password_hash = null`.** Argon2id is T14's dependency and
+  no credential hash was committed. Seeded accounts cannot log in until T14 exists; that
+  is intentional, not an oversight.
+- **D48 — The "never centre" rule is scoped to editorial contexts, not forms.** A T7–T11
+  agent centred the auth column per Stitch Screen 6 and flagged it against `design.md`'s
+  global rule. Kept the centred auth and **amended the spec instead of the code**. The
+  rule was written for prose and display; a 420px single-purpose form centred is the
+  established convention, and left-aligning it looks broken. When a global rule meets a
+  legitimate exception, scope the rule — do not pretend the exception is not there.
+- **D49 — `format:check` is red on ~50 frontend files and will stay red until the
+  linter/formatter ownership is settled.** This is NOT Prettier version drift (3.9.9
+  everywhere). The FE agent ran `eslint --fix`, which reformatted to ESLint `stylistic`
+  taste, and Prettier now disagrees on those same files. Blind `prettier --write` would
+  flip them back and re-break ESLint on the next `--fix` — churning 50 files to no
+  lasting effect. **Rule: Prettier owns formatting, ESLint owns linting.** Resolving it
+  means turning off the conflicting `stylistic` rules, which is its own ticket, not a
+  side effect of a feature commit. `format:check` is deliberately NOT in the `npm run
+  verify` gate, so this does not block the build.
+- **D50 — Rating display bands assumed a 10-scale on 1–5 data.** `HotelBookingPanel`
+  mapped `>= 9` to "Excellent", so every real hotel (max 5.0) fell through to "Mixed".
+  Fixed to 4.5 / 4.0 / 3.5 / 3.0 thresholds. A display bug that no typecheck, build, or
+  lint can see — only reading the rendered values catches it.
+- **D51 — One branch per ticket, not one branch for the build.** `feature/full-build` is
+  the **integration branch**: it is always green and never carries feature work that has
+  not been verified on its own branch. Every ticket gets `feat/T<n>-<slug>` cut from
+  `feature/full-build`, is built, tested and committed there, is pushed as its own branch,
+  and is then fast-forward merged back. The history of T1–T17 is batched onto
+  `feature/full-build` and is **not** rewritten — that branch has been pushed and rebased
+  against remote work already, and force-pushing a shared branch to retroactively split
+  past commits risks losing someone else's work for no gain. The rule applies from T18
+  forward. **Consequence: a worktree can only be on one branch, so the FE and BE agents
+  no longer run in parallel on separate branches** — the pair becomes sequential, one
+  ticket branch at a time. If parallel agents become valuable again, the answer is a
+  second `git worktree` per agent, not a shared branch.
 
 ## Notes
 

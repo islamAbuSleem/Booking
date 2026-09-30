@@ -1,0 +1,13 @@
+dist
+build
+.output
+.nuxt
+.nitro
+node_modules
+coverage
+apps/api/src/generated
+packages/shared/dist
+package-lock.json
+context
+design
+*.png

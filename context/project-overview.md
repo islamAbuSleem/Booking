@@ -1,4 +1,4 @@
-# Project Overview
+﻿# Project Overview
 
 ## About
 A hotel booking platform. Guests discover hotels, check availability, book rooms, and pay.
@@ -93,6 +93,11 @@ depends on booking data that only exists once the core flow works.
   requests, plus per-user notification preferences
 - **Host analytics** — revenue, occupancy rate, ADR, top rooms, trends
 
+## Working notes
+Operational knowledge that is not domain spec — the parallel-agent ownership fence,
+environment tooling traps, and corrections already made — lives in
+context/working-notes.md. Read it alongside this file.
+
 ## Out of Scope (still not planned)
 - Mobile native apps
 - Multi-language content beyond EN
@@ -104,7 +109,7 @@ depends on booking data that only exists once the core flow works.
 
 ## Success Criteria
 1. `npm run build` passes at repo root (typecheck + build both apps).
-2. `npm run test` passes (Jest unit tests for API services).
+2. `npm run test` passes (Vitest unit tests for API services).
 3. A guest can complete a Stripe test-mode booking end-to-end and see it in `/bookings`.
 4. A host can create a listing with a photo and a room type, and it becomes publicly
    searchable once approved.
