@@ -5,6 +5,15 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // The API base the client (`app/utils/api.ts`) prefixes every request with.
+  // `NUXT_PUBLIC_API_BASE` overrides this in deploy environments; the default
+  // matches the `servers` entry in backend/openapi.json.
+  runtimeConfig: {
+    public: {
+      apiBase: 'http://localhost:3000',
+    },
+  },
+
   future: {
     compatibilityVersion: 4,
   },

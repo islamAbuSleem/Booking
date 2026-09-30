@@ -20,6 +20,12 @@ export const ERROR_CODES = [
   // Module-specific. T14/T16 own these; more are added as modules land.
   'HOTEL_NOT_FOUND',
   'ROOM_NOT_FOUND',
+  // T14 — auth. INVALID_CREDENTIALS covers both "no such email" and "wrong
+  // password" on purpose, so the code never leaks which one failed.
+  'INVALID_CREDENTIALS',
+  'EMAIL_TAKEN',
+  // T15 — OAuth profile has no usable email, provider error, or link failure.
+  'OAUTH_FAILED',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

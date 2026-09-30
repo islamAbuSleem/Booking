@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { AMENITY_BY_ID } from '~/utils/mock'
-import type { MockHotel } from '~/utils/mock/types'
+import { usd } from '~/utils/format'
+import type { ApiHotelCard } from '~/utils/api'
 
-const props = defineProps<{ hotel: MockHotel }>()
+const props = defineProps<{ hotel: ApiHotelCard }>()
 
 /** Three amenities then a count. Never more — a card is a summary, not a list. */
 const MAX_AMENITIES = 3
@@ -16,20 +17,15 @@ const visibleAmenities = computed(() =>
 
 const overflowCount = computed(() => Math.max(0, props.hotel.amenityIds.length - MAX_AMENITIES))
 
-const cover = computed(() => props.hotel.images[0])
-const cheapestNight = computed(() => {
-  const prices = props.hotel.rooms.map(room => room.pricePerNightCents)
-  return prices.length ? Math.min(...prices) : null
-})
+const cover = computed(() => props.hotel.coverImage)
 
+/** A missing price is "—": free and missing are different states. */
 const priceLabel = computed(() =>
-  cheapestNight.value === null
-    ? '—'
-    : new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        maximumFractionDigits: 0,
-      }).format(cheapestNight.value / 100),
+  props.hotel.priceFrom === null ? '—' : usd(props.hotel.priceFrom.amountCents),
+)
+
+const ratingLabel = computed(() =>
+  props.hotel.rating.average === null ? '—' : props.hotel.rating.average.toFixed(1),
 )
 </script>
 
@@ -47,19 +43,13 @@ const priceLabel = computed(() =>
         <img
           v-if="cover"
           :src="cover.url"
-          :alt="cover.alt"
-          :width="800"
-          :height="533"
+          :alt="cover.altText ?? hotel.name"
+          :width="cover.width"
+          :height="cover.height"
           loading="lazy"
           decoding="async"
           class="h-full w-full object-cover"
         >
-        <span
-          v-if="hotel.status === 'PENDING'"
-          class="bg-warning-wash text-warning border-warning absolute top-3 left-3 rounded-sm border px-2.5 py-0.5 text-label uppercase"
-        >
-          {{ $t('status.pending') }}
-        </span>
       </div>
 
       <div class="flex flex-1 flex-col gap-2 p-5">
@@ -84,7 +74,7 @@ const priceLabel = computed(() =>
 
         <div class="mt-auto flex items-end justify-between gap-4 pt-3">
           <p class="flex items-baseline gap-1.5 text-sm">
-            <span class="tabular text-lg font-semibold">{{ hotel.rating.average }}</span>
+            <span class="tabular text-lg font-semibold">{{ ratingLabel }}</span>
             <span class="text-fg-subtle">
               {{ $t('hotel.reviews', { count: hotel.rating.totalReviews }) }}
             </span>

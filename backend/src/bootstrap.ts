@@ -1,8 +1,15 @@
 import { Logger, ValidationPipe, type INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { EnvelopeInterceptor } from './common/interceptors/envelope.interceptor.js';
+import { JwtAuthGuard } from './modules/auth/jwt-auth.guard.js';
+import { RolesGuard } from './modules/auth/roles.guard.js';
+import type { UsersRepository } from './modules/users/users.repository.js';
+import { USERS_REPOSITORY } from './modules/users/users.repository.js';
 import {
   buildOpenApiDocument,
   OPENAPI_JSON_PATH,
@@ -22,6 +29,10 @@ export const API_PREFIX = 'api';
 export function configureApp(app: INestApplication): OpenAPIObject {
   app.setGlobalPrefix(API_PREFIX);
 
+  // T14 — the JWT guard reads `request.cookies`, so the parser runs before
+  // every route. No secret is passed: we only read, never sign, cookies here.
+  app.use(cookieParser());
+
   app.enableCors({
     origin: allowedOrigins(process.env['FRONTEND_ORIGIN']),
     credentials: true,
@@ -40,6 +51,22 @@ export function configureApp(app: INestApplication): OpenAPIObject {
   // One envelope on the success side and on the error side, on every route.
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new EnvelopeInterceptor(new Reflector()));
+
+  // T14 — every route defaults to authenticated; `@Public()` opts out and
+  // `@Roles()` narrows to a role. Wired manually (like the filter and the
+  // interceptor above) rather than via `APP_GUARD`, so the OpenAPI preview
+  // build — which never calls `configureApp` — does not resolve them.
+  // Authentication first, authorization second: order is registration order.
+  const reflector = new Reflector();
+  app.useGlobalGuards(
+    new JwtAuthGuard(
+      reflector,
+      app.get(JwtService),
+      app.get(ConfigService),
+      app.get<UsersRepository>(USERS_REPOSITORY),
+    ),
+    new RolesGuard(reflector),
+  );
 
   // The raw specification is served from a plain adapter route, not a controller, so it
   // is exactly the OpenAPI document: a controller return value would be wrapped by the

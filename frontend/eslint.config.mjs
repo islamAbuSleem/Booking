@@ -19,4 +19,8 @@ export default createConfigForNuxt({
   // Nuxt resolves layouts and pages BY FILENAME, so `default.vue` and `index.vue` are
   // the required names, not a naming slip. The rule cannot apply to them.
   ignores: ['app/pages/**', 'app/layouts/**'],
+}).append({
+  // Generated from backend/openapi.json via `npm run gen:api`. Never hand-edit,
+  // so house style does not apply to it.
+  ignores: ['app/types/api.ts'],
 })

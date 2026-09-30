@@ -10,9 +10,9 @@
  * The component is the seam: swapping the placeholder for a provider is a change to
  * this file alone, and nothing above it has to move.
  */
-import type { MockHotel } from '~/utils/mock/types'
+import type { ApiHotelDetail } from '~/utils/api'
 
-const props = defineProps<{ hotel: MockHotel }>()
+const props = defineProps<{ hotel: ApiHotelDetail }>()
 
 /** Deep link rather than an embed, so nothing third-party is baked into the page. */
 const directionsUrl = computed(

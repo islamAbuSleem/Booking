@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { parseEnv } from './config/env.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { HotelsModule } from './modules/hotels/hotels.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
+import { UsersModule } from './modules/users/users.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -11,6 +13,8 @@ import { PrismaModule } from './prisma/prisma.module.js';
     // rather than at the first request that needs it.
     ConfigModule.forRoot({ isGlobal: true, cache: true, validate: parseEnv }),
     PrismaModule,
+    UsersModule,
+    AuthModule,
     HotelsModule,
     HealthModule,
   ],

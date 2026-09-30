@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Inject } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
@@ -7,7 +7,9 @@ import { HealthService } from './health.service.js';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly health: HealthService) {}
+  // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`
+  // (see PrismaService), so inference would break the OpenAPI preview.
+  constructor(@Inject(HealthService) private readonly health: HealthService) {}
 
   @Get()
   @Public()

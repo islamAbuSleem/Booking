@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { HealthDataDto } from '../hotels/dto/hotel.dto.js';
 
@@ -13,7 +13,9 @@ import type { HealthDataDto } from '../hotels/dto/hotel.dto.js';
 export class HealthService {
   private readonly logger = new Logger(HealthService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`
+  // (see PrismaService), so inference would break the OpenAPI preview.
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async check(): Promise<HealthDataDto> {
     const db = await this.probeDatabase();

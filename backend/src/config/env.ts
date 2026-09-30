@@ -34,29 +34,49 @@ export const envSchema = z.object({
   /** DIRECT Neon URL. Only the Prisma CLI needs it; the API process does not. */
   DIRECT_URL: z.string().min(1).optional(),
 
-  /**
-   * Optional until T14 signs anything, but a *present* value has to be real: the
-   * `replace-me-with-32-plus-random-bytes` line from `.env.example` is public knowledge, so
-   * shipping it would mean every deployment shares a secret an attacker already has. Empty
-   * is allowed and means "auth is not configured"; a copy of the placeholder is refused at
-   * boot rather than in production.
-   */
-  JWT_SECRET: z
-    .string()
-    .optional()
-    .refine((value) => value !== JWT_SECRET_PLACEHOLDER, {
-      message: `JWT_SECRET is still the .env.example placeholder — generate one with "openssl rand -base64 48"`,
-    })
-    .refine(
-      (value) => value === undefined || value === '' || value.length >= 32,
-      {
-        message: 'JWT_SECRET must be 32 or more characters',
-      },
-    ),
-
   LOG_LEVEL: z
     .enum(['log', 'error', 'warn', 'debug', 'verbose'])
     .default('log'),
+
+  /**
+   * T14 — JWT is set as an httpOnly cookie. 32+ characters so it has at least
+   * 256 bits of entropy when random. Required: a missing secret fails at boot,
+   * not at the first login. A copy of the .env.example placeholder is refused
+   * for the same reason — shipping it would mean every deployment shares a
+   * secret an attacker already has.
+   */
+  JWT_SECRET: z
+    .string()
+    .refine((value) => value !== JWT_SECRET_PLACEHOLDER, {
+      message: `JWT_SECRET is still the .env.example placeholder — generate one with "openssl rand -base64 48"`,
+    })
+    .refine((value) => value.length >= 32, {
+      message: 'JWT_SECRET must be 32 or more characters',
+    }),
+
+  /** T14 — doubles as the auth-cookie lifetime (see `auth/cookie.ts`). */
+  JWT_EXPIRES_IN: z.string().min(1).default('7d'),
+
+  JWT_ISSUER: z.string().min(1).default('booking-api'),
+  JWT_AUDIENCE: z.string().min(1).default('booking-web'),
+
+  /**
+   * T15 — OAuth is optional in local dev and in tests. Missing values do NOT
+   * fail boot; the strategies fall back to placeholder credentials so the app
+   * builds and tests pass, and only a real provider redirect fails at runtime.
+   * Callback URLs must be registered with each provider for manual verification;
+   * the expected values are the defaults below (see also the strategy comments).
+   */
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z
+    .string()
+    .default('http://localhost:3000/api/auth/google/callback'),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GITHUB_CALLBACK_URL: z
+    .string()
+    .default('http://localhost:3000/api/auth/github/callback'),
 });
 
 /** The exact string `.env.example` used to ship, kept so it can be refused by name. */

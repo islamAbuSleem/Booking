@@ -10,11 +10,11 @@
  *
  * Navigation wraps. There is no first or last, so a user never lands on a dead arrow.
  */
-import type { MockImage } from '~/utils/mock/types'
+import type { ApiHotelImage } from '~/utils/api'
 
 const open = defineModel<boolean>('open', { required: true })
 
-const props = defineProps<{ images: MockImage[], startIndex: number }>()
+const props = defineProps<{ images: ApiHotelImage[], startIndex: number }>()
 
 const current = ref(0)
 const total = computed(() => props.images.length)
@@ -63,9 +63,9 @@ function select(index: number): void {
     >
       <img
         :src="image.url"
-        :alt="image.alt"
-        width="1200"
-        height="675"
+        :alt="image.altText ?? ''"
+        :width="image.width"
+        :height="image.height"
         decoding="async"
         class="aspect-[16/9] w-full bg-surface-alt object-contain"
       >
@@ -142,9 +142,9 @@ function select(index: number): void {
           >
             <img
               :src="entry.url"
-              :alt="entry.alt"
-              width="800"
-              height="600"
+              :alt="entry.altText ?? ''"
+              :width="entry.width"
+              :height="entry.height"
               loading="lazy"
               decoding="async"
               class="aspect-[4/3] w-full object-cover"

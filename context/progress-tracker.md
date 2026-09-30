@@ -57,12 +57,12 @@
 - [x] T12 Database schema, migration, seed
 - [x] T13 API foundation
 - [x] T13a OpenAPI contract and frontend type generation
-- [ ] T14 Auth: email/password
-- [ ] T15 Auth: Google and GitHub OAuth
+- [x] T14 Auth: email/password
+- [x] T15 Auth: Google and GitHub OAuth
 - [x] T16 Hotels read API
-- [ ] T17a API client and home page wiring
-- [ ] T17b Hotels list wiring
-- [ ] T17c Hotel detail wiring
+- [x] T17a API client and home page wiring
+- [x] T17b Hotels list wiring
+- [x] T17c Hotel detail wiring
 - [ ] T18 Availability and quote
 - [ ] T19 Favorites
 - [ ] T20 Bookings API
@@ -337,6 +337,19 @@
   rule was written for prose and display; a 420px single-purpose form centred is the
   established convention, and left-aligning it looks broken. When a global rule meets a
   legitimate exception, scope the rule — do not pretend the exception is not there.
+- **D49 — `format:check` is red on ~50 frontend files and will stay red until the
+  linter/formatter ownership is settled.** This is NOT Prettier version drift (3.9.9
+  everywhere). The FE agent ran `eslint --fix`, which reformatted to ESLint `stylistic`
+  taste, and Prettier now disagrees on those same files. Blind `prettier --write` would
+  flip them back and re-break ESLint on the next `--fix` — churning 50 files to no
+  lasting effect. **Rule: Prettier owns formatting, ESLint owns linting.** Resolving it
+  means turning off the conflicting `stylistic` rules, which is its own ticket, not a
+  side effect of a feature commit. `format:check` is deliberately NOT in the `npm run
+  verify` gate, so this does not block the build.
+- **D50 — Rating display bands assumed a 10-scale on 1–5 data.** `HotelBookingPanel`
+  mapped `>= 9` to "Excellent", so every real hotel (max 5.0) fell through to "Mixed".
+  Fixed to 4.5 / 4.0 / 3.5 / 3.0 thresholds. A display bug that no typecheck, build, or
+  lint can see — only reading the rendered values catches it.
 
 ## Notes
 

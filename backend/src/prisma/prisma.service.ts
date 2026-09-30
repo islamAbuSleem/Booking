@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -26,8 +27,12 @@ export class PrismaService
 {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor(config: ConfigService) {
+  constructor(@Inject(ConfigService) config: ConfigService) {
     // `super()` must be the first statement, so the adapter is built inline.
+    // The token is explicit (`@Inject`) rather than inferred, because the
+    // OpenAPI preview runs under tsx/esbuild, which never emits
+    // `design:paramtypes` — inferred injection silently resolves to undefined
+    // there. Explicit tokens work on every transform (tsc, tsx, vitest).
     super({
       adapter: new PrismaNeon({
         connectionString: config.getOrThrow<string>('DATABASE_URL'),

@@ -4,3 +4,5 @@
 node_modules
 dist
 package-lock.json
+# Generated from backend/openapi.json via `npm run gen:api`. Never hand-edit.
+app/types/api.ts

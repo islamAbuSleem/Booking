@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { HOTELS } from '~/utils/mock'
+import { fetchHotels, isEnvelopeError } from '~/utils/api'
+import type { ApiHotelCard } from '~/utils/api'
+import { mockHotelToCard } from '~/utils/hotelAdapters'
 
 useSeoMeta({
   title: () => $t('common.brand'),
@@ -9,14 +12,47 @@ useSeoMeta({
   ogType: 'website',
 })
 
-const featured = HOTELS.filter(hotel => hotel.status === 'PUBLISHED').slice(0, 3)
+const HOME_PAGE_SIZE = 6
+
+/**
+ * Real list endpoint first. A transport failure means no backend is running, so
+ * the page degrades to the mock fixtures; a real API error is rethrown and
+ * surfaces instead of being hidden behind fixtures.
+ */
+const { data: cards } = await useAsyncData<ApiHotelCard[]>(
+  'home:featured',
+  async () => {
+    try {
+      const live = await fetchHotels({ page: 1, pageSize: HOME_PAGE_SIZE })
+      return live.items
+    }
+    catch (error: unknown) {
+      if (isEnvelopeError(error)) throw error
+      return HOTELS
+        .filter(hotel => hotel.status === 'PUBLISHED')
+        .slice(0, HOME_PAGE_SIZE)
+        .map(mockHotelToCard)
+    }
+  },
+)
+
+const featured = computed(() => (cards.value ?? []).slice(0, 3))
 
 /** Unequal on purpose. A 1:1:1 strip is the generic look this system is arguing with. */
-const destinations = HOTELS.filter(hotel => hotel.status === 'PUBLISHED')
-  .filter((hotel, index, all) => all.findIndex(h => h.city === hotel.city) === index)
-  .slice(0, 3)
+const destinations = computed(() => {
+  const seen = new Set<string>()
+  const picks: ApiHotelCard[] = []
+  for (const card of cards.value ?? []) {
+    if (seen.has(card.city)) continue
+    seen.add(card.city)
+    picks.push(card)
+    if (picks.length >= 3) break
+  }
+  return picks
+})
 
-const heroImage = featured[0]?.images[0]
+const heroImage = computed(() => featured.value[0]?.coverImage ?? null)
+const heroAlt = computed(() => heroImage.value?.altText ?? featured.value[0]?.name ?? '')
 </script>
 
 <template>
@@ -50,9 +86,9 @@ const heroImage = featured[0]?.images[0]
           >
             <img
               :src="heroImage.url"
-              :alt="heroImage.alt"
-              :width="1200"
-              :height="675"
+              :alt="heroAlt"
+              :width="heroImage.width"
+              :height="heroImage.height"
               fetchpriority="high"
               decoding="async"
               class="aspect-[16/9] w-full object-cover"
@@ -60,7 +96,7 @@ const heroImage = featured[0]?.images[0]
             <figcaption
               class="absolute right-3 bottom-3 left-3 text-sm text-white"
             >
-              {{ heroImage.alt }}
+              {{ heroAlt }}
             </figcaption>
           </figure>
         </div>
@@ -113,11 +149,11 @@ const heroImage = featured[0]?.images[0]
           :class="index === 0 ? 'md:col-span-3' : 'md:col-span-1'"
         >
           <img
-            v-if="hotel.images[0]"
-            :src="hotel.images[0].url"
+            v-if="hotel.coverImage"
+            :src="hotel.coverImage.url"
             :alt="`${hotel.city}, ${hotel.country}`"
-            :width="800"
-            :height="600"
+            :width="hotel.coverImage.width"
+            :height="hotel.coverImage.height"
             loading="lazy"
             decoding="async"
             class="aspect-[4/3] w-full object-cover"

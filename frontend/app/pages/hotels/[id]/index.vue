@@ -8,8 +8,11 @@
  * the first property. T17c swaps the handler for a `$fetch` and the key stays.
  */
 import { AMENITY_BY_ID, getHotelDetail } from '~/utils/mock'
+import type { MockRatingBreakdown, MockReview } from '~/utils/mock/types'
+import { fetchHotelDetail, isApiError, isEnvelopeError } from '~/utils/api'
+import type { ApiHotelDetail } from '~/utils/api'
+import { mockHotelToDetail } from '~/utils/hotelAdapters'
 import { usd } from '~/utils/format'
-import { cheapestNightlyCents } from '~/utils/hotels'
 
 const route = useRoute()
 const requestUrl = useRequestURL()
@@ -17,21 +20,58 @@ const { t } = useI18n()
 
 const slug = computed(() => String(route.params.id ?? ''))
 
-const { data: hotel, error } = await useAsyncData(
-  () => `hotel:${slug.value}`,
-  async () => getHotelDetail(slug.value),
+interface HotelDetailPayload {
+  hotel: ApiHotelDetail | null
+  /** Mock-only: category scores for the bar chart. The API summary has none. */
+  breakdown: MockRatingBreakdown | null
+  /** Mock-only: no review list endpoint exists in the T16 contract. */
+  reviews: MockReview[]
+}
+
+/**
+ * Real detail endpoint first. `HOTEL_NOT_FOUND` and a missing mock slug both
+ * render the not-found state; a transport failure degrades to the mock
+ * fixtures; any other API error is rethrown.
+ */
+const { data: payload, error } = await useAsyncData<HotelDetailPayload>(
+  () => `hotel:${String(route.params.id ?? '')}`,
+  async (): Promise<HotelDetailPayload> => {
+    const id = String(route.params.id ?? '')
+    try {
+      const hotel = await fetchHotelDetail(id)
+      return { hotel, breakdown: null, reviews: [] }
+    }
+    catch (fetchError: unknown) {
+      if (isApiError(fetchError) && fetchError.code === 'HOTEL_NOT_FOUND') {
+        return { hotel: null, breakdown: null, reviews: [] }
+      }
+      if (isEnvelopeError(fetchError)) throw fetchError
+      const mock = getHotelDetail(id)
+      if (!mock) return { hotel: null, breakdown: null, reviews: [] }
+      return { hotel: mockHotelToDetail(mock), breakdown: mock.rating, reviews: mock.reviews }
+    }
+  },
 )
+
+const hotel = computed(() => payload.value?.hotel ?? null)
+const breakdown = computed(() => payload.value?.breakdown ?? null)
 
 /** A missing slug is a 404, not an exception — render the not-found state in place. */
 if (!hotel.value) {
   setResponseStatus(404, 'Hotel not found')
 }
 
-const notFound = computed(() => !hotel.value)
+const notFound = computed(() => hotel.value === null)
 
 const canonical = computed(() => `${requestUrl.origin}/hotels/${slug.value}`)
 
-const nightlyCents = computed(() => (hotel.value ? cheapestNightlyCents(hotel.value) : null))
+/** The detail payload has no `priceFrom` — the floor is the cheapest room rate. */
+const nightlyCents = computed(() => {
+  const prices = (hotel.value?.rooms ?? [])
+    .map(room => room.price?.amountCents ?? null)
+    .filter((price): price is number => price !== null)
+  return prices.length > 0 ? Math.min(...prices) : null
+})
 
 const rooms = computed(() => hotel.value?.rooms ?? [])
 
@@ -43,7 +83,7 @@ const amenities = computed(() =>
 
 /** Newest first, per the ticket. `localeCompare` on the ISO string is a date order. */
 const reviews = computed(() =>
-  [...(hotel.value?.reviews ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  [...(payload.value?.reviews ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
 )
 
 const lightboxOpen = ref(false)
@@ -100,11 +140,16 @@ useHead({
             'addressLocality': hotel.value.city,
             'addressCountry': hotel.value.country,
           },
-          'aggregateRating': {
-            '@type': 'AggregateRating',
-            'ratingValue': hotel.value.rating.average,
-            'reviewCount': hotel.value.rating.totalReviews,
-          },
+          // A missing average is omitted: a null ratingValue is invalid schema.
+          ...(hotel.value.rating.average === null
+            ? {}
+            : {
+                aggregateRating: {
+                  '@type': 'AggregateRating',
+                  'ratingValue': hotel.value.rating.average,
+                  'reviewCount': hotel.value.rating.totalReviews,
+                },
+              }),
         })
       },
     },
@@ -200,7 +245,15 @@ useHead({
 
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:gap-8">
         <div class="lg:col-span-4">
-          <RatingBreakdown :breakdown="hotel.rating" />
+          <RatingBreakdown
+            v-if="breakdown"
+            :breakdown="breakdown"
+          />
+          <HotelRatingSummary
+            v-else
+            :average="hotel.rating.average"
+            :total-reviews="hotel.rating.totalReviews"
+          />
 
           <div class="mt-8">
             <h3 class="text-fg-muted text-label uppercase">

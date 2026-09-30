@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
+    "gen:api": "openapi-typescript ../backend/openapi.json -o app/types/api.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -24,6 +25,7 @@
     "@nuxtjs/i18n": "^10.6.0",
     "@tailwindcss/vite": "^4.3.3",
     "eslint": "^10.11.0",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
     "vue-tsc": "^3.3.11"

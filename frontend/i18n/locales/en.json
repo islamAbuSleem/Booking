@@ -143,6 +143,8 @@
     "bandMixed": "Mixed",
     "reviewsCount": "{count} reviews",
     "reviewsCountOne": "1 review",
+    "noRating": "No guest rating yet",
+    "ratingScaleNote": "Scores are on a 1 to 5 scale",
     "noReviewsTitle": "No written reviews yet",
     "noReviewsHint": "The property has a rating but nothing has been written up. The first stay is yours to describe.",
     "locationHeading": "Location",

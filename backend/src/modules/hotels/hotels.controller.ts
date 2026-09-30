@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
@@ -13,7 +13,9 @@ import { HotelsService } from './hotels.service.js';
 
 @Controller('hotels')
 export class HotelsController {
-  constructor(private readonly hotels: HotelsService) {}
+  // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`
+  // (see PrismaService), so inference would break the OpenAPI preview.
+  constructor(@Inject(HotelsService) private readonly hotels: HotelsService) {}
 
   @Get()
   @Public()

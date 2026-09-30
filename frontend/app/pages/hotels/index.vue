@@ -21,6 +21,9 @@ import {
 } from '~/utils/hotels'
 import type { HotelFilterState, HotelSort } from '~/utils/hotels'
 import { localToday } from '~/utils/date'
+import { fetchHotels, isEnvelopeError, toHotelListParams } from '~/utils/api'
+import type { ApiHotelCard } from '~/utils/api'
+import { mockHotelToCard } from '~/utils/hotelAdapters'
 import { formatShortStayDate, wholeNumber } from '~/utils/format'
 import { nightsBetween } from '~/utils/mock'
 
@@ -79,25 +82,64 @@ const request = computed(() => ({
   sort: query.value.sort,
 }))
 
+interface HotelSearchPayload {
+  items: ApiHotelCard[]
+  total: number
+  live: boolean
+  /** The page actually rendered — clamped when the URL names a page past the end. */
+  page: number
+}
+
+/** `stars` has no API param, so it is applied to the returned page, not the query. */
+function applyStars(items: ApiHotelCard[], stars: number[]): ApiHotelCard[] {
+  if (stars.length === 0) return items
+  return items.filter(item => stars.includes(item.starRating))
+}
+
+/**
+ * Real list endpoint first. A transport failure means no backend is running, so
+ * the search degrades to the mock pipeline with client-side paging; a real API
+ * error is rethrown and drives the error state instead.
+ */
 const {
   data,
   status,
   error,
   refresh,
-} = await useAsyncData(
+} = await useAsyncData<HotelSearchPayload>(
   'hotels:search',
-  async () => searchHotels(request.value.filters, request.value.sort),
+  async (): Promise<HotelSearchPayload> => {
+    const { filters, sort } = request.value
+    try {
+      const first = await fetchHotels(toHotelListParams(filters, sort, page.value, HOTEL_PAGE_SIZE))
+      if (first.items.length === 0 && first.total > 0 && page.value > 1) {
+        const last = Math.max(1, Math.ceil(first.total / HOTEL_PAGE_SIZE))
+        const clamped = await fetchHotels(toHotelListParams(filters, sort, last, HOTEL_PAGE_SIZE))
+        return { items: applyStars(clamped.items, filters.stars), total: clamped.total, live: true, page: last }
+      }
+      return { items: applyStars(first.items, filters.stars), total: first.total, live: true, page: page.value }
+    }
+    catch (fetchError: unknown) {
+      if (isEnvelopeError(fetchError)) throw fetchError
+      const matched = searchHotels(filters, sort)
+      const pages = Math.max(1, Math.ceil(matched.total / HOTEL_PAGE_SIZE))
+      const current = Math.min(Math.max(page.value, 1), pages)
+      const start = (current - 1) * HOTEL_PAGE_SIZE
+      return {
+        items: matched.hotels.map(mockHotelToCard).slice(start, start + HOTEL_PAGE_SIZE),
+        total: matched.total,
+        live: false,
+        page: current,
+      }
+    }
+  },
   { watch: [request] },
 )
 
 const total = computed(() => data.value?.total ?? 0)
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / HOTEL_PAGE_SIZE)))
 
-const visible = computed(() => {
-  const current = Math.min(page.value, totalPages.value)
-  const start = (current - 1) * HOTEL_PAGE_SIZE
-  return (data.value?.hotels ?? []).slice(start, start + HOTEL_PAGE_SIZE)
-})
+const visible = computed(() => data.value?.items ?? [])
+const currentPage = computed(() => data.value?.page ?? page.value)
 
 /** Skeletons only when there is nothing to show — never on a background refresh. */
 const isLoading = computed(() => status.value === 'pending' && !data.value)
@@ -319,7 +361,7 @@ useHead({ link: [{ rel: 'canonical', href: `${requestUrl.origin}/hotels` }] })
 
             <div class="border-rule mt-12 flex justify-center border-t pt-6">
               <BasePagination
-                :page="Math.min(page, totalPages)"
+                :page="currentPage"
                 :page-size="HOTEL_PAGE_SIZE"
                 :total="total"
                 @update:page="page = $event"

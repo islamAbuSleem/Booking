@@ -7,22 +7,32 @@
  * Prose is Archivo at 68ch: a Fraunces description at 16px is unreadable and undoes
  * the editorial feel (D24).
  */
-import type { MockHotel } from '~/utils/mock/types'
-import { cheapestNightlyCents } from '~/utils/hotels'
+import type { ApiHotelDetail } from '~/utils/api'
 import { usd } from '~/utils/format'
 
-const props = defineProps<{ hotel: MockHotel }>()
+const props = defineProps<{ hotel: ApiHotelDetail }>()
 
 const { t } = useI18n()
 
-const nightlyCents = computed(() => cheapestNightlyCents(props.hotel))
+/** The detail payload has no `priceFrom` — the floor is the cheapest room rate. */
+const nightlyCents = computed(() => {
+  const prices = props.hotel.rooms
+    .map(room => room.price?.amountCents ?? null)
+    .filter((price): price is number => price !== null)
+  return prices.length > 0 ? Math.min(...prices) : null
+})
+
+const average = computed(() => props.hotel.rating.average)
 
 const band = computed(() => {
-  const average = props.hotel.rating.average
-  if (average >= 9) return t('detail.bandExcellent')
-  if (average >= 8) return t('detail.bandVeryGood')
-  if (average >= 7) return t('detail.bandGood')
-  if (average >= 6) return t('detail.bandPleasant')
+  const value = props.hotel.rating.average
+  if (value === null) return ''
+  // D43: ratings are 1-5. The 9/8/7/6 thresholds assumed a 10-scale, so every
+  // real hotel fell through to "Mixed".
+  if (value >= 4.5) return t('detail.bandExcellent')
+  if (value >= 4) return t('detail.bandVeryGood')
+  if (value >= 3.5) return t('detail.bandGood')
+  if (value >= 3) return t('detail.bandPleasant')
   return t('detail.bandMixed')
 })
 
@@ -42,8 +52,8 @@ const cancellation = computed(() => t('detail.cancellation'))
       </h1>
 
       <p class="mt-3 flex flex-wrap items-baseline gap-x-2 text-sm">
-        <span class="tabular text-lg font-semibold">{{ hotel.rating.average }}</span>
-        <span>{{ band }}</span>
+        <span class="tabular text-lg font-semibold">{{ average === null ? '—' : average.toFixed(1) }}</span>
+        <span v-if="band">{{ band }}</span>
         <span class="text-fg-subtle">
           {{ hotel.rating.totalReviews === 1
             ? $t('detail.reviewsCountOne')

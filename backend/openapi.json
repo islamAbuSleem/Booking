@@ -1,6 +1,179 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/api/auth/register": {
+      "post": {
+        "description": "`wantsToHost` promotes the new account to HOST, otherwise it is a GUEST. The password is hashed with Argon2id and never returned.",
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "The new user and the session token (also set as a cookie).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The email is already registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Register with email and password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "description": "A missing email and a wrong password both return the same `INVALID_CREDENTIALS` 401, so the response never leaks which one failed.",
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The user and the session token (also set as a cookie).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid email or password.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Log in with email and password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "The cookie was cleared."
+          }
+        },
+        "summary": "Clear the session cookie",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The user attached by the JWT guard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session cookie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The current session user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/google": {
+      "get": {
+        "operationId": "AuthController_googleEntry",
+        "parameters": [],
+        "responses": {
+          "302": {
+            "description": "Redirects to Google."
+          }
+        },
+        "summary": "Start Google OAuth (302 to Google)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/google/callback": {
+      "get": {
+        "operationId": "AuthController_googleCallback",
+        "parameters": [],
+        "responses": {
+          "302": {
+            "description": "Sets the session cookie and redirects to the frontend origin."
+          }
+        },
+        "summary": "Google OAuth callback",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/github": {
+      "get": {
+        "operationId": "AuthController_githubEntry",
+        "parameters": [],
+        "responses": {
+          "302": {
+            "description": "Redirects to GitHub."
+          }
+        },
+        "summary": "Start GitHub OAuth (302 to GitHub)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/github/callback": {
+      "get": {
+        "operationId": "AuthController_githubCallback",
+        "parameters": [],
+        "responses": {
+          "302": {
+            "description": "Sets the session cookie and redirects to the frontend origin."
+          }
+        },
+        "summary": "GitHub OAuth callback",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/hotels": {
       "get": {
         "description": "Only PUBLISHED hotels are ever returned — the filter is in SQL, so a non-published row cannot leak through a page boundary. Prices are the cheapest room that fits `guests`, in the requested currency. Dates are accepted and validated here; availability filtering lands with the quote endpoint in T18.",
@@ -695,6 +868,110 @@
           },
           "data": {
             "$ref": "#/components/schemas/HealthData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "AuthUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "GUEST",
+              "HOST",
+              "ADMIN"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "avatarUrl",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "AuthData": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "user",
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "AuthEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/AuthData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MeData": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          }
+        },
+        "required": [
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "MeEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/MeData"
           }
         },
         "required": [

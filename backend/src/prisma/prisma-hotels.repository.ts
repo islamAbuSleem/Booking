@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import {
   type HotelCard,
@@ -184,7 +184,9 @@ function toRatingSummary(reviews: ReviewAggregate): RatingSummary {
  */
 @Injectable()
 export class PrismaHotelsRepository implements HotelsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`, so an
+  // inferred token would be undefined in the OpenAPI preview (see PrismaService).
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async findPublished(criteria: HotelSearchCriteria): Promise<HotelListPage> {
     const where = buildPublishedWhere(criteria);

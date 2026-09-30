@@ -3,13 +3,20 @@
  * Room card. The rate is the loudest thing on it, because that is what the user is
  * comparing. Bed type and occupancy are labels, not prose — this is a functional
  * surface sitting inside an editorial one.
+ *
+ * The detail payload carries no per-room amenity list, so the card shows occupancy
+ * only. A missing price renders as "—", not "$0".
  */
-import type { MockRoom } from '~/utils/mock/types'
+import type { ApiHotelRoom } from '~/utils/api'
 import { usd, wholeNumber } from '~/utils/format'
 
-const props = defineProps<{ room: MockRoom, hotelSlug: string }>()
+const props = defineProps<{ room: ApiHotelRoom, hotelSlug: string }>()
 
-const photo = computed(() => props.room.images[0])
+const photo = computed(() => props.room.images[0] ?? null)
+
+const priceLabel = computed(() =>
+  props.room.price === null ? '—' : usd(props.room.price.amountCents),
+)
 
 const inventory = computed(() =>
   props.room.totalInventory === 1
@@ -27,9 +34,9 @@ const inventory = computed(() =>
       <img
         v-if="photo"
         :src="photo.url"
-        :alt="photo.alt"
-        width="800"
-        height="600"
+        :alt="photo.altText ?? room.name"
+        :width="photo.width"
+        :height="photo.height"
         loading="lazy"
         decoding="async"
         class="border-rule aspect-[4/3] w-full border-b object-cover"
@@ -49,20 +56,14 @@ const inventory = computed(() =>
           {{ room.description }}
         </p>
 
-        <ul class="text-fg-muted flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          <li>{{ $t('hotel.sleeps', { count: room.maxGuests }) }}</li>
-          <li
-            v-for="item in room.amenities"
-            :key="item"
-          >
-            {{ item }}
-          </li>
-        </ul>
+        <p class="text-fg-muted text-sm">
+          {{ $t('hotel.sleeps', { count: room.maxGuests }) }}
+        </p>
 
         <div class="mt-auto flex flex-wrap items-end justify-between gap-4 pt-4">
           <p class="flex flex-col">
             <span class="flex items-baseline gap-1.5">
-              <span class="tabular text-price">{{ usd(room.pricePerNightCents) }}</span>
+              <span class="tabular text-price">{{ priceLabel }}</span>
               <span class="text-fg-subtle text-sm">{{ $t('hotel.perNight') }}</span>
             </span>
             <span class="text-fg-subtle text-label uppercase">

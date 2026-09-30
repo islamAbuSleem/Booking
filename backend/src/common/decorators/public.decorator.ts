@@ -1,7 +1,11 @@
 import { SetMetadata, type CustomDecorator } from '@nestjs/common';
 
-/** T14 reads this. Today it is metadata only, and every route is public because there is
- *  no guard yet. Declared now so the convention is not retrofit onto every controller. */
+/**
+ * T14 — opts a route out of the global `JwtAuthGuard`.
+ *
+ * Register, login, health, public hotel reads and the OAuth entry/callback
+ * routes are public; everything else defaults to authenticated.
+ */
 export const IS_PUBLIC_KEY = 'isPublic';
 
 export const Public = (): CustomDecorator => SetMetadata(IS_PUBLIC_KEY, true);

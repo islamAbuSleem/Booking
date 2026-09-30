@@ -7,9 +7,9 @@
  * `alt` is content-bearing per ui-tokens.md, so a photograph whose text is the same
  * as its neighbours is decorative and takes `alt=""`.
  */
-import type { MockImage } from '~/utils/mock/types'
+import type { ApiHotelImage } from '~/utils/api'
 
-const props = defineProps<{ images: MockImage[] }>()
+const props = defineProps<{ images: ApiHotelImage[] }>()
 
 const emit = defineEmits<{ open: [index: number] }>()
 
@@ -26,9 +26,9 @@ const thumbnails = computed(() => props.images.slice(1, 4))
     >
       <img
         :src="images[0].url"
-        :alt="images[0].alt"
-        width="1200"
-        height="675"
+        :alt="images[0].altText ?? ''"
+        :width="images[0].width"
+        :height="images[0].height"
         fetchpriority="high"
         decoding="async"
         class="aspect-[16/9] w-full object-cover"
@@ -69,9 +69,9 @@ const thumbnails = computed(() => props.images.slice(1, 4))
         >
           <img
             :src="image.url"
-            :alt="image.alt"
-            width="800"
-            height="600"
+            :alt="image.altText ?? ''"
+            :width="image.width"
+            :height="image.height"
             loading="lazy"
             decoding="async"
             class="aspect-[4/3] w-full object-cover"
