@@ -47,9 +47,12 @@ export const envSchema = z.object({
     .refine((value) => value !== JWT_SECRET_PLACEHOLDER, {
       message: `JWT_SECRET is still the .env.example placeholder — generate one with "openssl rand -base64 48"`,
     })
-    .refine((value) => value === undefined || value === '' || value.length >= 32, {
-      message: 'JWT_SECRET must be 32 or more characters',
-    }),
+    .refine(
+      (value) => value === undefined || value === '' || value.length >= 32,
+      {
+        message: 'JWT_SECRET must be 32 or more characters',
+      },
+    ),
 
   LOG_LEVEL: z
     .enum(['log', 'error', 'warn', 'debug', 'verbose'])

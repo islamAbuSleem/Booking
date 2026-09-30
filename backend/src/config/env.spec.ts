@@ -47,8 +47,8 @@ describe('parseEnv', () => {
   });
 
   it('refuses a JWT_SECRET shorter than 32 characters', () => {
-    expect(() => parseEnv({ DATABASE_URL: 'x', JWT_SECRET: 'too-short' })).toThrow(
-      /JWT_SECRET/,
-    );
+    expect(() =>
+      parseEnv({ DATABASE_URL: 'x', JWT_SECRET: 'too-short' }),
+    ).toThrow(/JWT_SECRET/);
   });
 });

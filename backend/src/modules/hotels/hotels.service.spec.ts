@@ -316,7 +316,10 @@ describe('HotelsService.findOne', () => {
     const service = new HotelsService(new FakeHotelsRepository([], details));
 
     await expect(
-      service.findOne('the-barn-at-fen-end', '22222222-2222-4222-8222-222222222222'),
+      service.findOne(
+        'the-barn-at-fen-end',
+        '22222222-2222-4222-8222-222222222222',
+      ),
     ).rejects.toMatchObject({
       status: 404,
     });
