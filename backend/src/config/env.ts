@@ -34,10 +34,30 @@ export const envSchema = z.object({
   /** DIRECT Neon URL. Only the Prisma CLI needs it; the API process does not. */
   DIRECT_URL: z.string().min(1).optional(),
 
+  /**
+   * Optional until T14 signs anything, but a *present* value has to be real: the
+   * `replace-me-with-32-plus-random-bytes` line from `.env.example` is public knowledge, so
+   * shipping it would mean every deployment shares a secret an attacker already has. Empty
+   * is allowed and means "auth is not configured"; a copy of the placeholder is refused at
+   * boot rather than in production.
+   */
+  JWT_SECRET: z
+    .string()
+    .optional()
+    .refine((value) => value !== JWT_SECRET_PLACEHOLDER, {
+      message: `JWT_SECRET is still the .env.example placeholder — generate one with "openssl rand -base64 48"`,
+    })
+    .refine((value) => value === undefined || value === '' || value.length >= 32, {
+      message: 'JWT_SECRET must be 32 or more characters',
+    }),
+
   LOG_LEVEL: z
     .enum(['log', 'error', 'warn', 'debug', 'verbose'])
     .default('log'),
 });
+
+/** The exact string `.env.example` used to ship, kept so it can be refused by name. */
+export const JWT_SECRET_PLACEHOLDER = 'replace-me-with-32-plus-random-bytes';
 
 export type Env = z.infer<typeof envSchema>;
 

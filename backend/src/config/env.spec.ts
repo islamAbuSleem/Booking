@@ -1,4 +1,4 @@
-import { parseEnv } from './env.js';
+import { JWT_SECRET_PLACEHOLDER, parseEnv } from './env.js';
 
 describe('parseEnv', () => {
   it('fills the defaults for an empty environment', () => {
@@ -34,5 +34,21 @@ describe('parseEnv', () => {
     });
 
     expect(env.FRONTEND_ORIGIN).toBe('https://a.test,https://b.test');
+  });
+
+  it('allows an unset JWT_SECRET, because nothing signs anything yet', () => {
+    expect(parseEnv({ DATABASE_URL: 'x' }).JWT_SECRET).toBeUndefined();
+  });
+
+  it('refuses the .env.example JWT_SECRET placeholder at boot', () => {
+    expect(() =>
+      parseEnv({ DATABASE_URL: 'x', JWT_SECRET: JWT_SECRET_PLACEHOLDER }),
+    ).toThrow(/JWT_SECRET/);
+  });
+
+  it('refuses a JWT_SECRET shorter than 32 characters', () => {
+    expect(() => parseEnv({ DATABASE_URL: 'x', JWT_SECRET: 'too-short' })).toThrow(
+      /JWT_SECRET/,
+    );
   });
 });
