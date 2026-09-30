@@ -4,6 +4,8 @@
  * with a 2x2 field grid, not a cramped single row. That was a specific defect in the
  * design references — see the corrected prompt in context/stitch-prompts.md.
  */
+import { localToday } from '~/utils/date'
+
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -31,7 +33,7 @@ const rangeError = computed(() => {
   return checkOut.value > checkIn.value ? '' : t('search.invalidRange')
 })
 
-const today = new Date().toISOString().slice(0, 10)
+const today = localToday()
 
 const incrementGuests = (): void => {
   guests.value = Math.min(20, guests.value + 1)
