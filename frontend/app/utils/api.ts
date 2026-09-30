@@ -49,7 +49,7 @@ export function isTransportError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.code === 'NETWORK_ERROR'
 }
 
-/** No backend answered *at all*, or something that is not the API answered 2xx. Pages fall back to the mock fixtures on these two, and only these. */
+/** No backend answered *at all*, or something that answered 2xx but is not the API. Pages fall back to the mock fixtures on these two, and only these. */
 const LOCAL_FAILURES = new Set(['NETWORK_ERROR', 'BAD_RESPONSE'])
 
 /**
