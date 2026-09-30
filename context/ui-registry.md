@@ -31,8 +31,19 @@ Every component built, one row each. Add a row when the component is created.
 |---|---|---|---|---|
 | `HotelCard` | `app/components/HotelCard.vue` | display | T4 | built |
 | `SearchWidget` | `app/components/SearchWidget.vue` | form | T4 | built |
+| `GuestsStepper` | `app/components/GuestsStepper.vue` | form | T5 | built |
+| `HotelFilterDrawer` | `app/components/HotelFilterDrawer.vue` | form | T5 | built |
+| `HotelFilters` | `app/components/HotelFilters.vue` | form | T5 | built |
+| `PriceRangeSlider` | `app/components/PriceRangeSlider.vue` | form | T5 | built |
+| `HotelBookingPanel` | `app/components/HotelBookingPanel.vue` | display | T6 | built |
+| `HotelGallery` | `app/components/HotelGallery.vue` | display | T6 | built |
+| `HotelLightbox` | `app/components/HotelLightbox.vue` | display | T6 | built |
+| `HotelLocation` | `app/components/HotelLocation.vue` | display | T6 | built |
+| `RatingBreakdown` | `app/components/RatingBreakdown.vue` | display | T6 | built |
+| `ReviewCard` | `app/components/ReviewCard.vue` | display | T6 | built |
+| `RoomCard` | `app/components/RoomCard.vue` | display | T6 | built |
 
-Remaining, as their tickets build them — T5 list, T6 detail, T7 booking, T8 trips,
+Remaining, as their tickets build them — T7 booking flow, T8 trips, T9 auth,
 T10 host dashboard, T11 admin.
 
 **Type** — `display` (presentational) / `form` (input handling) / `layout` (page shell).

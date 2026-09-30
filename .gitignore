@@ -11,7 +11,7 @@ build/
 *.tsbuildinfo
 
 # Generated
-apps/api/src/generated/
+backend/src/generated/
 apps/web/.data/
 packages/shared/dist/
 

@@ -1,0 +1,374 @@
+// T12 — Phase 1-4 database schema.
+//
+// Prisma 7 notes (see context/library-docs.md):
+//   * `datasource.db` accepts `provider` ONLY. `url` and `directUrl` were removed and
+//     `prisma generate` fails with P1012 if they are present. The URLs live in
+//     `prisma.config.ts` (CLI, DIRECT_URL) and in a `PrismaNeon` driver adapter at
+//     runtime (pooled DATABASE_URL).
+//   * The `prisma-client` generator requires `output`. The API is nodenext ESM, so the
+//     generator's ESM defaults are correct here — do NOT force `moduleFormat = "cjs"`.
+//   * A driver adapter is mandatory in v7.
+//
+// Tables are snake_case and columns are mapped explicitly, matching
+// context/architecture.md. `rooms` deliberately carries NO price column: prices live in
+// `room_prices`, one row per (room_id, currency). Multi-currency in T39 is then an
+// INSERT, never an amendment to a populated table.
+//
+// Phase 5 tables (threads, messages, cancellation_policies, refunds, fx_rates,
+// notification_preferences, email_outbox, revenue_daily) are NOT created here. They are
+// added by their own tickets; an unused table is a migration to carry forever. The one
+// exception is `currencies`, which exists now so every room gets a real USD price row
+// against a known currency.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  GUEST
+  HOST
+  ADMIN
+}
+
+enum HotelStatus {
+  PENDING
+  PUBLISHED
+  REJECTED
+  SUSPENDED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  requires_payment
+  succeeded
+  refunded
+  failed
+}
+
+enum ReviewStatus {
+  VISIBLE
+  HIDDEN
+}
+
+model User {
+  id        String  @id @default(uuid()) @db.Uuid
+  email     String  @unique
+  name      String
+  avatarUrl String? @map("avatar_url")
+
+  /// Null for OAuth-only accounts (T15).
+  passwordHash String? @map("password_hash")
+
+  role UserRole @default(GUEST)
+
+  oauthProvider  String? @map("oauth_provider")
+  oauthAccountId String? @map("oauth_account_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  hotels    Hotel[]
+  bookings  Booking[]  @relation("GuestBookings")
+  reviews   Review[]
+  favorites Favorite[]
+
+  // Email stays unique across providers so one person is one account; the OAuth tuple
+  // is the lookup key for the provider callbacks. Postgres allows repeated NULLs in a
+  // unique index, so email/password users do not collide here.
+  @@unique([oauthProvider, oauthAccountId], map: "users_oauth_account_key")
+  @@map("users")
+}
+
+model Hotel {
+  id     String @id @default(uuid()) @db.Uuid
+  hostId String @map("host_id") @db.Uuid
+
+  name        String
+  slug        String @unique
+  description String
+
+  addressLine String @map("address_line")
+  city        String
+  country     String
+  lat         Float
+  lng         Float
+
+  starRating Int         @map("star_rating")
+  status     HotelStatus @default(PENDING)
+
+  /// Local wall-clock times as `HH:mm`. A stay is a date range, not an instant, so a
+  /// time-of-day column would invite timezone bugs for no benefit.
+  checkInTime  String @map("check_in_time")
+  checkOutTime String @map("check_out_time")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  host          User           @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  rooms         Room[]
+  amenities     HotelAmenity[]
+  images        HotelImage[]
+  reviews       Review[]
+  favorites     Favorite[]
+  blackoutDates BlackoutDate[]
+
+  @@index([status, city])
+  @@index([hostId])
+  @@map("hotels")
+}
+
+model Room {
+  id      String @id @default(uuid()) @db.Uuid
+  hotelId String @map("hotel_id") @db.Uuid
+
+  name        String
+  description String
+  bedType     String @map("bed_type")
+  maxGuests   Int    @map("max_guests")
+
+  /// Caps concurrent bookings. Availability math (T18) compares confirmed overlaps plus
+  /// blackout overlaps against this.
+  totalInventory Int @map("total_inventory")
+
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  hotel         Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  prices        RoomPrice[]
+  bookings      Booking[]
+  images        HotelImage[]
+  blackoutDates BlackoutDate[]
+
+  // A room name is a label within one hotel, so it is unique there. This is also the
+  // natural key the seed upserts on, which is what makes the seed re-runnable.
+  @@unique([hotelId, name], map: "rooms_hotel_id_name_key")
+  @@index([hotelId, sortOrder])
+  @@map("rooms")
+}
+
+model RoomPrice {
+  roomId   String @map("room_id") @db.Uuid
+  currency String @map("currency") @db.Char(3)
+
+  priceCents Int @map("price_cents")
+
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  currencyRef Currency @relation(fields: [currency], references: [code], onDelete: Restrict)
+
+  @@id([roomId, currency])
+  @@index([currency])
+  @@map("room_prices")
+}
+
+model Currency {
+  /// ISO 4217. A natural key: the code IS the identity, so there is no surrogate id.
+  code   String @id @db.Char(3)
+  name   String
+  symbol String
+
+  isActive Boolean @default(false) @map("is_active")
+
+  roomPrices RoomPrice[]
+
+  @@map("currencies")
+}
+
+model Amenity {
+  /// A readable slug (`wifi`, `pool`, ...) rather than a uuid. Amenities are a small
+  /// curated global lookup, and the slug is the natural key — it is what the public
+  /// filter query string carries (`?amenities=wifi,pool`).
+  id   String @id @db.VarChar(64)
+  name String @unique
+  icon String
+
+  hotels HotelAmenity[]
+
+  @@map("amenities")
+}
+
+model HotelAmenity {
+  hotelId   String @map("hotel_id") @db.Uuid
+  amenityId String @map("amenity_id") @db.VarChar(64)
+
+  hotel   Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  amenity Amenity @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([hotelId, amenityId])
+  @@index([amenityId])
+  @@map("hotel_amenities")
+}
+
+model HotelImage {
+  id      String @id @default(uuid()) @db.Uuid
+  hotelId String @map("hotel_id") @db.Uuid
+
+  /// Null for hotel-level imagery, set for room-level imagery.
+  roomId String? @map("room_id") @db.Uuid
+
+  url String
+
+  /// Needed for Cloudinary deletes and transformations; the url alone is not enough.
+  publicId String? @map("public_id")
+
+  altText String? @map("alt_text")
+
+  /// Declared up front so the API can hand the client intrinsic dimensions and the
+  /// browser can reserve the box before the bytes land (CLS budget).
+  aspect String @default("3:2")
+  width  Int    @default(800)
+  height Int    @default(533)
+
+  sortOrder Int     @default(0) @map("sort_order")
+  isCover   Boolean @default(false) @map("is_cover")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room  Room? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId, sortOrder])
+  @@index([roomId])
+
+  // The same asset is never attached to a hotel twice. Also the seed's natural key.
+  @@unique([hotelId, url], map: "hotel_images_hotel_id_url_key")
+  @@map("hotel_images")
+}
+
+model BlackoutDate {
+  id      String @id @default(uuid()) @db.Uuid
+  hotelId String @map("hotel_id") @db.Uuid
+
+  /// Null means the whole hotel is closed for the range.
+  roomId String? @map("room_id") @db.Uuid
+
+  /// Date-only and INCLUSIVE on both ends — an operator closing a hotel for two nights
+  /// writes the first and the last night of the block.
+  startsOn DateTime @map("starts_on") @db.Date
+  endsOn   DateTime @map("ends_on") @db.Date
+
+  reason String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room  Room? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId, startsOn, endsOn])
+  @@index([roomId, startsOn, endsOn])
+  @@map("blackout_dates")
+}
+
+model Booking {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Human-readable and unique, e.g. `GB-4821`. Shown to the guest, so it must not be
+  /// the primary key.
+  reference String @unique
+
+  guestId String @map("guest_id") @db.Uuid
+  roomId  String @map("room_id") @db.Uuid
+
+  /// DATE, not timestamp: a stay is a range of days, so check-in by date is correct.
+  checkIn  DateTime @map("check_in") @db.Date
+  checkOut DateTime @map("check_out") @db.Date
+
+  guestsCount Int @map("guests_count")
+  nights      Int
+
+  /// Immutable price snapshot. The server recomputes these; a client-sent total is never
+  /// trusted (D3).
+  subtotalCents Int @map("subtotal_cents")
+  feesCents     Int @map("fees_cents")
+  totalCents    Int @map("total_cents")
+
+  /// A historical label, deliberately NOT a foreign key to `currencies`: a booking pins
+  /// the currency it was quoted in, and a later currency deactivation must never
+  /// invalidate history (D10).
+  currency String @db.Char(3)
+
+  status BookingStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  guest   User     @relation("GuestBookings", fields: [guestId], references: [id], onDelete: Restrict)
+  room    Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  payment Payment?
+  review  Review?
+
+  @@index([guestId, status])
+  @@index([roomId, checkIn, checkOut])
+  @@map("bookings")
+}
+
+model Payment {
+  id        String @id @default(uuid()) @db.Uuid
+  bookingId String @unique @map("booking_id") @db.Uuid
+
+  stripePaymentIntentId String @unique @map("stripe_payment_intent_id")
+
+  amountCents Int           @map("amount_cents")
+  currency    String        @db.Char(3)
+  status      PaymentStatus @default(requires_payment)
+  receiptUrl  String?       @map("receipt_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+model Review {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// One review per completed stay.
+  bookingId String @unique @map("booking_id") @db.Uuid
+
+  authorId String @map("author_id") @db.Uuid
+  hotelId  String @map("hotel_id") @db.Uuid
+
+  /// 1-5, per context/architecture.md. The Phase 1 frontend mock used a 1-10 scale;
+  /// the API follows the schema.
+  rating Int
+
+  title  String
+  body   String
+  status ReviewStatus @default(VISIBLE)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  author  User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  hotel   Hotel   @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@index([hotelId, status, createdAt])
+  @@map("reviews")
+}
+
+model Favorite {
+  userId  String @map("user_id") @db.Uuid
+  hotelId String @map("hotel_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@id([userId, hotelId])
+  @@index([hotelId])
+  @@map("favorites")
+}

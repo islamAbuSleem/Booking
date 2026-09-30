@@ -1,33 +1,20 @@
-import { Logger, ValidationPipe } from '@nestjs/common'
-import { NestFactory } from '@nestjs/core'
-import { AppModule } from './app.module.js'
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module.js';
+import { configureApp, logListening } from './bootstrap.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
     // Stripe webhook signature verification (T27) needs the unparsed body. Set at
     // scaffold so it is never retrofitted. Do NOT also set bodyParser: false.
     rawBody: true,
-  })
+  });
 
-  app.setGlobalPrefix('api')
+  configureApp(app);
 
-  app.enableCors({
-    origin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:3000',
-    credentials: true,
-  })
+  const port = Number(process.env.PORT ?? 3000);
+  await app.listen(port);
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  )
-
-  const port = Number(process.env.PORT ?? 3000)
-  await app.listen(port)
-
-  new Logger('bootstrap').log(`[bootstrap] api listening on :${port}`)
+  logListening(port);
 }
 
-await bootstrap()
+await bootstrap();

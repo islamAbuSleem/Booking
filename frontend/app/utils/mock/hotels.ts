@@ -83,7 +83,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('larkspur-single', '4:3', 'Alley Single room')],
       },
     ],
-    rating: rating(9.4, 1284, [9.6, 9.1, 9.4, 8.9, 9.7]),
+    rating: rating(4.7, 1284, [4.8, 4.6, 4.7, 4.5, 4.9]),
   },
   {
     id: 'htl_casa_verde',
@@ -134,7 +134,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('casaverde-patio', '4:3', 'Patio room with doors open')],
       },
     ],
-    rating: rating(9.2, 312, [9.4, 9.6, 8.8, 8.7, 9.5]),
+    rating: rating(4.6, 312, [4.7, 4.8, 4.4, 4.4, 4.8]),
   },
   {
     id: 'htl_nord',
@@ -185,7 +185,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('nord-court', '4:3', 'Courtyard King room')],
       },
     ],
-    rating: rating(9.5, 580, [9.8, 9.6, 9.5, 9.4, 9.9]),
+    rating: rating(4.8, 580, [4.9, 4.8, 4.8, 4.7, 5]),
   },
   {
     id: 'htl_bellavista',
@@ -222,7 +222,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('bellavista-std', '4:3', 'Standard Double room')],
       },
     ],
-    rating: rating(8.1, 194, [8.0, 8.8, 7.9, 7.6, 8.4]),
+    rating: rating(4.1, 194, [4, 4.4, 4, 3.8, 4.2]),
   },
   {
     id: 'htl_palacio',
@@ -259,7 +259,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('palacio-suite', '4:3', 'Azulejo Suite sitting room')],
       },
     ],
-    rating: rating(9.6, 92, [9.9, 9.2, 9.7, 9.6, 9.8]),
+    rating: rating(4.8, 92, [5, 4.6, 4.9, 4.8, 4.9]),
   },
   {
     id: 'htl_fen_end',
@@ -293,7 +293,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('fenend-barn', '4:3', 'The Threshing Floor room')],
       },
     ],
-    rating: rating(8.8, 0, [9, 9, 8.5, 8, 9.5]),
+    rating: rating(4.4, 0, [4.5, 4.5, 4.3, 4, 4.8]),
   },
   {
     id: 'htl_miradouro',
@@ -327,7 +327,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('miradouro-std', '4:3', 'Standard Double at Miradouro')],
       },
     ],
-    rating: rating(8.4, 156, [8.6, 9.1, 8.0, 7.6, 8.8]),
+    rating: rating(4.2, 156, [4.3, 4.6, 4, 3.8, 4.4]),
   },
   {
     id: 'htl_casa_lopez',
@@ -361,7 +361,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('lopez-deluxe', '4:3', 'Courtyard Deluxe room')],
       },
     ],
-    rating: rating(9.0, 431, [9.3, 9.4, 8.8, 8.6, 9.1]),
+    rating: rating(4.5, 431, [4.7, 4.7, 4.4, 4.3, 4.6]),
   },
   {
     id: 'htl_schloss',
@@ -395,7 +395,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('schloss-atelier', '4:3', 'Atelier Room with tall studio windows')],
       },
     ],
-    rating: rating(8.8, 267, [8.7, 9.2, 8.6, 8.4, 9.0]),
+    rating: rating(4.4, 267, [4.4, 4.6, 4.3, 4.2, 4.5]),
   },
   {
     id: 'htl_douro',
@@ -429,7 +429,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('douro-tawny', '4:3', 'Tawny Room interior')],
       },
     ],
-    rating: rating(8.6, 98, [8.8, 8.9, 8.4, 8.0, 9.0]),
+    rating: rating(4.3, 98, [4.4, 4.5, 4.2, 4, 4.5]),
   },
   {
     id: 'htl_pousada',
@@ -463,7 +463,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('pousada-garden', '4:3', 'Garden Room looking onto the lawn')],
       },
     ],
-    rating: rating(9.7, 71, [9.9, 9.1, 9.8, 9.5, 9.9]),
+    rating: rating(4.9, 71, [5, 4.6, 4.9, 4.8, 5]),
   },
   {
     id: 'htl_verde_villa',
@@ -497,7 +497,7 @@ export const HOTELS: MockHotel[] = [
         images: [image('casadelmar-std', '4:3', 'Standard Double at Casa del Mar')],
       },
     ],
-    rating: rating(8.1, 0, [8, 8, 8, 8, 8.5]),
+    rating: rating(4.1, 0, [4, 4, 4, 4, 4.3]),
   },
 ]
 

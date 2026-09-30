@@ -1,0 +1,708 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/hotels": {
+      "get": {
+        "description": "Only PUBLISHED hotels are ever returned — the filter is in SQL, so a non-published row cannot leak through a page boundary. Prices are the cheapest room that fits `guests`, in the requested currency. Dates are accepted and validated here; availability filtering lands with the quote endpoint in T18.",
+        "operationId": "HotelsController_findAll",
+        "parameters": [
+          {
+            "name": "city",
+            "required": false,
+            "in": "query",
+            "description": "City name, case-insensitive exact match. Omit to search every city.",
+            "schema": {
+              "example": "Lisbon",
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkIn",
+            "required": false,
+            "in": "query",
+            "description": "First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp.",
+            "schema": {
+              "format": "date",
+              "example": "2026-06-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkOut",
+            "required": false,
+            "in": "query",
+            "description": "Last day the guest leaves, `YYYY-MM-DD`. Must be strictly after `checkIn`. The stay is half-open, so a checkout equal to another booking check-in never overlaps.",
+            "schema": {
+              "format": "date",
+              "example": "2026-06-04",
+              "type": "string"
+            }
+          },
+          {
+            "name": "guests",
+            "required": false,
+            "in": "query",
+            "description": "Party size, 1-20. A hotel qualifies only if it has a room that fits.",
+            "schema": {
+              "example": 2,
+              "type": "number"
+            }
+          },
+          {
+            "name": "minPrice",
+            "required": false,
+            "in": "query",
+            "description": "LOWEST nightly price in MAJOR currency units, not cents. `150` means 150.00. Must be <= maxPrice.",
+            "schema": {
+              "example": 150,
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxPrice",
+            "required": false,
+            "in": "query",
+            "description": "Highest nightly price in MAJOR currency units, not cents.",
+            "schema": {
+              "example": 500,
+              "type": "number"
+            }
+          },
+          {
+            "name": "amenities",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated amenity slugs, ANDed: `wifi,pool` returns only hotels with both. Slugs are lowercase: wifi, pool, breakfast, pets, ac, workspace, gym, spa, restaurant, bar, parking, shuttle.",
+            "schema": {
+              "example": "wifi,breakfast",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "description": "`recommended` (default) is star rating then name. `rating_desc` puts hotels with no reviews last, because a null average is not the best rating.",
+            "schema": {
+              "enum": [
+                "recommended",
+                "price_asc",
+                "price_desc",
+                "rating_desc",
+                "name_asc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "1-based page number.",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "Items per page, 1-50.",
+            "schema": {
+              "example": 12,
+              "type": "number"
+            }
+          },
+          {
+            "name": "currency",
+            "required": false,
+            "in": "query",
+            "description": "ISO 4217 code to price in. Only USD has price rows today; a currency with no `room_prices` row yields `priceFrom: null`, never zero.",
+            "schema": {
+              "example": "USD",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of hotels. `items` is empty and `total` is 0 when nothing matches.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelListEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The query string failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search published hotels",
+        "tags": [
+          "Hotels"
+        ]
+      }
+    },
+    "/api/hotels/{id}": {
+      "get": {
+        "description": "Resolves by uuid or by slug — the frontend links to `/hotels/{slug}`. A hotel that is not PUBLISHED is a 404 for everyone but its own host, so the endpoint cannot be used to discover a draft listing.",
+        "operationId": "HotelsController_findOne",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The hotel, with rooms, amenities, images and a review summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelDetailEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such hotel, or it is not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hotel detail",
+        "tags": [
+          "Hotels"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "Always 200. `status` is \"ok\" only when the database answered; `db` carries reachability on its own, so a monitor can alert on it without parsing a status string.",
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The service answered. The database may still be down — read `db`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Liveness and database reachability",
+        "tags": [
+          "Health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Booking API",
+    "description": "Hotel booking platform. Every response uses one envelope: { success: true, data } or { success: false, error: { code, message, details? } }. Branch on error.code, never on error.message.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "ApiErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "AmenitySlug": {
+        "type": "string"
+      },
+      "HotelImage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "altText": {
+            "nullable": true,
+            "type": "string"
+          },
+          "aspect": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "height": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "url",
+          "altText",
+          "aspect",
+          "width",
+          "height"
+        ],
+        "additionalProperties": false
+      },
+      "Money": {
+        "type": "object",
+        "properties": {
+          "amountCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code."
+          }
+        },
+        "required": [
+          "amountCents",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "RatingSummary": {
+        "type": "object",
+        "properties": {
+          "average": {
+            "nullable": true,
+            "type": "number"
+          },
+          "totalReviews": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "average",
+          "totalReviews"
+        ],
+        "additionalProperties": false
+      },
+      "HotelCard": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Stable, URL-safe. The detail route accepts this."
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "starRating": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "coverImage": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HotelImage"
+              }
+            ]
+          },
+          "amenityIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmenitySlug"
+            }
+          },
+          "rating": {
+            "$ref": "#/components/schemas/RatingSummary"
+          },
+          "priceFrom": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code the prices are quoted in."
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "city",
+          "country",
+          "starRating",
+          "coverImage",
+          "amenityIds",
+          "rating",
+          "priceFrom",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "HotelRoom": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "bedType": {
+            "type": "string"
+          },
+          "maxGuests": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalInventory": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "price": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              }
+            ]
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelImage"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "bedType",
+          "maxGuests",
+          "totalInventory",
+          "price",
+          "images"
+        ],
+        "additionalProperties": false
+      },
+      "HotelDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "addressLine": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lng": {
+            "type": "number"
+          },
+          "starRating": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PUBLISHED",
+              "REJECTED",
+              "SUSPENDED"
+            ]
+          },
+          "checkInTime": {
+            "type": "string",
+            "description": "Local wall-clock `HH:mm`."
+          },
+          "checkOutTime": {
+            "type": "string",
+            "description": "Local wall-clock `HH:mm`."
+          },
+          "currency": {
+            "type": "string"
+          },
+          "coverImage": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/HotelImage"
+              }
+            ]
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelImage"
+            },
+            "description": "Hotel-level imagery, cover first."
+          },
+          "amenityIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AmenitySlug"
+            }
+          },
+          "rating": {
+            "$ref": "#/components/schemas/RatingSummary"
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelRoom"
+            }
+          },
+          "host": {
+            "nullable": true,
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "addressLine",
+          "city",
+          "country",
+          "lat",
+          "lng",
+          "starRating",
+          "status",
+          "checkInTime",
+          "checkOutTime",
+          "currency",
+          "coverImage",
+          "images",
+          "amenityIds",
+          "rating",
+          "rooms",
+          "host"
+        ],
+        "additionalProperties": false
+      },
+      "HotelListData": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotelCard"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Total matching hotels, ignoring pagination."
+          },
+          "page": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "HealthData": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "db": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "db"
+        ],
+        "additionalProperties": false
+      },
+      "HotelListEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotelListData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "HotelDetailEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotelDetail"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "HealthEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/HealthData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

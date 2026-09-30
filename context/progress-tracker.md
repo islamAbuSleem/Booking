@@ -45,8 +45,8 @@
 - [x] T2 Design system and app shell
 - [x] T3 Mock data layer
 - [x] T4 Home page
-- [ ] T5 Hotels list + filters
-- [ ] T6 Hotel detail
+- [x] T5 Hotels list + filters
+- [x] T6 Hotel detail
 - [ ] T7 Booking flow
 - [ ] T8 Bookings pages
 - [ ] T9 Auth pages
@@ -54,12 +54,12 @@
 - [ ] T11 Admin dashboard
 
 ### Phase 2 — Domain
-- [ ] T12 Database schema, migration, seed
-- [ ] T13 API foundation
-- [ ] T13a OpenAPI contract and frontend type generation
+- [x] T12 Database schema, migration, seed
+- [x] T13 API foundation
+- [x] T13a OpenAPI contract and frontend type generation
 - [ ] T14 Auth: email/password
 - [ ] T15 Auth: Google and GitHub OAuth
-- [ ] T16 Hotels read API
+- [x] T16 Hotels read API
 - [ ] T17a API client and home page wiring
 - [ ] T17b Hotels list wiring
 - [ ] T17c Hotel detail wiring
@@ -296,15 +296,41 @@
   `npm audit fix --force` proposes `@nestjs/mau@0.0.6`, a **downgrade** from 0.2.6. Not
   applied. `mau` is only used by `nest deploy` and never ships. Revisit if it is ever
   used in CI.
-- **D42 — Subagents are unusable in this environment; the parallel FE/BE plan is on
-  hold.** Three attempts, including a no-tools probe, all failed with the same
-  opencode session-store insert error. So `/project-build` is being executed **solely**,
-  sequentially, ticket by ticket. The FE/BE fan-out the restructure would have enabled
-  (D36) is still sound in principle — the two directories share no files — but it needs
-  a working subagent runtime, and one agent must own `context/` and all verification
-  regardless, because both would otherwise fight over the same progress file and the same
-  build caches. **Do not assume parallel work is safe here just because the directories
-  are separate; verify the runtime works first.**
+- **D42 — Subagents work, but only after an opencode restart.** Three attempts failed with
+  an opencode session-store insert error; a restart fixed it immediately. The FE/BE
+  fan-out is therefore viable, and the ownership fence is what makes it safe: the FE
+  agent owns `frontend/`, the BE agent owns `backend/`, and the orchestrator owns
+  `context/`, root `package.json`, and all verification. **Neither agent runs the root
+  build** — `npm run verify` builds both projects and the two agents would fight over
+  the same caches. Verified in practice at T5/T6 + T12/T13/T13a/T16.
+- **D43 — Ratings are stored and displayed on a 1–5 scale. Resolved after a real
+  contradiction between the two agents.** `context/architecture.md` specifies
+  `reviews.rating` as 1–5 and the backend followed it; the T3 frontend fixtures used
+  1–10 (9.4, 1,284 reviews). Only one is right. **Decision: 1–5 everywhere, no
+  transform layer.** Displaying "9.4" when the review input range is 1–5 misstates the
+  scale, and a hidden ×2 in a display helper is exactly the kind of thing that drifts.
+  Fixtures rescaled; review counts were NOT rescaled (a first attempt halved them too and
+  was reverted — counts are a different quantity entirely). If a 1–10 display is ever
+  wanted, it is a deliberate, documented product decision, not a formatting preference.
+- **D44 — `minPrice` and `maxPrice` are MAJOR units (150 = $150), the one place in the
+  API where money is not integer cents.** Everything else money-shaped is integer cents.
+  Kept because a user typing a price filter means dollars, and converting their input is
+  more surprising than the internal inconsistency. Documented in the OpenAPI description
+  for both params. **This is a known sharp edge** — if it ever causes confusion, convert
+  at the edge rather than making it a second convention.
+- **D45 — `null` is never `0` in API money and rating fields.** `priceFrom`,
+  `rooms[].price`, and `rating.average` are all nullable: a hotel with no price row in
+  the requested currency returns `null`, and a hotel with no visible reviews returns
+  `rating: { average: null, totalReviews: 0 }`. A missing price must render as "—", not
+  "$0", because free is a real state and null is a real state and they are not the same.
+- **D46 — Hotels search sorts and paginates in memory.** "Cheapest room that fits N
+  guests" and "average rating" are derived values, not columns, so the filter reads all
+  matching rows and cuts the page in the service. Correct and narrow for MVP, but it
+  will not scale. The seam is marked in the code. Needs a SQL view or a denormalised
+  column before the result set outgrows memory — not before.
+- **D47 — Seeded users have `password_hash = null`.** Argon2id is T14's dependency and
+  no credential hash was committed. Seeded accounts cannot log in until T14 exists; that
+  is intentional, not an oversight.
 
 ## Notes
 

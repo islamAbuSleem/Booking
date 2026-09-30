@@ -72,6 +72,38 @@
   --text-label--line-height: 1.2rem;
   --text-label--letter-spacing: 0.08em;
   --text-label--font-weight: 500;
+
+  /*
+   * Type scale, transcribed from the scale table in context/ui-tokens.md.
+   *
+   * Only the steps Tailwind's built-in scale does not already provide are declared —
+   * `text-sm`, `text-base`, `text-lg` and `text-xl` come from Tailwind itself, and
+   * re-declaring them would collide. Fraunces gets its wonk axis at display sizes only;
+   * the base layer keeps it off body copy.
+   *
+   * Without these, `text-display-m` on a heading is silently a no-op and the heading
+   * falls back to the browser's default size. See the report note.
+   */
+  --text-display-xl: 3.5rem;
+  --text-display-xl--line-height: 0.95;
+  --text-display-xl--letter-spacing: -0.02em;
+
+  --text-display-l: 2.5rem;
+  --text-display-l--line-height: 1;
+  --text-display-l--letter-spacing: -0.015em;
+
+  --text-display-m: 1.875rem;
+  --text-display-m--line-height: 1.1;
+  --text-display-m--letter-spacing: -0.01em;
+
+  --text-price-lg: 1.75rem;
+  --text-price-lg--line-height: 1.1;
+  --text-price-lg--letter-spacing: -0.01em;
+
+  --text-price: 1.25rem;
+  --text-price--line-height: 1.2;
+  --text-price--letter-spacing: 0;
+  --text-price--font-weight: 600;
 }
 
 /*
