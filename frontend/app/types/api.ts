@@ -4,6 +4,168 @@
  */
 
 export interface paths {
+    "/api/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register with email and password
+         * @description `wantsToHost` promotes the new account to HOST, otherwise it is a GUEST. The password is hashed with Argon2id and never returned.
+         */
+        post: operations["AuthController_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log in with email and password
+         * @description A missing email and a wrong password both return the same `INVALID_CREDENTIALS` 401, so the response never leaks which one failed.
+         */
+        post: operations["AuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear the session cookie */
+        post: operations["AuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current session user */
+        get: operations["AuthController_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start Google OAuth (302 to Google) */
+        get: operations["AuthController_googleEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google OAuth callback */
+        get: operations["AuthController_googleCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/github": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start GitHub OAuth (302 to GitHub) */
+        get: operations["AuthController_githubEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/github/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GitHub OAuth callback */
+        get: operations["AuthController_githubCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Price a stay and check it is bookable
+         * @description Server-side arithmetic only: the client-sent total is never trusted (D3). Availability is decided before the price is read, so a sold-out room never leaks a price, and a room with no `room_prices` row in the requested currency is a `PRICE_UNAVAILABLE` error rather than a free stay. Writes nothing — the inventory is held when T20 writes the PENDING booking, and `holdExpiresAt` is how long the guest has to get there.
+         */
+        post: operations["BookingsController_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hotels": {
         parameters: {
             query?: never;
@@ -36,6 +198,26 @@ export interface paths {
          * @description Resolves by uuid or by slug — the frontend links to `/hotels/{slug}`. A hotel that is not PUBLISHED is a 404 for everyone but its own host, so the endpoint cannot be used to discover a draft listing.
          */
         get: operations["HotelsController_findOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hotels/{id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-room availability for a date range
+         * @description One verdict per room, not a filtered list: the client renders a card for every room and marks the unavailable ones. A room is available when it sleeps the party AND every night has at least one unit left AND no blackout covers that night — a room at exact fit is NOT available, because the last unit taken leaves nothing to sell. A `PENDING` booking holds inventory exactly like a `CONFIRMED` one, since that is how a guest checkout holds a room before payment.
+         */
+        get: operations["HotelsController_findAvailability"];
         put?: never;
         post?: never;
         delete?: never;
@@ -180,6 +362,85 @@ export interface components {
             success: true;
             data: components["schemas"]["HealthData"];
         };
+        AuthUser: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            name: string;
+            avatarUrl: string | null;
+            /** @enum {string} */
+            role: "GUEST" | "HOST" | "ADMIN";
+        };
+        AuthData: {
+            user: components["schemas"]["AuthUser"];
+            token: string;
+        };
+        AuthEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AuthData"];
+        };
+        MeData: {
+            user: components["schemas"]["AuthUser"];
+        };
+        MeEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MeData"];
+        };
+        AvailabilityRoom: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            bedType: string;
+            maxGuests: number;
+            /** @description Units the hotel sells of this room type. */
+            totalInventory: number;
+        };
+        RoomAvailability: {
+            room: components["schemas"]["AvailabilityRoom"];
+            available: boolean;
+            /** @description Units left on each night, in stay order from `checkIn`. Length is `nights`. A blacked-out or fully booked night is 0; the value never goes negative. */
+            remainingPerNight: components["schemas"]["__schema0"][];
+        };
+        __schema0: number;
+        HotelAvailabilityData: {
+            rooms: components["schemas"]["RoomAvailability"][];
+        };
+        HotelAvailabilityEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HotelAvailabilityData"];
+        };
+        QuoteNight: {
+            /**
+             * Format: date
+             * @description The night this price covers, `YYYY-MM-DD`.
+             */
+            date: string;
+            /** @description Integer cents for this night. Never major units. */
+            priceCents: number;
+        };
+        QuoteData: {
+            /** @description `checkOut - checkIn` in whole days. */
+            nights: number;
+            subtotalCents: number;
+            /** @description Zero today; T20/T26 set the real fee schedule. */
+            feesCents: number;
+            /** @description Always `subtotalCents + feesCents`. */
+            totalCents: number;
+            /** @description ISO 4217 code the room is priced in. */
+            currency: string;
+            breakdown: components["schemas"]["QuoteNight"][];
+            /** @description ISO 8601 instant by which T20 would take the hold. A quote holds nothing by itself, so this is advisory until the booking exists. */
+            holdExpiresAt: string;
+        };
+        QuoteEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["QuoteData"];
+        };
     };
     responses: never;
     parameters: never;
@@ -189,6 +450,239 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    AuthController_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new user and the session token (also set as a cookie). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthEnvelope"];
+                };
+            };
+            /** @description The email is already registered. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user and the session token (also set as a cookie). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthEnvelope"];
+                };
+            };
+            /** @description Invalid email or password. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cookie was cleared. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user attached by the JWT guard. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeEnvelope"];
+                };
+            };
+            /** @description No valid session cookie. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_googleEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirects to Google. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_googleCallback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sets the session cookie and redirects to the frontend origin. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_githubEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirects to GitHub. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_githubCallback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sets the session cookie and redirects to the frontend origin. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BookingsController_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The per-night breakdown and the totals, in integer cents. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteEnvelope"];
+                };
+            };
+            /** @description The body failed validation, or the room sleeps fewer guests than asked. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such room. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The room is sold out, blacked out, or too small for the party. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The room has no price in the requested currency. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     HotelsController_findAll: {
         parameters: {
             query?: {
@@ -257,6 +751,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HotelDetailEnvelope"];
+                };
+            };
+            /** @description No such hotel, or it is not visible to this caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HotelsController_findAvailability: {
+        parameters: {
+            query: {
+                /** @description First night, `YYYY-MM-DD`. Required: without a range there are no nights to report on, and an empty range would make every room vacuously available. */
+                checkIn: string;
+                /** @description Last day the guest leaves, `YYYY-MM-DD`. Must be strictly after `checkIn`. The stay is half-open, so `checkOut` is not one of its nights and a checkout equal to another booking's check-in never overlaps. */
+                checkOut: string;
+                /** @description Party size, 1-20. A room that cannot sleep the party reports `available: false` even when it has units left on every night. */
+                guests?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every room of the hotel, each with `available` and the units left on each night. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HotelAvailabilityEnvelope"];
+                };
+            };
+            /** @description The query string failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
             /** @description No such hotel, or it is not visible to this caller. */

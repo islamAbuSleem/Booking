@@ -4,17 +4,23 @@
  * the total the only emphasised row. Shared by the booking flow (T7) and the
  * booking detail (T8) — the second occurrence, so it is extracted, not copied.
  *
- * Amounts arrive as integer cents and are formatted payable-style (2 decimals).
+ * Amounts arrive as integer cents already priced by the server (T18) and are formatted
+ * payable-style in the currency it quoted: 2 decimals, symbol first. `nightlyCents` is
+ * nullable so a rate the response did not carry renders as "—", never as $0.
  */
-import { usdCents, wholeNumber } from '~/utils/format'
+import { payableCents, wholeNumber } from '~/utils/format'
 
-defineProps<{
-  nightlyCents: number
-  nights: number
-  subtotalCents: number
-  feesCents: number
-  totalCents: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    nightlyCents: number | null
+    nights: number
+    subtotalCents: number
+    feesCents: number
+    totalCents: number
+    currency?: string
+  }>(),
+  { currency: 'USD' },
+)
 </script>
 
 <template>
@@ -22,10 +28,15 @@ defineProps<{
     <dl class="flex flex-col">
       <div class="border-rule flex items-baseline justify-between gap-4 border-b py-3">
         <dt class="text-fg-muted text-sm">
-          {{ $t('booking.rateLine', { rate: usdCents(nightlyCents), count: wholeNumber(nights) }) }}
+          {{
+            $t('booking.rateLine', {
+              rate: nightlyCents === null ? '—' : payableCents(nightlyCents, props.currency),
+              count: wholeNumber(nights),
+            })
+          }}
         </dt>
         <dd class="tabular text-sm">
-          {{ usdCents(subtotalCents) }}
+          {{ payableCents(subtotalCents, props.currency) }}
         </dd>
       </div>
 
@@ -34,7 +45,7 @@ defineProps<{
           {{ $t('booking.feesLine') }}
         </dt>
         <dd class="tabular text-sm">
-          {{ usdCents(feesCents) }}
+          {{ payableCents(feesCents, props.currency) }}
         </dd>
       </div>
 
@@ -43,7 +54,7 @@ defineProps<{
           {{ $t('booking.total') }}
         </dt>
         <dd class="tabular font-display text-price-lg">
-          {{ usdCents(totalCents) }}
+          {{ payableCents(totalCents, props.currency) }}
         </dd>
       </div>
     </dl>

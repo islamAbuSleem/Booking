@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { errorEnvelopeSchema } from '../common/envelope.js';
+import { DTO_SCHEMAS as AVAILABILITY_DTO_SCHEMAS } from '../modules/bookings/dto/availability.dto.js';
 import { DTO_SCHEMAS as AUTH_DTO_SCHEMAS } from '../modules/auth/dto/auth.dto.js';
 import { DTO_SCHEMAS } from '../modules/hotels/dto/hotel.dto.js';
 import { DTO_SCHEMAS as USER_DTO_SCHEMAS } from '../modules/users/dto/user.dto.js';
@@ -18,6 +19,7 @@ export const CONTRACT_SCHEMAS = {
   ...DTO_SCHEMAS,
   ...USER_DTO_SCHEMAS,
   ...AUTH_DTO_SCHEMAS,
+  ...AVAILABILITY_DTO_SCHEMAS,
 } as const satisfies Record<string, z.ZodType>;
 
 export type ContractSchemaName = keyof typeof CONTRACT_SCHEMAS;

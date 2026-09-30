@@ -4,6 +4,7 @@ import { parseEnv } from './config/env.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { HotelsModule } from './modules/hotels/hotels.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
@@ -15,6 +16,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     PrismaModule,
     UsersModule,
     AuthModule,
+    BookingsModule,
     HotelsModule,
     HealthModule,
   ],
