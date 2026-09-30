@@ -64,6 +64,8 @@ export interface MockRatingBreakdown {
 
 export interface MockHotel {
   id: string
+  /** The user who may read this hotel's drafts. Ownership, not authorship. */
+  hostId: string
   slug: string
   name: string
   city: string

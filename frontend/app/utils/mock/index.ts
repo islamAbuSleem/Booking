@@ -125,8 +125,13 @@ export function getBookingsForGuest(userId = CURRENT_USER.id): MockBooking[] {
   return userId === CURRENT_USER.id ? BOOKINGS : []
 }
 
+/**
+ * Only the bookings on hotels this user actually owns. A host dashboard is scoped by
+ * `hostId`, so a lookup that returned everything would show one host another host's
+ * guests, names and stays.
+ */
 export function getBookingsForHost(hostId: string): MockBooking[] {
-  return BOOKINGS.filter(b => HOTEL_BY_ID.get(b.hotelId) !== undefined && hostId.length > 0)
+  return BOOKINGS.filter(b => HOTEL_BY_ID.get(b.hotelId)?.hostId === hostId)
 }
 
 export const STATUS_LABEL_KEY: Record<BookingStatus, string> = {

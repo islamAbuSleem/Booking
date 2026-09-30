@@ -20,6 +20,7 @@ function rating(
 export const HOTELS: MockHotel[] = [
   {
     id: 'htl_larkspur',
+    hostId: 'usr_host',
     slug: 'the-larkspur-hotel',
     name: 'The Larkspur Hotel',
     city: 'Lisbon',
@@ -87,6 +88,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_casa_verde',
+    hostId: 'usr_host',
     slug: 'casa-verde',
     name: 'Casa Verde',
     city: 'Oaxaca',
@@ -138,6 +140,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_nord',
+    hostId: 'usr_host',
     slug: 'hotel-nord',
     name: 'Hotel Nord',
     city: 'Copenhagen',
@@ -189,6 +192,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_bellavista',
+    hostId: 'usr_host',
     slug: 'bellavista',
     name: 'Hotel Bellavista',
     city: 'Barcelona',
@@ -226,6 +230,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_palacio',
+    hostId: 'usr_host',
     slug: 'palacio-belmonte',
     name: 'Palácio Belmonte',
     city: 'Lisbon',
@@ -263,6 +268,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_fen_end',
+    hostId: 'usr_host',
     slug: 'the-barn-at-fen-end',
     name: 'The Barn at Fen End',
     city: 'Norfolk',
@@ -297,6 +303,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_miradouro',
+    hostId: 'usr_host',
     slug: 'miradouro',
     name: 'Miradouro',
     city: 'Lisbon',
@@ -331,6 +338,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_casa_lopez',
+    hostId: 'usr_host',
     slug: 'casa-lopez',
     name: 'Casa López',
     city: 'Mexico City',
@@ -365,6 +373,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_schloss',
+    hostId: 'usr_host',
     slug: 'schloss-hof',
     name: 'Schloss Hof',
     city: 'Berlin',
@@ -399,6 +408,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_douro',
+    hostId: 'usr_host',
     slug: 'casa-do-douro',
     name: 'Casa do Douro',
     city: 'Porto',
@@ -433,6 +443,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_pousada',
+    hostId: 'usr_host',
     slug: 'pousada-da-serra',
     name: 'Pousada da Serra',
     city: 'Porto',
@@ -467,6 +478,7 @@ export const HOTELS: MockHotel[] = [
   },
   {
     id: 'htl_verde_villa',
+    hostId: 'usr_host',
     slug: 'casa-del-mar',
     name: 'Casa del Mar',
     city: 'Barcelona',
