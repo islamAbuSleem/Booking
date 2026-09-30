@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const model = defineModel<string | number | null>()
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     id: string
     label: string
@@ -19,9 +19,15 @@ withDefaults(
 const errorId = computed(() => `${useId()}-error`)
 const hintId = computed(() => `${useId()}-hint`)
 
+/**
+ * The error wins: the template shows one or the other, so a screen reader is told about
+ * exactly the text that is on screen. A hint with no error still has to be announced, and
+ * `aria-describedby` is the only thing that does that.
+ */
 const describedBy = computed(() => {
   const ids: string[] = []
-  if (errorId.value) ids.push(errorId.value)
+  if (props.error) ids.push(errorId.value)
+  else if (props.hint) ids.push(hintId.value)
   return ids.length ? ids.join(' ') : undefined
 })
 </script>
