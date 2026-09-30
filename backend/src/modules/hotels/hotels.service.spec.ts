@@ -116,6 +116,19 @@ describe('HotelsService.findAll', () => {
     });
   });
 
+  it('rounds a price whose cents sit on a float half-step', async () => {
+    const repository = new FakeHotelsRepository();
+    const service = new HotelsService(repository);
+
+    // 1.005 * 100 is 100.49999999999999, so a plain Math.round loses the cent.
+    await service.findAll(query({ minPrice: '1.005', maxPrice: '8.165' }));
+
+    expect(repository.criteriaSeen[0]).toMatchObject({
+      minPriceCents: 101,
+      maxPriceCents: 817,
+    });
+  });
+
   it('passes the amenity slugs through', async () => {
     const repository = new FakeHotelsRepository();
     const service = new HotelsService(repository);

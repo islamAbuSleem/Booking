@@ -114,6 +114,12 @@ function ratingScore(card: HotelCard): number {
     : card.rating.average;
 }
 
+/**
+ * Decimal-safe, because `1.005 * 100` is `100.49999999999999` in IEEE 754 and a plain
+ * `Math.round` turns 10.05 into 1004 cents instead of 1005. Scaling the epsilon by the
+ * value fixes the half-step at any magnitude and keeps the sign, so the rounding is the
+ * one a person doing the sum on paper would get.
+ */
 function toCents(amount: number): number {
-  return Math.round(amount * 100);
+  return Math.round((amount + Number.EPSILON * amount) * 100);
 }
