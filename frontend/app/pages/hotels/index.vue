@@ -128,7 +128,8 @@ const {
         const items = applyStars(clamped.items, filters.stars)
         return { items, total: starFilteredTotal(items, clamped.total, filters.stars), live: true, page: last }
       }
-      return { items: applyStars(first.items, filters.stars), total: first.total, live: true, page: page.value }
+      const items = applyStars(first.items, filters.stars)
+      return { items, total: starFilteredTotal(items, first.total, filters.stars), live: true, page: page.value }
     }
     catch (fetchError: unknown) {
       if (isEnvelopeError(fetchError)) throw fetchError
