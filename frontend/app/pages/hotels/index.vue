@@ -20,6 +20,7 @@ import {
   searchHotels,
 } from '~/utils/hotels'
 import type { HotelFilterState, HotelSort } from '~/utils/hotels'
+import { localToday } from '~/utils/date'
 import { formatShortStayDate, wholeNumber } from '~/utils/format'
 import { nightsBetween } from '~/utils/mock'
 
@@ -28,7 +29,7 @@ const router = useRouter()
 const requestUrl = useRequestURL()
 const { t } = useI18n()
 
-const today = new Date().toISOString().slice(0, 10)
+const today = localToday()
 
 const query = computed(() => parseHotelQuery(route.query))
 
