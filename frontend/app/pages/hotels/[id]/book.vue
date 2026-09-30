@@ -10,6 +10,7 @@
  */
 import { getHotelDetail, nightsBetween, quote } from '~/utils/mock'
 import { formatStayDate, usdCents, wholeNumber } from '~/utils/format'
+import { localToday } from '~/utils/date'
 import { guestDetailsSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
 
@@ -27,7 +28,7 @@ if (!hotel.value) {
   setResponseStatus(404, 'Hotel not found')
 }
 
-const today = new Date().toISOString().slice(0, 10)
+const today = localToday()
 
 const queryRoom = typeof route.query.room === 'string' ? route.query.room : ''
 const checkIn = ref('')
