@@ -65,8 +65,13 @@ export const DEFAULT_HOTEL_FILTERS: HotelFilterState = {
  */
 const nightlyRates = HOTELS.flatMap(hotel => hotel.rooms.map(room => room.pricePerNightCents / 100))
 export const PRICE_STEP = 10
-export const PRICE_MIN = Math.floor(Math.min(...nightlyRates) / PRICE_STEP) * PRICE_STEP
-export const PRICE_MAX = Math.ceil(Math.max(...nightlyRates) / PRICE_STEP) * PRICE_STEP
+// `Math.min()` of nothing is `Infinity` and `Math.max()` is `-Infinity`, which would put
+// the slider bounds at Infinity and break the control. A 0..0 range is the honest answer
+// when there is no room to price.
+const lowestNightly = nightlyRates.length ? Math.min(...nightlyRates) : 0
+const highestNightly = nightlyRates.length ? Math.max(...nightlyRates) : 0
+export const PRICE_MIN = Math.floor(lowestNightly / PRICE_STEP) * PRICE_STEP
+export const PRICE_MAX = Math.ceil(highestNightly / PRICE_STEP) * PRICE_STEP
 
 const collator = new Intl.Collator('en')
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
