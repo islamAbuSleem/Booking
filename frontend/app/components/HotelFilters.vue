@@ -8,6 +8,7 @@
  * a query string. Nothing is held locally, so the URL is always what is on screen.
  */
 import { AMENITIES } from '~/utils/mock'
+import { localToday } from '~/utils/date'
 import {
   DEFAULT_HOTEL_FILTERS,
   HOTEL_STAR_OPTIONS,
@@ -29,7 +30,7 @@ withDefaults(defineProps<{ resultCount: number, showSummary?: boolean }>(), { sh
 const { t } = useI18n()
 const uid = useId()
 
-const today = new Date().toISOString().slice(0, 10)
+const today = localToday()
 
 /**
  * An unusable range is reported, not silently dropped — and the page keeps searching
