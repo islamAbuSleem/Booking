@@ -611,7 +611,7 @@
     },
     "/api/uploads/sign": {
       "post": {
-        "description": "Returns the config the browser needs to POST straight to Cloudinary: the cloud name, the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller's own `booking/hotels/{hostId}/` folder, and a `signature` of `base64(HMAC-SHA1(secret, \"timestamp=\" + timestamp))` that Cloudinary re-verifies. Only the secret stays server-side. Answers 200, not 201: nothing is created here.",
+        "description": "Returns the config the browser needs to POST straight to Cloudinary: the cloud name, the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller's own `booking/hotels/{hostId}/` folder, and a `signature` of `base64(HMAC-SHA1(secret, \"folder=\" + folder + \"&timestamp=\" + timestamp))` that Cloudinary re-verifies. Only the secret stays server-side. Answers 200, not 201: nothing is created here.",
         "operationId": "UploadsController_sign",
         "parameters": [],
         "responses": {
@@ -2251,7 +2251,7 @@
           },
           "signature": {
             "type": "string",
-            "description": "base64 HMAC-SHA1 of \"timestamp=\" + timestamp under the API secret."
+            "description": "base64 HMAC-SHA1 of \"folder=\" + folder + \"&timestamp=\" + timestamp under the API secret."
           }
         },
         "required": [
@@ -2295,7 +2295,7 @@
             "description": "Set for room-level imagery, omitted for hotel-level.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/AttachUpload~__schema0"
+                "$ref": "#/components/schemas/AttachUpload-__schema0"
               }
             ]
           },
@@ -2308,7 +2308,7 @@
             "description": "The Cloudinary publicId, needed for deletes. Must start with the caller's booking/hotels/{hostId}/ folder or the attach is 403 UPLOAD_FOREIGN.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/AttachUpload~__schema1"
+                "$ref": "#/components/schemas/AttachUpload-__schema1"
               }
             ]
           },
@@ -2322,7 +2322,7 @@
             "description": "Intrinsic width, for CLS.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/AttachUpload~__schema2"
+                "$ref": "#/components/schemas/AttachUpload-__schema2"
               }
             ]
           },
@@ -2330,7 +2330,7 @@
             "description": "Intrinsic height, for CLS.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/AttachUpload~__schema3"
+                "$ref": "#/components/schemas/AttachUpload-__schema3"
               }
             ]
           },
@@ -2338,7 +2338,7 @@
             "description": "Aspect ratio, e.g. 3:2, 4:3, 16:9, 1:1.",
             "allOf": [
               {
-                "$ref": "#/components/schemas/AttachUpload~__schema4"
+                "$ref": "#/components/schemas/AttachUpload-__schema4"
               }
             ]
           }
@@ -2349,28 +2349,28 @@
         ],
         "additionalProperties": false
       },
-      "AttachUpload~__schema0": {
+      "AttachUpload-__schema0": {
         "type": "string",
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
       },
-      "AttachUpload~__schema1": {
+      "AttachUpload-__schema1": {
         "type": "string",
         "minLength": 1
       },
-      "AttachUpload~__schema2": {
+      "AttachUpload-__schema2": {
         "type": "integer",
         "minimum": 0,
         "exclusiveMinimum": true,
         "maximum": 9007199254740991
       },
-      "AttachUpload~__schema3": {
+      "AttachUpload-__schema3": {
         "type": "integer",
         "minimum": 0,
         "exclusiveMinimum": true,
         "maximum": 9007199254740991
       },
-      "AttachUpload~__schema4": {
+      "AttachUpload-__schema4": {
         "type": "string"
       },
       "AttachUploadEnvelope": {

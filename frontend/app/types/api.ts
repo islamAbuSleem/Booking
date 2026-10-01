@@ -281,7 +281,7 @@ export interface paths {
         put?: never;
         /**
          * Sign a Cloudinary upload
-         * @description Returns the config the browser needs to POST straight to Cloudinary: the cloud name, the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller's own `booking/hotels/{hostId}/` folder, and a `signature` of `base64(HMAC-SHA1(secret, "timestamp=" + timestamp))` that Cloudinary re-verifies. Only the secret stays server-side. Answers 200, not 201: nothing is created here.
+         * @description Returns the config the browser needs to POST straight to Cloudinary: the cloud name, the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller's own `booking/hotels/{hostId}/` folder, and a `signature` of `base64(HMAC-SHA1(secret, "folder=" + folder + "&timestamp=" + timestamp))` that Cloudinary re-verifies. Only the secret stays server-side. Answers 200, not 201: nothing is created here.
          */
         post: operations["UploadsController_sign"];
         delete?: never;
@@ -733,7 +733,7 @@ export interface components {
             timestamp: number;
             /** @description The caller's own folder, booking/hotels/{hostId}/. */
             folder: string;
-            /** @description base64 HMAC-SHA1 of "timestamp=" + timestamp under the API secret. */
+            /** @description base64 HMAC-SHA1 of "folder=" + folder + "&timestamp=" + timestamp under the API secret. */
             signature: string;
         };
         UploadSignEnvelope: {
@@ -748,26 +748,26 @@ export interface components {
              */
             hotelId: string;
             /** @description Set for room-level imagery, omitted for hotel-level. */
-            roomId?: components["schemas"]["AttachUpload~__schema0"];
+            roomId?: components["schemas"]["AttachUpload-__schema0"];
             /** @description The Cloudinary URL the asset uploaded to. */
             url: string;
             /** @description The Cloudinary publicId, needed for deletes. Must start with the caller's booking/hotels/{hostId}/ folder or the attach is 403 UPLOAD_FOREIGN. */
-            publicId?: components["schemas"]["AttachUpload~__schema1"];
+            publicId?: components["schemas"]["AttachUpload-__schema1"];
             altText?: string;
             isCover?: boolean;
             /** @description Intrinsic width, for CLS. */
-            width?: components["schemas"]["AttachUpload~__schema2"];
+            width?: components["schemas"]["AttachUpload-__schema2"];
             /** @description Intrinsic height, for CLS. */
-            height?: components["schemas"]["AttachUpload~__schema3"];
+            height?: components["schemas"]["AttachUpload-__schema3"];
             /** @description Aspect ratio, e.g. 3:2, 4:3, 16:9, 1:1. */
-            aspect?: components["schemas"]["AttachUpload~__schema4"];
+            aspect?: components["schemas"]["AttachUpload-__schema4"];
         };
         /** Format: uuid */
-        "AttachUpload~__schema0": string;
-        "AttachUpload~__schema1": string;
-        "AttachUpload~__schema2": number;
-        "AttachUpload~__schema3": number;
-        "AttachUpload~__schema4": string;
+        "AttachUpload-__schema0": string;
+        "AttachUpload-__schema1": string;
+        "AttachUpload-__schema2": number;
+        "AttachUpload-__schema3": number;
+        "AttachUpload-__schema4": string;
         AttachUploadEnvelope: {
             /** @enum {boolean} */
             success: true;
