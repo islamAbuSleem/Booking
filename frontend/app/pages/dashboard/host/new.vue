@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
  * /dashboard/host/new — the listing wizard: details → amenities → photos →
- * room types. Each step validates before advancing. The photo step renders
- * local previews only (`URL.createObjectURL`) — nothing is uploaded anywhere.
- * The finished listing lives in local state; the host API (T22) persists it.
+ * room types. Each step validates before advancing. The photo step uploads for real
+ * (T21): each file is signed by the API and posted straight to Cloudinary, with
+ * per-file progress and a retry that re-signs. The Cloudinary results are staged on
+ * the upload entries — `attach` needs a `hotelId`, and the listing does not exist
+ * until T22 creates it.
  */
 import { AMENITIES } from '~/utils/mock'
 import { usd, wholeNumber } from '~/utils/format'
@@ -36,15 +38,16 @@ const name = ref('')
 const city = ref('')
 const description = ref('')
 const amenityIds = ref<string[]>([])
-const previews = ref<{ url: string, name: string }[]>([])
 const rooms = ref<RoomDraft[]>([])
 const roomKey = ref(0)
 const stepError = ref('')
 const finished = ref(false)
 
-onUnmounted(() => {
-  for (const preview of previews.value) URL.revokeObjectURL(preview.url)
-})
+/** Owns the uploads and every object URL they make; the page only selects and forwards. */
+const { uploads, addFiles, retry, remove } = usePhotoUploads()
+
+/** Announced on change, so it must be a number the page computed, not one read per render. */
+const uploadedCount = computed(() => uploads.value.filter(photo => photo.status === 'done').length)
 
 function toggleAmenity(id: string): void {
   amenityIds.value = amenityIds.value.includes(id)
@@ -54,18 +57,10 @@ function toggleAmenity(id: string): void {
 
 function onFiles(event: Event): void {
   const input = event.target as HTMLInputElement | null
-  const files = input?.files ? [...input.files] : []
-  for (const file of files) {
-    if (!file.type.startsWith('image/')) continue
-    previews.value.push({ url: URL.createObjectURL(file), name: file.name })
-  }
+  addFiles(input?.files ? [...input.files] : [])
+  // Clearing the input is what makes choosing the same file twice in a row fire
+  // `change` at all; without it a retry after a failure looks like nothing happened.
   if (input) input.value = ''
-}
-
-function removePreview(index: number): void {
-  const removed = previews.value[index]
-  if (removed) URL.revokeObjectURL(removed.url)
-  previews.value.splice(index, 1)
 }
 
 function addRoom(): void {
@@ -244,7 +239,7 @@ useSeoMeta({
           </ul>
         </fieldset>
 
-        <!-- Step 3: photos. Local previews only — no upload. -->
+        <!-- Step 3: photos. Real signed uploads to Cloudinary, per-file state. -->
         <div v-if="step === 'photos'">
           <label
             for="wizard-photos"
@@ -261,34 +256,24 @@ useSeoMeta({
           <p class="text-fg-subtle mt-2 text-sm">
             {{ $t('host.photosHint') }}
           </p>
-          <ul
-            v-if="previews.length"
-            class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3"
+          <p
+            v-if="uploads.length"
+            class="text-fg-muted mt-4 text-sm"
+            aria-live="polite"
           >
-            <li
-              v-for="(preview, index) in previews"
-              :key="preview.url"
-              class="border-rule bg-surface rounded-none border"
-            >
-              <img
-                :src="preview.url"
-                :alt="preview.name"
-                width="400"
-                height="300"
-                class="aspect-[4/3] w-full object-cover"
-              >
-              <div class="flex items-center justify-between gap-2 p-2">
-                <span class="min-w-0 truncate text-sm">{{ preview.name }}</span>
-                <button
-                  type="button"
-                  class="text-danger shrink-0 px-2 py-1 text-sm underline-offset-4 hover:underline"
-                  :aria-label="$t('host.removePhoto', { name: preview.name })"
-                  @click="removePreview(index)"
-                >
-                  {{ $t('common.remove') }}
-                </button>
-              </div>
-            </li>
+            {{ $t('host.photosSummary', { done: uploadedCount, total: uploads.length }) }}
+          </p>
+          <ul
+            v-if="uploads.length"
+            class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2"
+          >
+            <PhotoUploadTile
+              v-for="photo in uploads"
+              :key="photo.id"
+              :photo="photo"
+              @retry="retry"
+              @remove="remove"
+            />
           </ul>
           <BaseEmptyState
             v-else

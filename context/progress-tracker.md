@@ -67,7 +67,7 @@
 - [x] T18 Availability and quote
 - [x] T19 Favorites
 - [x] T20 Bookings API
-- [ ] T21 Cloudinary upload
+- [x] T21 Cloudinary upload
 - [ ] T22 Host listing management API
 - [ ] T23 Wire auth into the frontend
 - [ ] T24 Reviews
@@ -472,6 +472,22 @@
   is in `backend/src/openapi/document.ts`, regenerated `backend/openapi.json`, and a re-run
   of `gen:api`; the T13a drift-guard test still passes because it compares the in-memory
   document against the *regenerated* file, so both move together.
+- **D58 — Cloudinary is optional infrastructure, like OAuth (T15).** `CLOUDINARY_CLOUD_NAME`,
+  `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` are optional with placeholder defaults;
+  the app builds and tests pass without creds. No SDK is used: `sign` is pure HMAC-SHA1,
+  and the single server-side call (`destroy`) is a `fetch` behind a `CLOUDINARY` token faked
+  in tests. Placeholder defaults: `cloudName='booking-upload-placeholder'`,
+  `apiKey='00000000000000000000000'`, `apiSecret='cloudinary-upload-placeholder-secret'`,
+  `uploadPath='booking/hotels/'`. A real deployment overrides them.
+- **D58b — The upload folder is host-scoped: `booking/hotels/{hostId}/` (the ticket's
+  "folder scoped per host" + "folder prefix matches the requesting host"). Architecture.md's
+  `{hotelId}` is corrected to `{hostId}`; the prefix check is a plain string `startsWith`
+  and does not query the DB.
+- **D59 — `attach` does not check hotel ownership; that is T22's responsibility.** T21
+  validates only the `publicId` folder prefix (a DB-free string check). A host can attach an
+  image to any `hotelId` if the `publicId` prefix matches their own folder — T22's host-ownership
+  query-filter rule is what closes this. If T22 lands without that check, a host could attach
+  images to another host's hotel.
 
 ## Notes
 

@@ -9,7 +9,9 @@ import { PrismaAvailabilityRepository } from './prisma-availability.repository.j
 import { PrismaBookingRepository } from './prisma-bookings.repository.js';
 import { PrismaFavoritesRepository } from './prisma-favorites.repository.js';
 import { PrismaHotelsRepository } from './prisma-hotels.repository.js';
+import { PrismaUploadsRepository } from './prisma-uploads.repository.js';
 import { PrismaService } from './prisma.service.js';
+import { UPLOADS_REPOSITORY } from './uploads.repository.js';
 
 /**
  * The single Prisma client for the process, plus the repository bindings that hide it.
@@ -35,6 +37,8 @@ import { PrismaService } from './prisma.service.js';
     { provide: FAVORITES_REPOSITORY, useExisting: PrismaFavoritesRepository },
     PrismaUsersRepository,
     { provide: USERS_REPOSITORY, useExisting: PrismaUsersRepository },
+    PrismaUploadsRepository,
+    { provide: UPLOADS_REPOSITORY, useExisting: PrismaUploadsRepository },
   ],
   exports: [
     PrismaService,
@@ -48,6 +52,8 @@ import { PrismaService } from './prisma.service.js';
     FAVORITES_REPOSITORY,
     PrismaUsersRepository,
     USERS_REPOSITORY,
+    PrismaUploadsRepository,
+    UPLOADS_REPOSITORY,
   ],
 })
 export class PrismaModule {}

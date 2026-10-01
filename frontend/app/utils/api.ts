@@ -30,6 +30,8 @@ export type ApiQuoteNight = components['schemas']['QuoteNight']
 export type ApiFavorite = components['schemas']['Favorite']
 export type ApiBooking = components['schemas']['Booking']
 export type ApiBookingListData = components['schemas']['BookingListData']
+export type ApiUploadSign = components['schemas']['UploadSign']
+export type ApiAttachUpload = components['schemas']['AttachUpload']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -128,11 +130,16 @@ interface ApiRequestOptions {
   query?: Record<string, string | number>
   /**
    * `POST` for the writes that carry a body — the quote (which changes nothing, the
-   * server prices a stay and answers 200) and the favourites insert. `DELETE` is a
-   * path-only call that answers 204 with no body at all.
+   * server prices a stay and answers 200), the favourites insert, and the upload
+   * sign/attach. `DELETE` is a path-only call that answers 204 with no body at all.
    */
   method?: 'POST' | 'DELETE'
-  body?: Record<string, string | number>
+  /**
+   * `boolean` is here for `AttachUpload.isCover`. Optional fields stay `undefined`
+   * rather than being dropped by the caller: `$fetch` omits them from the JSON body, so
+   * the API applies its own default, which is what its Zod schema describes.
+   */
+  body?: Record<string, string | number | boolean | undefined>
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -282,4 +289,41 @@ export async function fetchBooking(id: string): Promise<ApiBooking> {
  */
 export async function cancelBooking(id: string): Promise<ApiBooking> {
   return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+}
+
+/**
+ * T21. `POST /api/uploads/sign` — the folder-scoped upload config. Only the API secret
+ * stays server-side; the `apiKey` and `signature` are handed to the browser on purpose.
+ *
+ * This is the one call in the upload flow that goes through `apiFetch`. The Cloudinary
+ * POST that follows is a third-party host, so it uses a raw `XMLHttpRequest` in
+ * `usePhotoUploads` instead — see the comment there.
+ */
+export async function fetchUploadSign(): Promise<ApiUploadSign> {
+  return apiFetch<ApiUploadSign>('/api/uploads/sign', { method: 'POST' })
+}
+
+/**
+ * T21. `POST /api/uploads/attach` — persists the `hotel_images` row for an asset that
+ * already uploaded to Cloudinary. T22 calls this: the wizard has no `hotelId` until it
+ * creates the listing, so T21 stages the Cloudinary result instead of calling this.
+ *
+ * A `publicId` outside the caller's `booking/hotels/{hostId}/` folder is 403
+ * `UPLOAD_FOREIGN`; a `(hotelId, url)` pair already attached is 409.
+ */
+export async function attachUpload(request: ApiAttachUpload): Promise<ApiHotelImage> {
+  return apiFetch<ApiHotelImage>('/api/uploads/attach', { method: 'POST', body: { ...request } })
+}
+
+/**
+ * T21. `DELETE /api/uploads/:publicId` — destroys the asset and removes its row.
+ *
+ * The `publicId` is a Cloudinary path full of slashes (`booking/hotels/{hostId}/lobby`),
+ * so it has to travel as one `%2F`-encoded segment. Interpolating it raw would make
+ * `/api/uploads/` match with an empty param and the path segments route as separate
+ * ones — a 404 that reads like a missing asset. `encodeURIComponent` is what a real HTTP
+ * client does, and Express decodes it back before the handler sees it.
+ */
+export async function deleteUpload(publicId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/uploads/${encodeURIComponent(publicId)}`, { method: 'DELETE' })
 }
