@@ -48,10 +48,14 @@ const canFavorite = computed(() => isUuid(props.hotel.id))
       assistive tech announces one control where there are two. Absolute, so it sits over
       the cover's top-right without touching the link's box. First in the DOM because the
       heart is above the card visually and tab order should follow the eye.
+
+      `inset-x-3` rather than `right-3`: the toggle's problem message grows downwards out of
+      the same box, and a box with no left edge lets that message run wider than the card and
+      over the neighbouring grid cell.
     -->
     <div
       v-if="canFavorite"
-      class="absolute right-3 top-3"
+      class="absolute inset-x-3 top-3 flex justify-end"
     >
       <FavoriteToggle
         :hotel-id="hotel.id"
