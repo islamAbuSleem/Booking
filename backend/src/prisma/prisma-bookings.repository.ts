@@ -181,9 +181,13 @@ export class PrismaBookingRepository implements BookingRepository {
         // worth re-running the transaction.
         if (error instanceof ApiError) throw error;
         if (!isRetryableWriteConflict(error)) throw error;
-        this.logger.warn(
-          `[bookings] retryable write conflict on attempt ${attempt} for room ${input.roomId}, re-running the transaction`,
-        );
+        // The last attempt has no retry after it, so it must not claim one: this log
+        // is the one an operator reads while diagnosing a contended room.
+        if (attempt < BOOKING_TX_MAX_ATTEMPTS) {
+          this.logger.warn(
+            `[bookings] retryable write conflict on attempt ${attempt} for room ${input.roomId}, re-running the transaction`,
+          );
+        }
       }
     }
 
