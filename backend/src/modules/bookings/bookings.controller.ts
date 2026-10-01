@@ -64,8 +64,7 @@ export class BookingsController {
   })
   @ApiResponse({
     status: 409,
-    description:
-      'The room is sold out, blacked out, or too small for the party.',
+    description: 'The room is sold out or blacked out for those dates.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   @ApiResponse({
