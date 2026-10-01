@@ -75,7 +75,12 @@ const visible = computed(() => {
 /** Skeletons only when there is nothing to show — never on a background refresh. */
 const isLoading = computed(() => status.value === 'pending' && !data.value)
 const hasFailed = computed(() => status.value === 'error')
-const isEmpty = computed(() => !isLoading.value && !hasFailed.value && bookings.value.length === 0)
+/**
+ * The current tab's rows, not the whole payload: a guest with only upcoming trips
+ * who opens "Past (0)" must get the empty state, not an empty table and a
+ * pagination that self-hides.
+ */
+const isEmpty = computed(() => !isLoading.value && !hasFailed.value && rows.value.length === 0)
 
 function select(next: Tab): void {
   tab.value = next
