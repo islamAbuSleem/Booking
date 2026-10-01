@@ -11,6 +11,7 @@ import {
   type RoomPrice,
 } from './availability.repository.js';
 import { PrismaService } from './prisma.service.js';
+import type { HotelVisibility } from './hotels.repository.js';
 
 /** Only the columns the availability math and the response need. */
 const ROOM_SELECT = {
@@ -20,6 +21,16 @@ const ROOM_SELECT = {
   bedType: true,
   maxGuests: true,
   totalInventory: true,
+} satisfies Prisma.RoomSelect;
+
+/**
+ * `findRoom` additionally reads the parent hotel's status, so the quote path can 404 a room of
+ * a draft listing without a second round trip. `findHotelRooms` already has it, and passes it
+ * in, so the two reads share one mapper.
+ */
+const ROOM_WITH_HOTEL_SELECT = {
+  ...ROOM_SELECT,
+  hotel: { select: { status: true } },
 } satisfies Prisma.RoomSelect;
 
 /**
@@ -101,16 +112,16 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     return {
       id: row.id,
       status: row.status,
-      rooms: row.rooms.map(toAvailabilityRoom),
+      rooms: row.rooms.map((room) => toAvailabilityRoom(room, row.status)),
     };
   }
 
   async findRoom(roomId: string): Promise<AvailabilityRoom | null> {
     const row = await this.prisma.room.findUnique({
       where: { id: roomId },
-      select: ROOM_SELECT,
+      select: ROOM_WITH_HOTEL_SELECT,
     });
-    return row ? toAvailabilityRoom(row) : null;
+    return row ? toAvailabilityRoom(row, row.hotel.status) : null;
   }
 
   async findOverlappingBookings(
@@ -169,10 +180,12 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
 
 function toAvailabilityRoom(
   row: Prisma.RoomGetPayload<{ select: typeof ROOM_SELECT }>,
+  hotelStatus: HotelVisibility,
 ): AvailabilityRoom {
   return {
     id: row.id,
     hotelId: row.hotelId,
+    hotelStatus,
     name: row.name,
     bedType: row.bedType,
     maxGuests: row.maxGuests,

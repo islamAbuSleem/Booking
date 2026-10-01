@@ -30,6 +30,12 @@ export interface AvailabilityRoom {
   id: string;
   /** Needed to reach hotel-wide blackouts, which are stored against the hotel. */
   hotelId: string;
+  /**
+   * The parent hotel's visibility, carried on the room so a room id alone can never be used
+   * to price or read a draft listing. `hotelAvailability()` already filters on the hotel;
+   * this is what lets the quote path apply the same rule without a second query.
+   */
+  hotelStatus: HotelVisibility;
   name: string;
   bedType: string;
   maxGuests: number;
@@ -73,6 +79,10 @@ export interface RoomPrice {
 export interface AvailabilityRepository {
   /** `null` when no hotel has that id or slug. Room inventory is a projection, not a graph. */
   findHotelRooms(hotelIdOrSlug: string): Promise<HotelRooms | null>;
+  /**
+   * `null` when no room has that id. The room carries its hotel's status, so the caller can
+   * refuse a room of an unpublished hotel without a second query.
+   */
   findRoom(roomId: string): Promise<AvailabilityRoom | null>;
   /**
    * Bookings that overlap `[checkIn, checkOut)` for any of `roomIds`, in either holding
