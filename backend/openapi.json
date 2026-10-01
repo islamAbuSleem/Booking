@@ -237,6 +237,258 @@
         ]
       }
     },
+    "/api/bookings": {
+      "post": {
+        "description": "Creates the PENDING booking inside a serializable transaction that re-checks availability on the transaction client before the insert, so a concurrent booking for the last unit is answered ROOM_UNAVAILABLE rather than oversold. The money is a server-computed snapshot: the request carries no money fields, and a total sent in the body is stripped, never trusted (D3). The guest contact fields are validated but not persisted — the payment flow (T26/T27) is where they live. The booking embeds a hotel display snapshot so the detail page needs no second fetch.",
+        "operationId": "BookingsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBooking"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The PENDING booking, with its money snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation, or the room sleeps fewer guests than asked (the 400 names the room limit).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such room, or the room's hotel is not published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The room is sold out, blacked out, or too small for the party (ROOM_UNAVAILABLE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The room has no price in the requested currency.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Book a room",
+        "tags": [
+          "Bookings"
+        ]
+      },
+      "get": {
+        "description": "Only the caller's own rows, newest first: the read is filtered by the JWT subject and no request field can widen it. A guest with no bookings gets an empty list, not an error.",
+        "operationId": "BookingsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The caller's bookings, most recent first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the caller's bookings",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
+    "/api/bookings/{id}": {
+      "get": {
+        "description": "404 BOOKING_NOT_FOUND when no such booking exists; 403 NOT_BOOKING_OWNER when it exists but belongs to a different guest. The 403 rather than a 404 is deliberate: a 404 would let a caller probe whether a booking id they do not own exists.",
+        "operationId": "BookingsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The booking, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The booking, with its hotel snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking exists but belongs to a different guest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of the caller's bookings",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
+    "/api/bookings/{id}/cancel": {
+      "post": {
+        "description": "Guarded to CONFIRMED only: a PENDING booking is an unpaid hold that T26/T27 confirm, and cancelling it out from under the payment would strand the money, so a PENDING booking answers INVALID_CANCEL_STATE until it is confirmed. Refunds are a later ticket; this flips the status only. Answers 200 with the booking in its CANCELLED state, not 204: the client renders the flip from the body.",
+        "operationId": "BookingsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The booking to cancel, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The booking, now CANCELLED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking belongs to a different guest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The booking is not CONFIRMED (INVALID_CANCEL_STATE): PENDING until payment confirms it, and COMPLETED past cancelling.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel the caller's booking",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
     "/api/favorites": {
       "post": {
         "description": "Creates the `favorites` row for the caller. The guest is the JWT subject: a `userId` in the body is stripped by the schema, never obeyed. A hotel that is already a favourite is a `FAVORITE_EXISTS` 409 rather than a second 201, because `(userId, hotelId)` is a composite primary key and a duplicate insert is a constraint violation worth surfacing. Clients call this optimistically and roll back on the 409.",
@@ -1286,7 +1538,7 @@
           "remainingPerNight": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/__schema0"
+              "$ref": "#/components/schemas/RoomAvailability~__schema0"
             },
             "description": "Units left on each night, in stay order from `checkIn`. Length is `nights`. A blacked-out or fully booked night is 0; the value never goes negative."
           }
@@ -1298,7 +1550,7 @@
         ],
         "additionalProperties": false
       },
-      "__schema0": {
+      "RoomAvailability~__schema0": {
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
@@ -1318,6 +1570,11 @@
         ],
         "additionalProperties": false
       },
+      "HotelAvailabilityData~__schema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
       "HotelAvailabilityEnvelope": {
         "type": "object",
         "properties": {
@@ -1336,6 +1593,11 @@
           "data"
         ],
         "additionalProperties": false
+      },
+      "HotelAvailabilityEnvelope~__schema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
       },
       "QuoteNight": {
         "type": "object",
@@ -1488,6 +1750,311 @@
           "data"
         ],
         "additionalProperties": false
+      },
+      "CreateBooking": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "$ref": "#/components/schemas/CreateBooking~__schema0"
+          },
+          "checkIn": {
+            "$ref": "#/components/schemas/CreateBooking~__schema1"
+          },
+          "checkOut": {
+            "$ref": "#/components/schemas/CreateBooking~__schema2"
+          },
+          "guests": {
+            "$ref": "#/components/schemas/CreateBooking~__schema3"
+          },
+          "guestName": {
+            "$ref": "#/components/schemas/CreateBooking~__schema4"
+          },
+          "guestEmail": {
+            "$ref": "#/components/schemas/CreateBooking~__schema5"
+          },
+          "guestPhone": {
+            "$ref": "#/components/schemas/CreateBooking~__schema6"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CreateBooking~__schema7"
+          }
+        },
+        "required": [
+          "roomId",
+          "checkIn",
+          "checkOut",
+          "guests",
+          "guestName",
+          "guestEmail",
+          "guestPhone"
+        ],
+        "additionalProperties": false
+      },
+      "CreateBooking~__schema0": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+        "description": "The room to book, by uuid."
+      },
+      "CreateBooking~__schema1": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+        "description": "First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp."
+      },
+      "CreateBooking~__schema2": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+        "description": "Last day the guest leaves, `YYYY-MM-DD`. Strictly after `checkIn`. The stay is half-open, so a checkout equal to another booking check-in never overlaps."
+      },
+      "CreateBooking~__schema3": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Party size, 1-20. Checked against the room again server-side."
+      },
+      "CreateBooking~__schema4": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Lead guest name. Validated, not persisted (T26/T27 consume it)."
+      },
+      "CreateBooking~__schema5": {
+        "type": "string",
+        "format": "email",
+        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+        "description": "Lead guest email. Validated, not persisted (T26/T27 consume it)."
+      },
+      "CreateBooking~__schema6": {
+        "type": "string",
+        "description": "Lead guest phone. Validated, not persisted (T26/T27 consume it)."
+      },
+      "CreateBooking~__schema7": {
+        "description": "ISO 4217 code to book in. Defaults to the room's price currency, else USD; a room with no `room_prices` row in that currency is a PRICE_UNAVAILABLE error, never a free stay.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CreateBooking~__schema8"
+          }
+        ]
+      },
+      "CreateBooking~__schema8": {
+        "type": "string",
+        "pattern": "^[A-Z]{3}$"
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Human-readable, e.g. GB-4821. Shown to the guest; never the primary key."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONFIRMED",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "nights": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "`checkOut - checkIn` in whole days. The stay is half-open."
+          },
+          "guestsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code the booking was priced in. A historical label, not a key."
+          },
+          "subtotalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Integer cents for the stay, before fees."
+          },
+          "feesCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Zero today; T20/T26 set the real fee schedule."
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `subtotalCents + feesCents`."
+          },
+          "hotel": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "addressLine": {
+                "type": "string"
+              },
+              "coverImage": {
+                "nullable": true,
+                "description": "The hotel cover image URL, or null when it has none.",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Booking~__schema0"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "city",
+              "country",
+              "addressLine",
+              "coverImage"
+            ],
+            "additionalProperties": false
+          },
+          "room": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 instant the booking was created."
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "checkIn",
+          "checkOut",
+          "nights",
+          "guestsCount",
+          "currency",
+          "subtotalCents",
+          "feesCents",
+          "totalCents",
+          "hotel",
+          "room",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Booking~__schema0": {
+        "type": "string"
+      },
+      "BookingEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Booking"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "BookingEnvelope~__schema0": {
+        "type": "string"
+      },
+      "BookingListData": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Booking"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `items.length` until the list is paginated."
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "BookingListData~__schema0": {
+        "type": "string"
+      },
+      "BookingListEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/BookingListData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "BookingListEnvelope~__schema0": {
+        "type": "string"
       }
     }
   }

@@ -37,6 +37,13 @@ export const ERROR_CODES = [
   // reads this 409 as "already on, keep the filled heart" instead of as a failure to roll
   // back. `translatePrismaError`'s generic P2002 -> CONFLICT cannot express that.
   'FAVORITE_EXISTS',
+  // T20 — bookings. A booking that exists but belongs to a different guest is a 403, not a
+  // 404, so the code states which rule failed rather than hiding the row's existence.
+  'NOT_BOOKING_OWNER',
+  'BOOKING_NOT_FOUND',
+  // T20 — cancel is guarded to CONFIRMED only (D55): a PENDING hold cannot be cancelled
+  // until T26/T27 confirm it, and a COMPLETED stay is past cancelling at all.
+  'INVALID_CANCEL_STATE',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

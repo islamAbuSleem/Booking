@@ -1,8 +1,10 @@
 /**
- * Mock bookings store. One `useState` list shared by the trips index and the
- * booking detail page, so cancelling on the detail is visible in the list.
+ * Mock bookings store — the fallback source behind the booking pages since T20 wired
+ * them to the real API: the index degrades to `getBookingsForGuest()`, the detail page
+ * to `bookingById()`, and this store owns the fallback cancel.
  *
- * Local state only — the bookings API (T20) replaces this with server state.
+ * Local state only — the API is the primary source of truth, and this module is deleted
+ * when the backend is assumed present.
  * Types are inferred from the fixtures (`typeof BOOKINGS`) so this shared
  * module never imports `~/utils/mock/types.ts`, which is a placeholder for
  * the generated API types.
@@ -28,10 +30,14 @@ export function useBookings() {
     return bookings.value.find(booking => booking.id === id)
   }
 
-  /** Only a held or confirmed stay can be cancelled. Returns false otherwise. */
+  /**
+   * Only a CONFIRMED stay can be cancelled — the API guards the same way (409
+   * `INVALID_CANCEL_STATE` for any other status), so the fallback must match or the
+   * mock and live detail pages would disagree about which trips are cancellable.
+   */
   function cancelBooking(id: string): boolean {
     const booking = bookingById(id)
-    if (!booking || !isUpcomingStatus(booking.status)) return false
+    if (!booking || booking.status !== 'CONFIRMED') return false
     booking.status = 'CANCELLED'
     return true
   }

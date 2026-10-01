@@ -75,11 +75,31 @@ function convert(
   const definitions = (json['definitions'] ??
     json['$defs'] ??
     {}) as JsonSchema;
+
+  // Zod's `reused: 'ref'` names the anonymous sub-schemas it hoists **per call** —
+  // `__schema0`, `__schema1`, ... Those names are not stable across calls: the
+  // `__schema0` in *this* call is a different schema than the `__schema0` in the *next*
+  // one, yet every call hoists into one shared `components.schemas` map. Left as-is, the
+  // later call silently clobbers the earlier one, and a field's `$ref` then points at a
+  // sibling component's schema — `coverImage` (a string) resolving to the integer some
+  // other component parked at `__schema0` is exactly that.
+  //
+  // So: file each component's anonymous defs under `${name}~__schemaN`. Registered names
+  // (`z.metadata`, the CamelCase components) stay global because they are identical
+  // across calls; only the anonymous `__`-names are per-call and need the namespace.
+  const rename = (local: string) =>
+    local.startsWith('__') ? `${name}~${local}` : local;
+
+  const hoisted: Record<string, JsonSchema> = {};
+  for (const [localKey, schema] of Object.entries(definitions)) {
+    hoisted[rename(localKey)] = schema as JsonSchema;
+  }
+
   const definition =
     (definitions[name] as JsonSchema | undefined) ?? stripDefs(json);
   return {
-    definition: rewriteRefs(definition),
-    hoisted: rewriteRefs(definitions) as Record<string, JsonSchema>,
+    definition: rewriteRefs(definition, rename),
+    hoisted: rewriteRefs(hoisted, rename),
   };
 }
 
@@ -90,9 +110,14 @@ function stripDefs(node: JsonSchema): JsonSchema {
   return rest;
 }
 
-/** `#/definitions/X` (Zod) → `#/components/schemas/X` (OpenAPI 3.0). */
-function rewriteRefs<T>(node: T): T {
-  if (Array.isArray(node)) return node.map((item) => rewriteRefs(item)) as T;
+/**
+ * `#/definitions/X` (Zod) → `#/components/schemas/X` (OpenAPI 3.0). `rename` is the same
+ * function that renamed the hoisted defs, so a ref targets the *namespaced* key that was
+ * actually filed into `components.schemas`, not the raw per-call `__schemaN`.
+ */
+function rewriteRefs<T>(node: T, rename: (local: string) => string): T {
+  if (Array.isArray(node))
+    return node.map((item) => rewriteRefs(item, rename)) as T;
   if (typeof node !== 'object' || node === null) return node;
 
   const out: Record<string, unknown> = {};
@@ -103,10 +128,11 @@ function rewriteRefs<T>(node: T): T {
       typeof value === 'string' &&
       value.startsWith('#/definitions/')
     ) {
-      out[key] = `#/components/schemas/${value.slice('#/definitions/'.length)}`;
+      const local = value.slice('#/definitions/'.length);
+      out[key] = `#/components/schemas/${rename(local)}`;
       continue;
     }
-    out[key] = rewriteRefs(value);
+    out[key] = rewriteRefs(value, rename);
   }
   return out as T;
 }
