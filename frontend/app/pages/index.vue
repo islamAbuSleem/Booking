@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { HOTELS } from '~/utils/mock'
-import { fetchHotels, isEnvelopeError } from '~/utils/api'
+import { fetchHotels, isApiFailure } from '~/utils/api'
 import type { ApiHotelCard } from '~/utils/api'
 import { mockHotelToCard } from '~/utils/hotelAdapters'
 
@@ -27,7 +27,7 @@ const { data: cards } = await useAsyncData<ApiHotelCard[]>(
       return live.items
     }
     catch (error: unknown) {
-      if (isEnvelopeError(error)) throw error
+      if (isApiFailure(error)) throw error
       return HOTELS
         .filter(hotel => hotel.status === 'PUBLISHED')
         .slice(0, HOME_PAGE_SIZE)

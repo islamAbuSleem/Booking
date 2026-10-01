@@ -9,7 +9,7 @@
  */
 import { AMENITY_BY_ID, getHotelDetail } from '~/utils/mock'
 import type { MockRatingBreakdown, MockReview } from '~/utils/mock/types'
-import { fetchHotelDetail, isApiError, isEnvelopeError } from '~/utils/api'
+import { fetchHotelDetail, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiHotelDetail } from '~/utils/api'
 import { mockHotelToDetail } from '~/utils/hotelAdapters'
 import { usd } from '~/utils/format'
@@ -45,7 +45,7 @@ const { data: payload, error } = await useAsyncData<HotelDetailPayload>(
       if (isApiError(fetchError) && fetchError.code === 'HOTEL_NOT_FOUND') {
         return { hotel: null, breakdown: null, reviews: [] }
       }
-      if (isEnvelopeError(fetchError)) throw fetchError
+      if (isApiFailure(fetchError)) throw fetchError
       const mock = getHotelDetail(id)
       if (!mock) return { hotel: null, breakdown: null, reviews: [] }
       return { hotel: mockHotelToDetail(mock), breakdown: mock.rating, reviews: mock.reviews }

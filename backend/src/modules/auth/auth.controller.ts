@@ -34,6 +34,11 @@ import {
   type LoginInput,
   type RegisterInput,
 } from './dto/auth.dto.js';
+import {
+  allowedOrigins,
+  clearOAuthOrigin,
+  readOAuthOrigin,
+} from './oauth-origin.js';
 
 /**
  * T14 + T15 — auth routes. Thin on purpose: parse, delegate, set the cookie.
@@ -196,12 +201,17 @@ export class AuthController {
   private finishOAuth(req: Request & { user?: Session }, res: Response): void {
     // `request.user` is the `Session` the strategy's `validate` returned.
     const session = req.user;
+    // The origin the entry route recorded, not just the first configured one:
+    // in a multi-origin deployment the first entry is often the wrong host, and
+    // the user would land there logged out. See `oauth-origin.ts`.
+    const origin = this.frontendOrigin(req);
+    clearOAuthOrigin(res, { secure: this.isSecure() });
     if (!session || !session.token) {
-      res.redirect(this.frontendOrigin());
+      res.redirect(origin);
       return;
     }
     this.setCookie(res, session.token);
-    res.redirect(this.frontendOrigin());
+    res.redirect(origin);
   }
 
   private setCookie(res: Response, token: string): void {
@@ -216,9 +226,10 @@ export class AuthController {
     return this.config.get<string>('NODE_ENV') === 'production';
   }
 
-  private frontendOrigin(): string {
-    const raw =
-      this.config.get<string>('FRONTEND_ORIGIN') ?? 'http://localhost:3000';
-    return raw.split(',')[0]?.trim() || 'http://localhost:3000';
+  private frontendOrigin(req: Request): string {
+    return readOAuthOrigin(
+      req,
+      allowedOrigins(this.config.get<string>('FRONTEND_ORIGIN')),
+    );
   }
 }

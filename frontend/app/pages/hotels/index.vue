@@ -21,7 +21,7 @@ import {
 } from '~/utils/hotels'
 import type { HotelFilterState, HotelSort } from '~/utils/hotels'
 import { localToday } from '~/utils/date'
-import { fetchHotels, isEnvelopeError, toHotelListParams } from '~/utils/api'
+import { fetchHotels, isApiFailure, toHotelListParams } from '~/utils/api'
 import type { ApiHotelCard } from '~/utils/api'
 import { mockHotelToCard } from '~/utils/hotelAdapters'
 import { formatShortStayDate, wholeNumber } from '~/utils/format'
@@ -97,6 +97,16 @@ function applyStars(items: ApiHotelCard[], stars: number[]): ApiHotelCard[] {
 }
 
 /**
+ * The API total counts rows the star filter then hides, so a short filtered page
+ * means the real total is unknowable from one page. Report the honest count so
+ * the paginator never offers a page that cannot exist.
+ */
+function starFilteredTotal(items: ApiHotelCard[], apiTotal: number, stars: number[]): number {
+  if (stars.length === 0) return apiTotal
+  return items.length < HOTEL_PAGE_SIZE ? items.length : apiTotal
+}
+
+/**
  * Real list endpoint first. A transport failure means no backend is running, so
  * the search degrades to the mock pipeline with client-side paging; a real API
  * error is rethrown and drives the error state instead.
@@ -115,12 +125,14 @@ const {
       if (first.items.length === 0 && first.total > 0 && page.value > 1) {
         const last = Math.max(1, Math.ceil(first.total / HOTEL_PAGE_SIZE))
         const clamped = await fetchHotels(toHotelListParams(filters, sort, last, HOTEL_PAGE_SIZE))
-        return { items: applyStars(clamped.items, filters.stars), total: clamped.total, live: true, page: last }
+        const items = applyStars(clamped.items, filters.stars)
+        return { items, total: starFilteredTotal(items, clamped.total, filters.stars), live: true, page: last }
       }
-      return { items: applyStars(first.items, filters.stars), total: first.total, live: true, page: page.value }
+      const items = applyStars(first.items, filters.stars)
+      return { items, total: starFilteredTotal(items, first.total, filters.stars), live: true, page: page.value }
     }
     catch (fetchError: unknown) {
-      if (isEnvelopeError(fetchError)) throw fetchError
+      if (isApiFailure(fetchError)) throw fetchError
       const matched = searchHotels(filters, sort)
       const pages = Math.max(1, Math.ceil(matched.total / HOTEL_PAGE_SIZE))
       const current = Math.min(Math.max(page.value, 1), pages)

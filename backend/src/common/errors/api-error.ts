@@ -26,12 +26,15 @@ export const ERROR_CODES = [
   'EMAIL_TAKEN',
   // T15 — OAuth profile has no usable email, provider error, or link failure.
   'OAUTH_FAILED',
+
   // T18 — availability and quote. ROOM_UNAVAILABLE is the ticket's code for a room that
   // cannot take the stay (sold out, blacked out, or too small for the party).
   'ROOM_UNAVAILABLE',
   // T18 — the room exists but has no `room_prices` row in the requested currency. A missing
   // price is an error, never a zero (context/architecture.md, "Pricing").
   'PRICE_UNAVAILABLE',
+  'OAUTH_LINK_CONFLICT',
+
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

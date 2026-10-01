@@ -279,4 +279,85 @@ describe('AuthService.validateOAuthProfile', () => {
     expect(session.user.email).toBe('new@example.com');
     expect(users.created).toHaveLength(1);
   });
+
+  it('409s instead of overwriting a link the account already has', async () => {
+    const users = new FakeUsers();
+    const { service } = serviceWith(users);
+    const stored = record({
+      oauthProvider: 'google',
+      oauthAccountId: 'g-1',
+    });
+    users.byOAuth.set('google:g-1', stored);
+    users.byId.set(stored.id, stored);
+    users.byEmail.set(stored.email, stored);
+
+    // Same verified email, second provider. The Google link must survive.
+    await expect(
+      service.validateOAuthProfile({
+        provider: 'github',
+        providerId: 'gh-9',
+        email: stored.email,
+        name: 'Ada',
+        avatarUrl: null,
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: expect.objectContaining({ code: 'OAUTH_LINK_CONFLICT' }),
+    });
+
+    expect(users.updated).toHaveLength(0);
+    expect(users.byOAuth.get('google:g-1')?.oauthProvider).toBe('google');
+  });
+
+  it('409s when the same provider reports a different account id', async () => {
+    const users = new FakeUsers();
+    const { service } = serviceWith(users);
+    const stored = record({
+      oauthProvider: 'google',
+      oauthAccountId: 'g-1',
+    });
+    users.byOAuth.set('google:g-1', stored);
+    users.byId.set(stored.id, stored);
+    users.byEmail.set(stored.email, stored);
+
+    await expect(
+      service.validateOAuthProfile({
+        provider: 'google',
+        providerId: 'g-other',
+        email: stored.email,
+        name: 'Ada',
+        avatarUrl: null,
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+      response: expect.objectContaining({ code: 'OAUTH_LINK_CONFLICT' }),
+    });
+
+    expect(users.updated).toHaveLength(0);
+  });
+
+  it('completes a half-written link instead of refusing it', async () => {
+    const users = new FakeUsers();
+    const { service } = serviceWith(users);
+    const stored = record({ oauthProvider: 'google', oauthAccountId: null });
+    users.byId.set(stored.id, stored);
+    users.byEmail.set(stored.email, stored);
+
+    const session = await service.validateOAuthProfile({
+      provider: 'google',
+      providerId: 'g-1',
+      email: stored.email,
+      name: 'Ada',
+      avatarUrl: null,
+    });
+
+    expect(session.user.id).toBe(stored.id);
+    expect(users.updated).toHaveLength(1);
+    expect(users.updated[0]).toMatchObject({
+      patch: expect.objectContaining({
+        oauthProvider: 'google',
+        oauthAccountId: 'g-1',
+      }),
+    });
+  });
 });
