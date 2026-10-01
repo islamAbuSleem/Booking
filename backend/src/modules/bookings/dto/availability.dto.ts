@@ -18,6 +18,8 @@ import { envelopeSchema } from '../../../common/envelope.js';
  *     per-night list anyway so a dated rate table can land without changing the contract.
  *   * `holdExpiresAt` is advisory: a quote writes nothing, so nothing is held until T20
  *     creates the `PENDING` booking inside this window.
+ *   * A stay is at most `MAX_STAY_NIGHTS` nights. Both endpoints are public and both walk the
+ *     range one night at a time, so an unbounded range is a denial-of-service lever.
  */
 
 /**
@@ -63,6 +65,29 @@ const CHECKOUT_AFTER_CHECKIN = {
 };
 
 /**
+ * The longest stay the API will price. Both endpoints are public, and both walk the range one
+ * night at a time in memory, so an unbounded range (`0001-01-01` to `9999-12-31` passes the
+ * date shape) would cost one unauthenticated caller millions of night entries and a filtered
+ * booking scan per night. 30 nights covers every realistic hotel stay, and the cap is one
+ * constant rather than a value per endpoint.
+ */
+export const MAX_STAY_NIGHTS = 30;
+
+const STAY_TOO_LONG = {
+  message: `a stay cannot be longer than ${MAX_STAY_NIGHTS} nights`,
+  path: ['checkOut'],
+};
+
+const MILLIS_PER_DAY = 86_400_000;
+
+/** Nights in a half-open range, counted as UTC days so no host timezone can shift it. */
+function stayLength(checkIn: string, checkOut: string): number {
+  const from = Date.parse(`${checkIn}T00:00:00.000Z`);
+  const to = Date.parse(`${checkOut}T00:00:00.000Z`);
+  return Math.round((to - from) / MILLIS_PER_DAY);
+}
+
+/**
  * `GET /api/hotels/:id/availability` — the range is required; there is nothing to report
  * without it, and an empty range would make every room vacuously available.
  */
@@ -70,10 +95,12 @@ export const availabilityQueryBase = nightRangeBase.extend({
   guests: guestsSchema.default(2),
 });
 
-export const availabilityQuerySchema = availabilityQueryBase.refine(
-  (query) => query.checkOut > query.checkIn,
-  CHECKOUT_AFTER_CHECKIN,
-);
+export const availabilityQuerySchema = availabilityQueryBase
+  .refine((query) => query.checkOut > query.checkIn, CHECKOUT_AFTER_CHECKIN)
+  .refine(
+    (query) => stayLength(query.checkIn, query.checkOut) <= MAX_STAY_NIGHTS,
+    STAY_TOO_LONG,
+  );
 
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
 
@@ -93,10 +120,16 @@ export const quoteRequestBase = nightRangeBase.extend({
     ),
 });
 
-export const quoteRequestSchema = quoteRequestBase.refine(
-  (request) => request.checkOut > request.checkIn,
-  CHECKOUT_AFTER_CHECKIN,
-);
+export const quoteRequestSchema = quoteRequestBase
+  .refine(
+    (request) => request.checkOut > request.checkIn,
+    CHECKOUT_AFTER_CHECKIN,
+  )
+  .refine(
+    (request) =>
+      stayLength(request.checkIn, request.checkOut) <= MAX_STAY_NIGHTS,
+    STAY_TOO_LONG,
+  );
 
 export type QuoteRequest = z.infer<typeof quoteRequestSchema>;
 
