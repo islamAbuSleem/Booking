@@ -174,6 +174,69 @@
         ]
       }
     },
+    "/api/bookings/quote": {
+      "post": {
+        "description": "Server-side arithmetic only: the client-sent total is never trusted (D3). Availability is decided before the price is read, so a sold-out room never leaks a price, and a room with no `room_prices` row in the requested currency is a `PRICE_UNAVAILABLE` error rather than a free stay. Writes nothing — the inventory is held when T20 writes the PENDING booking, and `holdExpiresAt` is how long the guest has to get there.",
+        "operationId": "BookingsController_quote",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The per-night breakdown and the totals, in integer cents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation, or the room sleeps fewer guests than asked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such room.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The room is sold out or blacked out for those dates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The room has no price in the requested currency.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Price a stay and check it is bookable",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
     "/api/hotels": {
       "get": {
         "description": "Only PUBLISHED hotels are ever returned — the filter is in SQL, so a non-published row cannot leak through a page boundary. Prices are the cheapest room that fits `guests`, in the requested currency. Dates are accepted and validated here; availability filtering lands with the quote endpoint in T18.",
@@ -354,6 +417,82 @@
           }
         },
         "summary": "Hotel detail",
+        "tags": [
+          "Hotels"
+        ]
+      }
+    },
+    "/api/hotels/{id}/availability": {
+      "get": {
+        "description": "One verdict per room, not a filtered list: the client renders a card for every room and marks the unavailable ones. A room is available when it sleeps the party AND every night has at least one unit left AND no blackout covers that night — a room at exact fit is NOT available, because the last unit taken leaves nothing to sell. A `PENDING` booking holds inventory exactly like a `CONFIRMED` one, since that is how a guest checkout holds a room before payment.",
+        "operationId": "HotelsController_findAvailability",
+        "parameters": [
+          {
+            "name": "checkIn",
+            "required": true,
+            "in": "query",
+            "description": "First night, `YYYY-MM-DD`. Required: without a range there are no nights to report on, and an empty range would make every room vacuously available.",
+            "schema": {
+              "format": "date",
+              "example": "2026-06-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkOut",
+            "required": true,
+            "in": "query",
+            "description": "Last day the guest leaves, `YYYY-MM-DD`. Must be strictly after `checkIn`. The stay is half-open, so `checkOut` is not one of its nights and a checkout equal to another booking's check-in never overlaps.",
+            "schema": {
+              "format": "date",
+              "example": "2026-06-04",
+              "type": "string"
+            }
+          },
+          {
+            "name": "guests",
+            "required": false,
+            "in": "query",
+            "description": "Party size, 1-20. A room that cannot sleep the party reports `available: false` even when it has units left on every night.",
+            "schema": {
+              "example": 2,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every room of the hotel, each with `available` and the units left on each night.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelAvailabilityEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The query string failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such hotel, or it is not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Per-room availability for a date range",
         "tags": [
           "Hotels"
         ]
@@ -972,6 +1111,197 @@
           },
           "data": {
             "$ref": "#/components/schemas/MeData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "AvailabilityRoom": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bedType": {
+            "type": "string"
+          },
+          "maxGuests": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalInventory": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Units the hotel sells of this room type."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "bedType",
+          "maxGuests",
+          "totalInventory"
+        ],
+        "additionalProperties": false
+      },
+      "RoomAvailability": {
+        "type": "object",
+        "properties": {
+          "room": {
+            "$ref": "#/components/schemas/AvailabilityRoom"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "remainingPerNight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/__schema0"
+            },
+            "description": "Units left on each night, in stay order from `checkIn`. Length is `nights`. A blacked-out or fully booked night is 0; the value never goes negative."
+          }
+        },
+        "required": [
+          "room",
+          "available",
+          "remainingPerNight"
+        ],
+        "additionalProperties": false
+      },
+      "__schema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "HotelAvailabilityData": {
+        "type": "object",
+        "properties": {
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoomAvailability"
+            }
+          }
+        },
+        "required": [
+          "rooms"
+        ],
+        "additionalProperties": false
+      },
+      "HotelAvailabilityEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotelAvailabilityData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteNight": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The night this price covers, `YYYY-MM-DD`."
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Integer cents for this night. Never major units."
+          }
+        },
+        "required": [
+          "date",
+          "priceCents"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteData": {
+        "type": "object",
+        "properties": {
+          "nights": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "`checkOut - checkIn` in whole days."
+          },
+          "subtotalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "feesCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Zero today; T20/T26 set the real fee schedule."
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `subtotalCents + feesCents`."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code the room is priced in."
+          },
+          "breakdown": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteNight"
+            }
+          },
+          "holdExpiresAt": {
+            "type": "string",
+            "description": "ISO 8601 instant by which T20 would take the hold. A quote holds nothing by itself, so this is advisory until the booking exists."
+          }
+        },
+        "required": [
+          "nights",
+          "subtotalCents",
+          "feesCents",
+          "totalCents",
+          "currency",
+          "breakdown",
+          "holdExpiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/QuoteData"
           }
         },
         "required": [

@@ -25,6 +25,8 @@ export type ApiHotelRoom = components['schemas']['HotelRoom']
 export type ApiHotelImage = components['schemas']['HotelImage']
 export type ApiHotelListData = components['schemas']['HotelListData']
 export type ApiMoney = components['schemas']['Money']
+export type ApiQuoteData = components['schemas']['QuoteData']
+export type ApiQuoteNight = components['schemas']['QuoteNight']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -121,6 +123,12 @@ function normalizeTransportError(error: unknown): ApiRequestError {
 
 interface ApiRequestOptions {
   query?: Record<string, string | number>
+  /**
+   * `POST` for the quote only. It writes nothing — the server prices a stay and answers
+   * 200 — but it carries a body, so it cannot ride the query string like the reads.
+   */
+  method?: 'POST'
+  body?: Record<string, string | number>
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -139,7 +147,9 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
       baseURL: base,
       credentials: 'include',
       headers,
+      method: options.method,
       query: options.query,
+      body: options.body,
     })
   }
   catch (error: unknown) {
@@ -197,4 +207,23 @@ export async function fetchHotels(params: Record<string, string | number>): Prom
 /** Accepts a uuid or a slug — the frontend links to `/hotels/{slug}`. */
 export async function fetchHotelDetail(id: string): Promise<ApiHotelDetail> {
   return apiFetch<ApiHotelDetail>(`/api/hotels/${encodeURIComponent(id)}`)
+}
+
+/**
+ * `POST /api/bookings/quote` — the T18 body. `currency` is the property's own quoted
+ * currency, read from the detail payload rather than asserted here, so the site never
+ * asks for a currency it has not shown prices in.
+ *
+ * Half-open dates: `checkOut` is the day the guest leaves, not a night.
+ */
+export interface QuoteRequest {
+  roomId: string
+  checkIn: string
+  checkOut: string
+  guests: number
+  currency?: string
+}
+
+export async function fetchQuote(request: QuoteRequest): Promise<ApiQuoteData> {
+  return apiFetch<ApiQuoteData>('/api/bookings/quote', { method: 'POST', body: { ...request } })
 }

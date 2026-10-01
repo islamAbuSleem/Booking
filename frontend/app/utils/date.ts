@@ -16,3 +16,20 @@ export function localToday(): string {
   const now = new Date()
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
+
+const DAY_MS = 86_400_000
+
+/**
+ * The `count` nights of a stay beginning on `checkIn`, in order. The half-open rule read
+ * from the other end: `checkOut` is the day after the last night, so a four-night stay
+ * from the 14th lists the 14th to the 17th.
+ *
+ * Every step is a UTC instant read through a UTC getter. Adding 86_400_000ms to a
+ * UTC-midnight date is exactly one day, so a guest in a negative-offset timezone cannot
+ * have a night shifted by a day (the same rule the API's `stayNights` applies).
+ */
+export function stayNights(checkIn: string, count: number): string[] {
+  const first = Date.parse(`${checkIn}T00:00:00.000Z`)
+  if (Number.isNaN(first) || count < 1) return []
+  return Array.from({ length: count }, (_, night) => new Date(first + night * DAY_MS).toISOString().slice(0, 10))
+}

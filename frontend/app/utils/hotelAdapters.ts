@@ -6,7 +6,9 @@
  * path feeds the same API-typed components as the live path. Nothing here is
  * authoritative — delete it when the backend is assumed present.
  */
-import type { ApiHotelCard, ApiHotelDetail, ApiHotelImage, ApiHotelRoom } from '~/utils/api'
+import type { ApiHotelCard, ApiHotelDetail, ApiHotelImage, ApiHotelRoom, ApiQuoteData } from '~/utils/api'
+import { quote } from '~/utils/mock'
+import { stayNights } from '~/utils/date'
 import type { MockHotel, MockImage, MockRoom } from '~/utils/mock/types'
 
 const IMAGE_DIMS: Record<MockImage['aspect'], { width: number, height: number }> = {
@@ -84,5 +86,37 @@ export function mockHotelToDetail(hotel: MockHotel): ApiHotelDetail {
     rating: { average: hotel.rating.average, totalReviews: hotel.rating.totalReviews },
     rooms: hotel.rooms.map(mockRoomToApi),
     host: null,
+  }
+}
+
+/** The API's advisory hold window, so the fixture's shape matches the live one. */
+const MOCK_HOLD_MS = 15 * 60 * 1000
+
+/**
+ * Mock quote → `ApiQuoteData`, for the no-backend fallback on the booking page.
+ *
+ * The arithmetic is the fixtures' own `quote()` and stays in this layer — no component and
+ * no page computes a total, which is the whole point of the T18 endpoint. The flat 10%
+ * fee is the Phase 1 fixture's, kept so the mock booking pages and this panel agree with
+ * each other; the live API returns zero until T20/T26 set a fee schedule.
+ */
+export function mockQuoteToApi(
+  room: MockRoom,
+  checkIn: string,
+  checkOut: string,
+): ApiQuoteData | null {
+  const price = quote(room, checkIn, checkOut)
+  if (!price) return null
+  return {
+    nights: price.nights,
+    subtotalCents: price.subtotalCents,
+    feesCents: price.feesCents,
+    totalCents: price.totalCents,
+    currency: price.currency,
+    breakdown: stayNights(checkIn, price.nights).map(date => ({
+      date,
+      priceCents: price.nightlyCents,
+    })),
+    holdExpiresAt: new Date(Date.now() + MOCK_HOLD_MS).toISOString(),
   }
 }

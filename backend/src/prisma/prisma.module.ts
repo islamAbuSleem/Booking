@@ -1,7 +1,9 @@
 import { Global, Module } from '@nestjs/common';
 import { USERS_REPOSITORY } from '../modules/users/users.repository.js';
 import { PrismaUsersRepository } from '../modules/users/prisma-users.repository.js';
+import { AVAILABILITY_REPOSITORY } from './availability.repository.js';
 import { HOTELS_REPOSITORY } from './hotels.repository.js';
+import { PrismaAvailabilityRepository } from './prisma-availability.repository.js';
 import { PrismaHotelsRepository } from './prisma-hotels.repository.js';
 import { PrismaService } from './prisma.service.js';
 
@@ -15,6 +17,11 @@ import { PrismaService } from './prisma.service.js';
     PrismaService,
     PrismaHotelsRepository,
     { provide: HOTELS_REPOSITORY, useExisting: PrismaHotelsRepository },
+    PrismaAvailabilityRepository,
+    {
+      provide: AVAILABILITY_REPOSITORY,
+      useExisting: PrismaAvailabilityRepository,
+    },
     PrismaUsersRepository,
     { provide: USERS_REPOSITORY, useExisting: PrismaUsersRepository },
   ],
@@ -22,6 +29,8 @@ import { PrismaService } from './prisma.service.js';
     PrismaService,
     PrismaHotelsRepository,
     HOTELS_REPOSITORY,
+    PrismaAvailabilityRepository,
+    AVAILABILITY_REPOSITORY,
     PrismaUsersRepository,
     USERS_REPOSITORY,
   ],
