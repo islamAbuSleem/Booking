@@ -270,6 +270,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/uploads/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a Cloudinary upload
+         * @description Returns the config the browser needs to POST straight to Cloudinary: the cloud name, the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller's own `booking/hotels/{hostId}/` folder, and a `signature` of `base64(HMAC-SHA1(secret, "timestamp=" + timestamp))` that Cloudinary re-verifies. Only the secret stays server-side. Answers 200, not 201: nothing is created here.
+         */
+        post: operations["UploadsController_sign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach an uploaded asset to a hotel
+         * @description Persists the `hotel_images` row the browser posts back after a Cloudinary upload. When `publicId` is present it must start with the caller's `booking/hotels/{hostId}/` folder prefix or the attach is 403 `UPLOAD_FOREIGN`; omitted, there is nothing to check. The hotel is not looked up here — a host may only touch their own listings is T22's query-filter rule; this one is a DB-free string check. Returns the T16 `HotelImage` summary.
+         */
+        post: operations["UploadsController_attach"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{publicId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete an uploaded asset
+         * @description Destroys the asset from Cloudinary by `publicId` and removes its `hotel_images` row. The `publicId` must live inside the caller's folder, checked before the DB, so a foreign id is 403 and never 404s into an existence leak. A non-foreign id with no row is 404, not 204: a 204 would claim the delete happened when there was nothing to delete.
+         */
+        delete: operations["UploadsController_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hotels": {
         parameters: {
             query?: never;
@@ -664,6 +724,55 @@ export interface components {
             data: components["schemas"]["BookingListData"];
         };
         "BookingListEnvelope~__schema0": string;
+        UploadSign: {
+            /** @description The Cloudinary cloud the browser uploads to. */
+            cloudName: string;
+            /** @description Exposed to the browser; the secret is not. */
+            apiKey: string;
+            /** @description Unix seconds the signature is bound to; Cloudinary rejects a stale one. */
+            timestamp: number;
+            /** @description The caller's own folder, booking/hotels/{hostId}/. */
+            folder: string;
+            /** @description base64 HMAC-SHA1 of "timestamp=" + timestamp under the API secret. */
+            signature: string;
+        };
+        UploadSignEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["UploadSign"];
+        };
+        AttachUpload: {
+            /**
+             * Format: uuid
+             * @description The hotel the image belongs to, by uuid.
+             */
+            hotelId: string;
+            /** @description Set for room-level imagery, omitted for hotel-level. */
+            roomId?: components["schemas"]["AttachUpload~__schema0"];
+            /** @description The Cloudinary URL the asset uploaded to. */
+            url: string;
+            /** @description The Cloudinary publicId, needed for deletes. Must start with the caller's booking/hotels/{hostId}/ folder or the attach is 403 UPLOAD_FOREIGN. */
+            publicId?: components["schemas"]["AttachUpload~__schema1"];
+            altText?: string;
+            isCover?: boolean;
+            /** @description Intrinsic width, for CLS. */
+            width?: components["schemas"]["AttachUpload~__schema2"];
+            /** @description Intrinsic height, for CLS. */
+            height?: components["schemas"]["AttachUpload~__schema3"];
+            /** @description Aspect ratio, e.g. 3:2, 4:3, 16:9, 1:1. */
+            aspect?: components["schemas"]["AttachUpload~__schema4"];
+        };
+        /** Format: uuid */
+        "AttachUpload~__schema0": string;
+        "AttachUpload~__schema1": string;
+        "AttachUpload~__schema2": number;
+        "AttachUpload~__schema3": number;
+        "AttachUpload~__schema4": string;
+        AttachUploadEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HotelImage"];
+        };
     };
     responses: never;
     parameters: never;
@@ -1203,6 +1312,152 @@ export interface operations {
             };
             /** @description No valid session. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UploadsController_sign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The signed, folder-scoped upload config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSignEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UploadsController_attach: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachUpload"];
+            };
+        };
+        responses: {
+            /** @description The persisted image, as the T16 HotelImage summary. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachUploadEnvelope"];
+                };
+            };
+            /** @description The body failed validation: `hotelId`/`roomId` must be uuids, `url` non-empty. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The `publicId` is not in the caller's folder (UPLOAD_FOREIGN). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The `(hotelId, url)` pair is already attached — a composite unique key. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UploadsController_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Cloudinary publicId, a path like booking/hotels/{hostId}/abcd123. */
+                publicId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone: the asset is destroyed and the row removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The `publicId` path parameter is empty. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The `publicId` is not in the caller's folder (UPLOAD_FOREIGN). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No image row maps to that `publicId`. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

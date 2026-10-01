@@ -44,6 +44,11 @@ export const ERROR_CODES = [
   // T20 — cancel is guarded to CONFIRMED only (D55): a PENDING hold cannot be cancelled
   // until T26/T27 confirm it, and a COMPLETED stay is past cancelling at all.
   'INVALID_CANCEL_STATE',
+  // T21 — uploads. A `publicId` that does not start with the caller's own
+  // `booking/hotels/{hostId}/` folder is a foreign asset: another host's upload, which
+  // this host may neither attach nor delete. The folder-prefix rule is the DB-free check
+  // the ticket specifies (D58); a listing-ownership check is T22's, not this one's.
+  'UPLOAD_FOREIGN',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

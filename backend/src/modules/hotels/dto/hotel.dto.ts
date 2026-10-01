@@ -15,7 +15,7 @@ import { envelopeSchema } from '../../../common/envelope.js';
  *   * `rating.average` is `null` for a hotel with no visible reviews, not `0`.
  */
 
-const imageSummarySchema = z.object({
+export const imageSummarySchema = z.object({
   url: z.string(),
   altText: z.string().nullable(),
   /** `3:2` | `4:3` | `16:9` | `1:1`, matching `hotel_images.aspect`. */
@@ -112,6 +112,8 @@ export const healthEnvelopeSchema = envelopeSchema(healthDataSchema);
 
 export type HotelCardDto = z.infer<typeof hotelCardSchema>;
 export type HotelDetailDto = z.infer<typeof hotelDetailSchema>;
+/** The T16 image summary; `attach` (T21) returns exactly this, so it is not redefined. */
+export type HotelImageDto = z.infer<typeof imageSummarySchema>;
 export type HotelListDataDto = z.infer<typeof hotelListDataSchema>;
 export type HealthDataDto = z.infer<typeof healthDataSchema>;
 

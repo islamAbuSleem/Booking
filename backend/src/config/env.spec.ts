@@ -78,6 +78,31 @@ describe('parseEnv', () => {
     ).toThrow(/JWT_SECRET/);
   });
 
+  it('fills the Cloudinary placeholders so a missing var does not fail boot (T21)', () => {
+    const env = parseEnv({ DATABASE_URL: 'postgresql://user:pw@host/db', JWT_SECRET });
+
+    // OAuth-style fallback: the Cloudinary creds are defaulted, not required, so boot
+    // passes without them and `sign` returns a placeholder config.
+    expect(env.CLOUDINARY_CLOUD_NAME).toBe('booking-upload-placeholder');
+    expect(env.CLOUDINARY_API_KEY).toBe('00000000000000000000000');
+    expect(env.CLOUDINARY_API_SECRET).toBe(
+      'cloudinary-upload-placeholder-secret',
+    );
+    expect(env.CLOUDINARY_UPLOAD_PATH).toBe('booking/hotels/');
+  });
+
+  it('lets a real Cloudinary config override the placeholders', () => {
+    const env = parseEnv({
+      DATABASE_URL: 'x',
+      JWT_SECRET,
+      CLOUDINARY_CLOUD_NAME: 'real-cloud',
+      CLOUDINARY_UPLOAD_PATH: 'booking/hotels/',
+    });
+
+    expect(env.CLOUDINARY_CLOUD_NAME).toBe('real-cloud');
+    expect(env.CLOUDINARY_UPLOAD_PATH).toBe('booking/hotels/');
+  });
+
   it('leaves OAuth secrets optional so tests build without providers', () => {
     const env = parseEnv({ DATABASE_URL: 'x', JWT_SECRET });
 
