@@ -67,7 +67,8 @@ export class BookingsController {
       'is decided before the price is read, so a sold-out room never leaks a price, and a ' +
       'room with no `room_prices` row in the requested currency is a `PRICE_UNAVAILABLE` ' +
       'error rather than a free stay. Writes nothing — the inventory is held when T20 writes ' +
-      'the PENDING booking, and `holdExpiresAt` is how long the guest has to get there.',
+      'the PENDING booking. That hold has no expiry yet: nothing sweeps it, and a PENDING ' +
+      'booking cannot be cancelled, so the payment window itself lands with T26.',
   })
   @ApiResponse({
     status: 200,
