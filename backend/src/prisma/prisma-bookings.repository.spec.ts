@@ -98,8 +98,22 @@ class FakePrisma {
   private conflictFailures = 0;
   private queue: Promise<unknown> = Promise.resolve();
   private transactionCount = 0;
+  /**
+   * Postgres aborts the whole transaction on any statement error, so the statement after
+   * a failed insert fails with `25P02 current transaction is aborted` rather than with the
+   * error the caller just saw. The fake models that, because an in-transaction recovery
+   * would otherwise look correct here and fail on a real round trip.
+   */
+  private aborted = false;
 
   readonly attemptedReferences: string[] = [];
+
+  /** The 25P02 every further statement on an aborted transaction would get. */
+  assertLive(): void {
+    if (this.aborted) {
+      throw new Error('25P02: current transaction is aborted');
+    }
+  }
 
   withRoom(room: RoomSpec): this {
     this.rooms.set(room.id, room);
@@ -155,11 +169,19 @@ class FakePrisma {
   $transaction<R>(fn: (tx: unknown) => Promise<R>): Promise<R> {
     const attempt = this.queue.then(async () => {
       this.transactionCount += 1;
+      this.aborted = false;
       if (this.conflictFailures > 0) {
         this.conflictFailures -= 1;
         throw knownError('P2034');
       }
-      return fn(this.delegates());
+      try {
+        return await fn(this.delegates());
+      } catch (error) {
+        // A failed statement leaves the transaction aborted; a fresh `$transaction`
+        // clears it above.
+        this.aborted = true;
+        throw error;
+      }
     });
     // The queue swallows both outcomes so the next transaction still runs: a failure is
     // not a stuck queue.
@@ -223,6 +245,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
   return {
     room: {
       findUnique: async (args: { where: { id: string }; select?: unknown }) => {
+        prisma.assertLive();
         const room = prisma.rooms.get(args.where.id);
         if (!room) return null;
         return {
@@ -238,6 +261,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
         where: Prisma.BookingWhereInput;
         orderBy?: Prisma.BookingOrderByWithRelationInput;
       }) => {
+        prisma.assertLive();
         const where = args.where;
         // Two shapes share this delegate. The owner read is the plain `{ guestId }`
         // filter; the overlap read is the pure T18 predicate, and is interpreted here
@@ -297,6 +321,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
         data: Record<string, unknown>;
         select?: unknown;
       }) => {
+        prisma.assertLive();
         // The production call site is the generated create input; the fake just reads
         // back the fields it stores, typed as it stores them.
         const data = args.data as {
@@ -341,6 +366,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
     },
     blackoutDate: {
       findMany: async (args: { where: Prisma.BlackoutDateWhereInput }) => {
+        prisma.assertLive();
         const where = args.where;
         const and = (where as { AND?: unknown[] }).AND;
         expect(and).toHaveLength(2);
@@ -598,6 +624,8 @@ describe('PrismaBookingRepository.createPending', () => {
     const record = await repo.createPending(input());
 
     expect(prisma.attemptedReferences).toHaveLength(3);
+    // Each regeneration is a whole new transaction: the aborted one cannot be used.
+    expect(prisma.transactionAttempts).toBe(3);
     expect(record.reference).toBe(prisma.attemptedReferences[2]);
     expect(prisma.bookings[0]?.reference).toBe(record.reference);
   });
