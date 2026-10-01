@@ -48,6 +48,7 @@ Every component built, one row each. Add a row when the component is created.
 | `StatCard` | `app/components/StatCard.vue` | display | T10 | built |
 | `HotelStatusBadge` | `app/components/HotelStatusBadge.vue` | display | T10 | built |
 | `HotelRatingSummary` | `app/components/HotelRatingSummary.vue` | display | T17c | built |
+| `FavoriteToggle` | `app/components/FavoriteToggle.vue` | form | T19 | built |
 
 Remaining, as their tickets build them — Phase 2 domain components and Phase 5 additions.
 

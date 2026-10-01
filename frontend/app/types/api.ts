@@ -4,6 +4,332 @@
  */
 
 export interface paths {
+    "/api/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register with email and password
+         * @description `wantsToHost` promotes the new account to HOST, otherwise it is a GUEST. The password is hashed with Argon2id and never returned.
+         */
+        post: operations["AuthController_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log in with email and password
+         * @description A missing email and a wrong password both return the same `INVALID_CREDENTIALS` 401, so the response never leaks which one failed.
+         */
+        post: operations["AuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear the session cookie */
+        post: operations["AuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current session user */
+        get: operations["AuthController_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start Google OAuth (302 to Google) */
+        get: operations["AuthController_googleEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/google/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google OAuth callback */
+        get: operations["AuthController_googleCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/github": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start GitHub OAuth (302 to GitHub) */
+        get: operations["AuthController_githubEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/github/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GitHub OAuth callback */
+        get: operations["AuthController_githubCallback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Price a stay and check it is bookable
+         * @description Server-side arithmetic only: the client-sent total is never trusted (D3). Availability is decided before the price is read, so a sold-out room never leaks a price, and a room with no `room_prices` row in the requested currency is a `PRICE_UNAVAILABLE` error rather than a free stay. Writes nothing — the inventory is held when T20 writes the PENDING booking, and `holdExpiresAt` is how long the guest has to get there: a hold only holds the room while that instant is still in the future.
+         */
+        post: operations["BookingsController_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the caller's bookings
+         * @description Only the caller's own rows, newest first: the read is filtered by the JWT subject and no request field can widen it. A guest with no bookings gets an empty list, not an error.
+         */
+        get: operations["BookingsController_list"];
+        put?: never;
+        /**
+         * Book a room
+         * @description Creates the PENDING booking inside a serializable transaction that re-checks availability on the transaction client before the insert, so a concurrent booking for the last unit is answered ROOM_UNAVAILABLE rather than oversold. The money is a server-computed snapshot: the request carries no money fields, and a total sent in the body is stripped, never trusted (D3). The guest contact fields are validated but not persisted — the payment flow (T26/T27) is where they live. The booking embeds a hotel display snapshot so the detail page needs no second fetch.
+         */
+        post: operations["BookingsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One of the caller's bookings
+         * @description 404 BOOKING_NOT_FOUND when no such booking exists; 403 NOT_BOOKING_OWNER when it exists but belongs to a different guest. The 403 rather than a 404 is deliberate: a 404 would let a caller probe whether a booking id they do not own exists.
+         */
+        get: operations["BookingsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel the caller's booking
+         * @description Guarded to CONFIRMED only: a PENDING booking is an unpaid hold that T26/T27 confirm, and cancelling it out from under the payment would strand the money, so a PENDING booking answers INVALID_CANCEL_STATE until it is confirmed. Refunds are a later ticket; this flips the status only. Answers 200 with the booking in its CANCELLED state, not 204: the client renders the flip from the body.
+         */
+        post: operations["BookingsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Favourite a hotel
+         * @description Creates the `favorites` row for the caller. The guest is the JWT subject: a `userId` in the body is stripped by the schema, never obeyed. A hotel that is already a favourite is a `FAVORITE_EXISTS` 409 rather than a second 201, because `(userId, hotelId)` is a composite primary key and a duplicate insert is a constraint violation worth surfacing. Clients call this optimistically and roll back on the 409.
+         */
+        post: operations["FavoritesController_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/{hotelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Un-favourite a hotel
+         * @description Always 204, including when the caller never favourited that hotel: a toggle that fails on the second click shows an error for a state the guest caused on purpose. Only the caller's own row is touched, because the row is keyed by `(userId, hotelId)` and `userId` is the JWT subject. An unknown `hotelId` is a 204 no-op too, so un-favouriting can never disagree with the toggle that called it.
+         */
+        delete: operations["FavoritesController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign a Cloudinary upload
+         * @description Returns the config the browser needs to POST straight to Cloudinary: the cloud name, the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller's own `booking/hotels/{hostId}/` folder, and a `signature` of `base64(HMAC-SHA1(secret, "folder=" + folder + "&timestamp=" + timestamp))` that Cloudinary re-verifies. Only the secret stays server-side. Answers 200, not 201: nothing is created here.
+         */
+        post: operations["UploadsController_sign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/attach": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach an uploaded asset to a hotel
+         * @description Persists the `hotel_images` row the browser posts back after a Cloudinary upload. When `publicId` is present it must start with the caller's `booking/hotels/{hostId}/` folder prefix or the attach is 403 `UPLOAD_FOREIGN`; omitted, there is nothing to check. The hotel is not looked up here — a host may only touch their own listings is T22's query-filter rule; this one is a DB-free string check. Returns the T16 `HotelImage` summary.
+         */
+        post: operations["UploadsController_attach"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{publicId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete an uploaded asset
+         * @description Destroys the asset from Cloudinary by `publicId` and removes its `hotel_images` row. The `publicId` must live inside the caller's folder, checked before the DB, so a foreign id is 403 and never 404s into an existence leak. A non-foreign id with no row is 404, not 204: a 204 would claim the delete happened when there was nothing to delete.
+         */
+        delete: operations["UploadsController_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hotels": {
         parameters: {
             query?: never;
@@ -36,6 +362,26 @@ export interface paths {
          * @description Resolves by uuid or by slug — the frontend links to `/hotels/{slug}`. A hotel that is not PUBLISHED is a 404 for everyone but its own host, so the endpoint cannot be used to discover a draft listing.
          */
         get: operations["HotelsController_findOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hotels/{id}/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-room availability for a date range
+         * @description One verdict per room, not a filtered list: the client renders a card for every room and marks the unavailable ones. A room is available when it sleeps the party AND every night has at least one unit left AND no blackout covers that night — a room at exact fit is NOT available, because the last unit taken leaves nothing to sell. A `PENDING` booking holds inventory exactly like a `CONFIRMED` one, since that is how a guest checkout holds a room before payment.
+         */
+        get: operations["HotelsController_findAvailability"];
         put?: never;
         post?: never;
         delete?: never;
@@ -180,6 +526,253 @@ export interface components {
             success: true;
             data: components["schemas"]["HealthData"];
         };
+        AuthUser: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            name: string;
+            avatarUrl: string | null;
+            /** @enum {string} */
+            role: "GUEST" | "HOST" | "ADMIN";
+        };
+        AuthData: {
+            user: components["schemas"]["AuthUser"];
+            token: string;
+        };
+        AuthEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AuthData"];
+        };
+        MeData: {
+            user: components["schemas"]["AuthUser"];
+        };
+        MeEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MeData"];
+        };
+        AvailabilityRoom: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            bedType: string;
+            maxGuests: number;
+            /** @description Units the hotel sells of this room type. */
+            totalInventory: number;
+        };
+        RoomAvailability: {
+            room: components["schemas"]["AvailabilityRoom"];
+            available: boolean;
+            /** @description Units left on each night, in stay order from `checkIn`. Length is `nights`. A blacked-out or fully booked night is 0; the value never goes negative. */
+            remainingPerNight: components["schemas"]["RoomAvailability-__schema0"][];
+        };
+        "RoomAvailability-__schema0": number;
+        HotelAvailabilityData: {
+            rooms: components["schemas"]["RoomAvailability"][];
+        };
+        "HotelAvailabilityData-__schema0": number;
+        HotelAvailabilityEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HotelAvailabilityData"];
+        };
+        "HotelAvailabilityEnvelope-__schema0": number;
+        QuoteNight: {
+            /**
+             * Format: date
+             * @description The night this price covers, `YYYY-MM-DD`.
+             */
+            date: string;
+            /** @description Integer cents for this night. Never major units. */
+            priceCents: number;
+        };
+        QuoteData: {
+            /** @description `checkOut - checkIn` in whole days. */
+            nights: number;
+            subtotalCents: number;
+            /** @description Zero today; T20/T26 set the real fee schedule. */
+            feesCents: number;
+            /** @description Always `subtotalCents + feesCents`. */
+            totalCents: number;
+            /** @description ISO 4217 code the room is priced in. */
+            currency: string;
+            breakdown: components["schemas"]["QuoteNight"][];
+            /** @description ISO 8601 instant by which T20 would take the hold. A quote holds nothing by itself, so this is advisory until the booking exists. */
+            holdExpiresAt: string;
+        };
+        QuoteEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["QuoteData"];
+        };
+        CreateFavorite: {
+            /**
+             * Format: uuid
+             * @description The hotel to favourite, by uuid.
+             */
+            hotelId: string;
+        };
+        Favorite: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            hotelId: string;
+            /** @description ISO 8601 instant the favourite was created. */
+            createdAt: string;
+        };
+        FavoriteEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Favorite"];
+        };
+        CreateBooking: {
+            roomId: components["schemas"]["CreateBooking-__schema0"];
+            checkIn: components["schemas"]["CreateBooking-__schema1"];
+            checkOut: components["schemas"]["CreateBooking-__schema2"];
+            guests: components["schemas"]["CreateBooking-__schema3"];
+            guestName: components["schemas"]["CreateBooking-__schema4"];
+            guestEmail: components["schemas"]["CreateBooking-__schema5"];
+            guestPhone: components["schemas"]["CreateBooking-__schema6"];
+            currency?: components["schemas"]["CreateBooking-__schema7"];
+        };
+        /**
+         * Format: uuid
+         * @description The room to book, by uuid.
+         */
+        "CreateBooking-__schema0": string;
+        /**
+         * Format: date
+         * @description First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp.
+         */
+        "CreateBooking-__schema1": string;
+        /**
+         * Format: date
+         * @description Last day the guest leaves, `YYYY-MM-DD`. Strictly after `checkIn`. The stay is half-open, so a checkout equal to another booking check-in never overlaps.
+         */
+        "CreateBooking-__schema2": string;
+        /** @description Party size, 1-20. Checked against the room again server-side. */
+        "CreateBooking-__schema3": number;
+        /** @description Lead guest name. Validated, not persisted (T26/T27 consume it). */
+        "CreateBooking-__schema4": string;
+        /**
+         * Format: email
+         * @description Lead guest email. Validated, not persisted (T26/T27 consume it).
+         */
+        "CreateBooking-__schema5": string;
+        /** @description Lead guest phone. Validated, not persisted (T26/T27 consume it). */
+        "CreateBooking-__schema6": string;
+        /** @description ISO 4217 code to book in. Defaults to the room's price currency, else USD; a room with no `room_prices` row in that currency is a PRICE_UNAVAILABLE error, never a free stay. */
+        "CreateBooking-__schema7": components["schemas"]["CreateBooking-__schema8"];
+        "CreateBooking-__schema8": string;
+        Booking: {
+            /** Format: uuid */
+            id: string;
+            /** @description Human-readable, e.g. GB-4821. Shown to the guest; never the primary key. */
+            reference: string;
+            /** @enum {string} */
+            status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+            /** Format: date */
+            checkIn: string;
+            /** Format: date */
+            checkOut: string;
+            /** @description `checkOut - checkIn` in whole days. The stay is half-open. */
+            nights: number;
+            guestsCount: number;
+            /** @description ISO 4217 code the booking was priced in. A historical label, not a key. */
+            currency: string;
+            /** @description Integer cents for the stay, before fees. */
+            subtotalCents: number;
+            /** @description Zero today; T20/T26 set the real fee schedule. */
+            feesCents: number;
+            /** @description Always `subtotalCents + feesCents`. */
+            totalCents: number;
+            hotel: {
+                /** Format: uuid */
+                id: string;
+                slug: string;
+                name: string;
+                city: string;
+                country: string;
+                addressLine: string;
+                /** @description The hotel cover image URL, or null when it has none. */
+                coverImage: components["schemas"]["Booking-__schema0"] | null;
+            };
+            room: {
+                name: string;
+            };
+            /** @description ISO 8601 instant the booking was created. */
+            createdAt: string;
+        };
+        "Booking-__schema0": string;
+        BookingEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Booking"];
+        };
+        "BookingEnvelope-__schema0": string;
+        BookingListData: {
+            items: components["schemas"]["Booking"][];
+            /** @description Always `items.length` until the list is paginated. */
+            total: number;
+        };
+        "BookingListData-__schema0": string;
+        BookingListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BookingListData"];
+        };
+        "BookingListEnvelope-__schema0": string;
+        UploadSign: {
+            /** @description The Cloudinary cloud the browser uploads to. */
+            cloudName: string;
+            /** @description Exposed to the browser; the secret is not. */
+            apiKey: string;
+            /** @description Unix seconds the signature is bound to; Cloudinary rejects a stale one. */
+            timestamp: number;
+            /** @description The caller's own folder, booking/hotels/{hostId}/. */
+            folder: string;
+            /** @description base64 HMAC-SHA1 of "folder=" + folder + "&timestamp=" + timestamp under the API secret. */
+            signature: string;
+        };
+        UploadSignEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["UploadSign"];
+        };
+        AttachUpload: {
+            /**
+             * Format: uuid
+             * @description The hotel the image belongs to, by uuid.
+             */
+            hotelId: string;
+            /** @description Set for room-level imagery, omitted for hotel-level. */
+            roomId?: components["schemas"]["AttachUpload-__schema0"];
+            /** @description The Cloudinary URL the asset uploaded to. */
+            url: string;
+            /** @description The Cloudinary publicId, needed for deletes. Must start with the caller's booking/hotels/{hostId}/ folder or the attach is 403 UPLOAD_FOREIGN. */
+            publicId?: components["schemas"]["AttachUpload-__schema1"];
+            altText?: string;
+            isCover?: boolean;
+            /** @description Intrinsic width, for CLS. */
+            width?: components["schemas"]["AttachUpload-__schema2"];
+            /** @description Intrinsic height, for CLS. */
+            height?: components["schemas"]["AttachUpload-__schema3"];
+            /** @description Aspect ratio, e.g. 3:2, 4:3, 16:9, 1:1. */
+            aspect?: components["schemas"]["AttachUpload-__schema4"];
+        };
+        /** Format: uuid */
+        "AttachUpload-__schema0": string;
+        "AttachUpload-__schema1": string;
+        "AttachUpload-__schema2": number;
+        "AttachUpload-__schema3": number;
+        "AttachUpload-__schema4": string;
+        AttachUploadEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HotelImage"];
+        };
     };
     responses: never;
     parameters: never;
@@ -189,6 +782,691 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    AuthController_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new user and the session token (also set as a cookie). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthEnvelope"];
+                };
+            };
+            /** @description The email is already registered. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user and the session token (also set as a cookie). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthEnvelope"];
+                };
+            };
+            /** @description Invalid email or password. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cookie was cleared. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user attached by the JWT guard. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeEnvelope"];
+                };
+            };
+            /** @description No valid session cookie. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_googleEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirects to Google. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_googleCallback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sets the session cookie and redirects to the frontend origin. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_githubEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirects to GitHub. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AuthController_githubCallback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sets the session cookie and redirects to the frontend origin. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    BookingsController_quote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The per-night breakdown and the totals, in integer cents. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteEnvelope"];
+                };
+            };
+            /** @description The body failed validation, or the room sleeps fewer guests than asked. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such room. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The room is sold out or blacked out for those dates. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The room has no price in the requested currency. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's bookings, most recent first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingListEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBooking"];
+            };
+        };
+        responses: {
+            /** @description The PENDING booking, with its money snapshot. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingEnvelope"];
+                };
+            };
+            /** @description The body failed validation, or the room sleeps fewer guests than asked (the 400 names the room limit). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such room, or the room's hotel is not published. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The room is sold out, blacked out, or too small for the party (ROOM_UNAVAILABLE). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The room has no price in the requested currency. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking, with its hotel snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking exists but belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking to cancel, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The booking, now CANCELLED. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking is not CONFIRMED (INVALID_CANCEL_STATE): PENDING until payment confirms it, and COMPLETED past cancelling. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FavoritesController_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFavorite"];
+            };
+        };
+        responses: {
+            /** @description The row that was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FavoriteEnvelope"];
+                };
+            };
+            /** @description The body failed validation — `hotelId` must be a uuid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such hotel. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Already a favourite (`FAVORITE_EXISTS`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FavoritesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel to un-favourite, by uuid. */
+                hotelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone, or was never there. No body either way. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The path parameter is not a uuid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UploadsController_sign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The signed, folder-scoped upload config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadSignEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UploadsController_attach: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttachUpload"];
+            };
+        };
+        responses: {
+            /** @description The persisted image, as the T16 HotelImage summary. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachUploadEnvelope"];
+                };
+            };
+            /** @description The body failed validation: `hotelId`/`roomId` must be uuids, `url` non-empty. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The `publicId` is not in the caller's folder (UPLOAD_FOREIGN). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The `(hotelId, url)` pair is already attached — a composite unique key. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UploadsController_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Cloudinary publicId, a path like booking/hotels/{hostId}/abcd123. */
+                publicId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone: the asset is destroyed and the row removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The `publicId` path parameter is empty. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The `publicId` is not in the caller's folder (UPLOAD_FOREIGN). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No image row maps to that `publicId`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     HotelsController_findAll: {
         parameters: {
             query?: {
@@ -257,6 +1535,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HotelDetailEnvelope"];
+                };
+            };
+            /** @description No such hotel, or it is not visible to this caller. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HotelsController_findAvailability: {
+        parameters: {
+            query: {
+                /** @description First night, `YYYY-MM-DD`. Required: without a range there are no nights to report on, and an empty range would make every room vacuously available. */
+                checkIn: string;
+                /** @description Last day the guest leaves, `YYYY-MM-DD`. Must be strictly after `checkIn`. The stay is half-open, so `checkOut` is not one of its nights and a checkout equal to another booking's check-in never overlaps. */
+                checkOut: string;
+                /** @description Party size, 1-20. A room that cannot sleep the party reports `available: false` even when it has units left on every night. */
+                guests?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every room of the hotel, each with `available` and the units left on each night. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HotelAvailabilityEnvelope"];
+                };
+            };
+            /** @description The query string failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
             /** @description No such hotel, or it is not visible to this caller. */

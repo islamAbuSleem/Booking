@@ -4,12 +4,16 @@
  * calmer than the detail page: a 7/5 grid of form and sticky order summary,
  * square corners, hairlines, tabular figures, no imagery beyond thumbnails.
  *
- * Nights are the half-open range (`nightsBetween`, checkout excluded) and the
- * total is the mock's flat-10% `quote()`, recomputed on every change. No card
+ * Nights are the half-open range (checkout excluded) and every figure in the order
+ * summary is priced by `POST /api/bookings/quote` — this page computes no total, because
+ * the server decides availability and the rate before it hands back cents (D3). No card
  * fields yet — the Stripe Elements step is T28; this ticket ends at confirm.
  */
-import { getHotelDetail, nightsBetween, quote } from '~/utils/mock'
-import { formatStayDate, usdCents, wholeNumber } from '~/utils/format'
+import { getHotelDetail, nightsBetween } from '~/utils/mock'
+import { fetchHotelDetail, fetchQuote, isApiError, isApiFailure } from '~/utils/api'
+import type { ApiHotelDetail, ApiHotelRoom, ApiQuoteData, QuoteRequest } from '~/utils/api'
+import { mockHotelToDetail, mockQuoteToApi } from '~/utils/hotelAdapters'
+import { formatStayDate, payableCents, wholeNumber } from '~/utils/format'
 import { localToday } from '~/utils/date'
 import { guestDetailsSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
@@ -19,9 +23,25 @@ const { t } = useI18n()
 
 const slug = computed(() => String(route.params.id ?? ''))
 
-const { data: hotel } = await useAsyncData(
-  `hotel-book:${slug.value}`,
-  async () => getHotelDetail(slug.value),
+/**
+ * Real detail endpoint first, degrading to the fixtures only when nothing answered —
+ * the same seam as /hotels and /hotels/[id]. `HOTEL_NOT_FOUND` and an unknown mock slug
+ * both render the not-found state; any other API error is rethrown.
+ */
+const { data: hotel } = await useAsyncData<ApiHotelDetail | null>(
+  () => `hotel-book:${slug.value}`,
+  async (): Promise<ApiHotelDetail | null> => {
+    const id = String(route.params.id ?? '')
+    try {
+      return await fetchHotelDetail(id)
+    }
+    catch (fetchError: unknown) {
+      if (isApiError(fetchError) && fetchError.code === 'HOTEL_NOT_FOUND') return null
+      if (isApiFailure(fetchError)) throw fetchError
+      const mock = getHotelDetail(id)
+      return mock ? mockHotelToDetail(mock) : null
+    }
+  },
 )
 
 if (!hotel.value) {
@@ -61,14 +81,105 @@ const datesError = computed(() => {
   return ''
 })
 
+/**
+ * Read before the request goes out: the API rejects a party larger than the room sleeps
+ * with a 400, and a message on the stepper beats a round trip to be told the same thing.
+ */
+const guestsError = computed(() =>
+  selectedRoom.value && guests.value > selectedRoom.value.maxGuests
+    ? t('booking.guestsOverRoom', { count: wholeNumber(selectedRoom.value.maxGuests) })
+    : '',
+)
+
+/**
+ * The quote's inputs. `null` until they are all present and usable, and the handler below
+ * makes no request for a `null` — the panel shows its empty state instead.
+ *
+ * `currency` is the property's own quoted currency from the detail payload, not a constant
+ * here: the site must not ask for a currency it has not already shown prices in.
+ */
+const quoteRequest = computed<QuoteRequest | null>(() => {
+  const room = selectedRoom.value
+  const property = hotel.value
+  if (!room || !property) return null
+  if (!checkIn.value || !checkOut.value) return null
+  if (checkInPast.value || checkOut.value <= checkIn.value) return null
+  if (guestsError.value) return null
+  return {
+    roomId: room.id,
+    checkIn: checkIn.value,
+    checkOut: checkOut.value,
+    guests: guests.value,
+    currency: property.currency,
+  }
+})
+
+/** What the panel renders for the current request: nothing, a quote, or a verdict. */
+type QuoteState
+  = | { kind: 'idle' }
+    | { kind: 'quoted', quote: ApiQuoteData }
+    | { kind: 'unavailable' }
+    | { kind: 'no-price' }
+
+/**
+ * The key carries the property and every input the quote depends on, so changing the room
+ * or the dates cannot leave the previous stay's figures on screen — and two properties in
+ * the same session cannot share one cache entry (context/ui-rules.md).
+ */
+const {
+  data: quoteState,
+  status: quoteStatus,
+  error: quoteError,
+  refresh: requote,
+} = await useAsyncData<QuoteState>(
+  () => `quote:${slug.value}:${roomId.value}:${checkIn.value}:${checkOut.value}:${guests.value}`,
+  async (): Promise<QuoteState> => {
+    const request = quoteRequest.value
+    if (!request) return { kind: 'idle' }
+    try {
+      return { kind: 'quoted', quote: await fetchQuote(request) }
+    }
+    catch (quoteFailure: unknown) {
+      // Branch on the code, never on the message (context/code-standards.md). Both of
+      // these are answers, not failures, so they render as states instead of an error.
+      if (isApiError(quoteFailure)) {
+        if (quoteFailure.code === 'ROOM_UNAVAILABLE') return { kind: 'unavailable' }
+        if (quoteFailure.code === 'PRICE_UNAVAILABLE') return { kind: 'no-price' }
+      }
+      if (isApiFailure(quoteFailure)) throw quoteFailure
+      // Nothing is listening, which means nothing priced this stay either. The fixture
+      // stands in, as on the list and detail pages — but only when the room on screen is
+      // itself a fixture, so a live property never shows invented figures.
+      const mock = getHotelDetail(slug.value)
+      const fixture = mock?.rooms.find(room => room.id === request.roomId)
+      const quoted = fixture ? mockQuoteToApi(fixture, request.checkIn, request.checkOut) : null
+      if (!quoted) throw quoteFailure
+      return { kind: 'quoted', quote: quoted }
+    }
+  },
+)
+
+const quote = computed(() => (quoteState.value?.kind === 'quoted' ? quoteState.value.quote : null))
+const isRoomUnavailable = computed(() => quoteState.value?.kind === 'unavailable')
+const isPriceUnavailable = computed(() => quoteState.value?.kind === 'no-price')
+const hasQuoteFailed = computed(() => quoteStatus.value === 'error')
+/** Only a cold request shows the skeleton; a cached quote renders straight away. */
+const isQuoting = computed(() => quoteStatus.value === 'pending' && !quote.value)
+
+/**
+ * The nightly figure, from the quote's own per-night list. Null when the response carried
+ * no breakdown — an unavailable rate, which must not read as $0 (D45).
+ */
+const nightlyCents = computed(() => quote.value?.breakdown[0]?.priceCents ?? null)
+
+/** A room's advertised rate, for the selector. No price row is "—", never $0 (D45). */
+function roomRate(room: ApiHotelRoom): string {
+  return room.price === null ? '—' : payableCents(room.price.amountCents, room.price.currency)
+}
+
 const nights = computed(() =>
   checkIn.value && checkOut.value ? nightsBetween(checkIn.value, checkOut.value) : 0,
 )
-
-const breakdown = computed(() => {
-  if (!selectedRoom.value || nights.value < 1) return null
-  return quote(selectedRoom.value, checkIn.value, checkOut.value)
-})
 
 const roomFits = computed(() => (maxGuests: number) => maxGuests >= guests.value)
 
@@ -92,8 +203,9 @@ function confirm(): void {
   fieldErrors.value = { ...guest.errors }
   if (!checkIn.value || !checkOut.value || datesError.value) return
   if (!selectedRoom.value) return
+  if (guestsError.value) return
   if (!guest.success) return
-  if (!breakdown.value) return
+  if (!quote.value) return
 
   confirming.value = true
   confirmTimer.value = setTimeout(() => {
@@ -218,7 +330,7 @@ useSeoMeta({
                           </span>
                         </span>
                         <span class="flex items-baseline gap-1.5">
-                          <span class="tabular text-price">{{ usdCents(room.pricePerNightCents) }}</span>
+                          <span class="tabular text-price">{{ roomRate(room) }}</span>
                           <span class="text-fg-subtle text-sm">{{ $t('hotel.perNight') }}</span>
                         </span>
                       </span>
@@ -276,6 +388,7 @@ useSeoMeta({
                   :value-label="guestsLabel"
                   :decrease-label="$t('hotels.guestsDecrease')"
                   :increase-label="$t('hotels.guestsIncrease')"
+                  :error="guestsError"
                 />
               </div>
             </div>
@@ -350,7 +463,7 @@ useSeoMeta({
               <img
                 v-if="hotel.images[0]"
                 :src="hotel.images[0].url"
-                :alt="hotel.images[0].alt"
+                :alt="hotel.images[0].altText ?? hotel.name"
                 width="160"
                 height="120"
                 loading="lazy"
@@ -373,15 +486,70 @@ useSeoMeta({
               </div>
             </div>
 
-            <div class="mt-4">
-              <OrderSummary
-                v-if="breakdown"
-                :nightly-cents="breakdown.nightlyCents"
-                :nights="breakdown.nights"
-                :subtotal-cents="breakdown.subtotalCents"
-                :fees-cents="breakdown.feesCents"
-                :total-cents="breakdown.totalCents"
+            <!--
+              Four states, in the order they can occur. The failure alert is first because
+              `status` is authoritative and stays 'error' until a retry or a new request;
+              a stale quote under an error would be the wrong thing to show.
+            -->
+            <div
+              class="mt-4"
+              :aria-busy="isQuoting"
+            >
+              <BaseAlert
+                v-if="hasQuoteFailed"
+                tone="danger"
+                :title="$t('booking.quoteErrorTitle')"
+              >
+                <p>{{ $t('booking.quoteErrorHint') }}</p>
+                <p
+                  v-if="quoteError"
+                  class="font-mono text-xs"
+                >
+                  {{ quoteError.message }}
+                </p>
+                <button
+                  type="button"
+                  class="border-danger text-danger mt-2 inline-flex h-11 items-center rounded-sm border px-4 text-sm"
+                  @click="requote()"
+                >
+                  {{ $t('common.retry') }}
+                </button>
+              </BaseAlert>
+
+              <!-- Static blocks, no shimmer: a skeleton that animates is motion the
+                   design language rules out, and this panel is not the only motion on
+                   a payment path. -->
+              <BaseSkeleton
+                v-else-if="isQuoting"
+                :rows="4"
               />
+
+              <OrderSummary
+                v-else-if="quote"
+                :nightly-cents="nightlyCents"
+                :nights="quote.nights"
+                :subtotal-cents="quote.subtotalCents"
+                :fees-cents="quote.feesCents"
+                :total-cents="quote.totalCents"
+                :currency="quote.currency"
+              />
+
+              <BaseAlert
+                v-else-if="isRoomUnavailable"
+                tone="warning"
+                :title="$t('booking.quoteUnavailableTitle')"
+              >
+                {{ $t('booking.quoteUnavailableBody') }}
+              </BaseAlert>
+
+              <BaseAlert
+                v-else-if="isPriceUnavailable"
+                tone="info"
+                :title="$t('booking.quotePriceUnavailableTitle')"
+              >
+                {{ $t('booking.quotePriceUnavailableBody', { currency: hotel.currency }) }}
+              </BaseAlert>
+
               <p
                 v-else
                 class="text-fg-subtle border-rule border-t pt-4 text-sm"

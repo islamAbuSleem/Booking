@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AMENITY_BY_ID } from '~/utils/mock'
 import { usd } from '~/utils/format'
+import { isUuid } from '~/utils/validation'
 import type { ApiHotelCard } from '~/utils/api'
 
 const props = defineProps<{ hotel: ApiHotelCard }>()
@@ -27,14 +28,41 @@ const priceLabel = computed(() =>
 const ratingLabel = computed(() =>
   props.hotel.rating.average === null ? '—' : props.hotel.rating.average.toFixed(1),
 )
+
+/**
+ * The mock fallback keys fixtures by `htl_*` slugs, and `POST /favorites` wants a uuid, so
+ * the heart would always come back as a 400 the guest cannot act on. A card that cannot be
+ * saved is better off without the control than with one that always fails.
+ */
+const canFavorite = computed(() => isUuid(props.hotel.id))
 </script>
 
 <template>
   <BaseCard
     as="article"
     interactive
-    class="group flex h-full flex-col"
+    class="group relative flex h-full flex-col"
   >
+    <!--
+      A sibling of the link, not inside it: a <button> nested in an <a> is invalid HTML and
+      assistive tech announces one control where there are two. Absolute, so it sits over
+      the cover's top-right without touching the link's box. First in the DOM because the
+      heart is above the card visually and tab order should follow the eye.
+
+      `inset-x-3` rather than `right-3`: the toggle's problem message grows downwards out of
+      the same box, and a box with no left edge lets that message run wider than the card and
+      over the neighbouring grid cell.
+    -->
+    <div
+      v-if="canFavorite"
+      class="absolute inset-x-3 top-3 flex justify-end"
+    >
+      <FavoriteToggle
+        :hotel-id="hotel.id"
+        :hotel-name="hotel.name"
+      />
+    </div>
+
     <NuxtLink
       :to="`/hotels/${hotel.slug}`"
       class="flex h-full flex-col"

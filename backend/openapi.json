@@ -174,6 +174,613 @@
         ]
       }
     },
+    "/api/bookings/quote": {
+      "post": {
+        "description": "Server-side arithmetic only: the client-sent total is never trusted (D3). Availability is decided before the price is read, so a sold-out room never leaks a price, and a room with no `room_prices` row in the requested currency is a `PRICE_UNAVAILABLE` error rather than a free stay. Writes nothing — the inventory is held when T20 writes the PENDING booking, and `holdExpiresAt` is how long the guest has to get there: a hold only holds the room while that instant is still in the future.",
+        "operationId": "BookingsController_quote",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The per-night breakdown and the totals, in integer cents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation, or the room sleeps fewer guests than asked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such room.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The room is sold out or blacked out for those dates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The room has no price in the requested currency.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Price a stay and check it is bookable",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
+    "/api/bookings": {
+      "post": {
+        "description": "Creates the PENDING booking inside a serializable transaction that re-checks availability on the transaction client before the insert, so a concurrent booking for the last unit is answered ROOM_UNAVAILABLE rather than oversold. The money is a server-computed snapshot: the request carries no money fields, and a total sent in the body is stripped, never trusted (D3). The guest contact fields are validated but not persisted — the payment flow (T26/T27) is where they live. The booking embeds a hotel display snapshot so the detail page needs no second fetch.",
+        "operationId": "BookingsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBooking"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The PENDING booking, with its money snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation, or the room sleeps fewer guests than asked (the 400 names the room limit).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such room, or the room's hotel is not published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The room is sold out, blacked out, or too small for the party (ROOM_UNAVAILABLE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The room has no price in the requested currency.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Book a room",
+        "tags": [
+          "Bookings"
+        ]
+      },
+      "get": {
+        "description": "Only the caller's own rows, newest first: the read is filtered by the JWT subject and no request field can widen it. A guest with no bookings gets an empty list, not an error.",
+        "operationId": "BookingsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The caller's bookings, most recent first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the caller's bookings",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
+    "/api/bookings/{id}": {
+      "get": {
+        "description": "404 BOOKING_NOT_FOUND when no such booking exists; 403 NOT_BOOKING_OWNER when it exists but belongs to a different guest. The 403 rather than a 404 is deliberate: a 404 would let a caller probe whether a booking id they do not own exists.",
+        "operationId": "BookingsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The booking, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The booking, with its hotel snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking exists but belongs to a different guest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of the caller's bookings",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
+    "/api/bookings/{id}/cancel": {
+      "post": {
+        "description": "Guarded to CONFIRMED only: a PENDING booking is an unpaid hold that T26/T27 confirm, and cancelling it out from under the payment would strand the money, so a PENDING booking answers INVALID_CANCEL_STATE until it is confirmed. Refunds are a later ticket; this flips the status only. Answers 200 with the booking in its CANCELLED state, not 204: the client renders the flip from the body.",
+        "operationId": "BookingsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The booking to cancel, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The booking, now CANCELLED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking belongs to a different guest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The booking is not CONFIRMED (INVALID_CANCEL_STATE): PENDING until payment confirms it, and COMPLETED past cancelling.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel the caller's booking",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
+    "/api/favorites": {
+      "post": {
+        "description": "Creates the `favorites` row for the caller. The guest is the JWT subject: a `userId` in the body is stripped by the schema, never obeyed. A hotel that is already a favourite is a `FAVORITE_EXISTS` 409 rather than a second 201, because `(userId, hotelId)` is a composite primary key and a duplicate insert is a constraint violation worth surfacing. Clients call this optimistically and roll back on the 409.",
+        "operationId": "FavoritesController_add",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFavorite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The row that was created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoriteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation — `hotelId` must be a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such hotel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already a favourite (`FAVORITE_EXISTS`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Favourite a hotel",
+        "tags": [
+          "Favorites"
+        ]
+      }
+    },
+    "/api/favorites/{hotelId}": {
+      "delete": {
+        "description": "Always 204, including when the caller never favourited that hotel: a toggle that fails on the second click shows an error for a state the guest caused on purpose. Only the caller's own row is touched, because the row is keyed by `(userId, hotelId)` and `userId` is the JWT subject. An unknown `hotelId` is a 204 no-op too, so un-favouriting can never disagree with the toggle that called it.",
+        "operationId": "FavoritesController_remove",
+        "parameters": [
+          {
+            "name": "hotelId",
+            "required": true,
+            "in": "path",
+            "description": "The hotel to un-favourite, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Gone, or was never there. No body either way."
+          },
+          "400": {
+            "description": "The path parameter is not a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Un-favourite a hotel",
+        "tags": [
+          "Favorites"
+        ]
+      }
+    },
+    "/api/uploads/sign": {
+      "post": {
+        "description": "Returns the config the browser needs to POST straight to Cloudinary: the cloud name, the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller's own `booking/hotels/{hostId}/` folder, and a `signature` of `base64(HMAC-SHA1(secret, \"folder=\" + folder + \"&timestamp=\" + timestamp))` that Cloudinary re-verifies. Only the secret stays server-side. Answers 200, not 201: nothing is created here.",
+        "operationId": "UploadsController_sign",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The signed, folder-scoped upload config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadSignEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sign a Cloudinary upload",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/api/uploads/attach": {
+      "post": {
+        "description": "Persists the `hotel_images` row the browser posts back after a Cloudinary upload. When `publicId` is present it must start with the caller's `booking/hotels/{hostId}/` folder prefix or the attach is 403 `UPLOAD_FOREIGN`; omitted, there is nothing to check. The hotel is not looked up here — a host may only touch their own listings is T22's query-filter rule; this one is a DB-free string check. Returns the T16 `HotelImage` summary.",
+        "operationId": "UploadsController_attach",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The persisted image, as the T16 HotelImage summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachUploadEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation: `hotelId`/`roomId` must be uuids, `url` non-empty.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The `publicId` is not in the caller's folder (UPLOAD_FOREIGN).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The `(hotelId, url)` pair is already attached — a composite unique key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Attach an uploaded asset to a hotel",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/api/uploads/{publicId}": {
+      "delete": {
+        "description": "Destroys the asset from Cloudinary by `publicId` and removes its `hotel_images` row. The `publicId` must live inside the caller's folder, checked before the DB, so a foreign id is 403 and never 404s into an existence leak. A non-foreign id with no row is 404, not 204: a 204 would claim the delete happened when there was nothing to delete.",
+        "operationId": "UploadsController_delete",
+        "parameters": [
+          {
+            "name": "publicId",
+            "required": true,
+            "in": "path",
+            "description": "The Cloudinary publicId, a path like booking/hotels/{hostId}/abcd123.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Gone: the asset is destroyed and the row removed."
+          },
+          "400": {
+            "description": "The `publicId` path parameter is empty.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The `publicId` is not in the caller's folder (UPLOAD_FOREIGN).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No image row maps to that `publicId`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete an uploaded asset",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
     "/api/hotels": {
       "get": {
         "description": "Only PUBLISHED hotels are ever returned — the filter is in SQL, so a non-published row cannot leak through a page boundary. Prices are the cheapest room that fits `guests`, in the requested currency. Dates are accepted and validated here; availability filtering lands with the quote endpoint in T18.",
@@ -354,6 +961,82 @@
           }
         },
         "summary": "Hotel detail",
+        "tags": [
+          "Hotels"
+        ]
+      }
+    },
+    "/api/hotels/{id}/availability": {
+      "get": {
+        "description": "One verdict per room, not a filtered list: the client renders a card for every room and marks the unavailable ones. A room is available when it sleeps the party AND every night has at least one unit left AND no blackout covers that night — a room at exact fit is NOT available, because the last unit taken leaves nothing to sell. A `PENDING` booking holds inventory exactly like a `CONFIRMED` one, since that is how a guest checkout holds a room before payment.",
+        "operationId": "HotelsController_findAvailability",
+        "parameters": [
+          {
+            "name": "checkIn",
+            "required": true,
+            "in": "query",
+            "description": "First night, `YYYY-MM-DD`. Required: without a range there are no nights to report on, and an empty range would make every room vacuously available.",
+            "schema": {
+              "format": "date",
+              "example": "2026-06-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "checkOut",
+            "required": true,
+            "in": "query",
+            "description": "Last day the guest leaves, `YYYY-MM-DD`. Must be strictly after `checkIn`. The stay is half-open, so `checkOut` is not one of its nights and a checkout equal to another booking's check-in never overlaps.",
+            "schema": {
+              "format": "date",
+              "example": "2026-06-04",
+              "type": "string"
+            }
+          },
+          {
+            "name": "guests",
+            "required": false,
+            "in": "query",
+            "description": "Party size, 1-20. A room that cannot sleep the party reports `available: false` even when it has units left on every night.",
+            "schema": {
+              "example": 2,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every room of the hotel, each with `available` and the units left on each night.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HotelAvailabilityEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The query string failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such hotel, or it is not visible to this caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Per-room availability for a date range",
         "tags": [
           "Hotels"
         ]
@@ -972,6 +1655,735 @@
           },
           "data": {
             "$ref": "#/components/schemas/MeData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "AvailabilityRoom": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bedType": {
+            "type": "string"
+          },
+          "maxGuests": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalInventory": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Units the hotel sells of this room type."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "bedType",
+          "maxGuests",
+          "totalInventory"
+        ],
+        "additionalProperties": false
+      },
+      "RoomAvailability": {
+        "type": "object",
+        "properties": {
+          "room": {
+            "$ref": "#/components/schemas/AvailabilityRoom"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "remainingPerNight": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoomAvailability-__schema0"
+            },
+            "description": "Units left on each night, in stay order from `checkIn`. Length is `nights`. A blacked-out or fully booked night is 0; the value never goes negative."
+          }
+        },
+        "required": [
+          "room",
+          "available",
+          "remainingPerNight"
+        ],
+        "additionalProperties": false
+      },
+      "RoomAvailability-__schema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "HotelAvailabilityData": {
+        "type": "object",
+        "properties": {
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoomAvailability"
+            }
+          }
+        },
+        "required": [
+          "rooms"
+        ],
+        "additionalProperties": false
+      },
+      "HotelAvailabilityData-__schema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "HotelAvailabilityEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotelAvailabilityData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "HotelAvailabilityEnvelope-__schema0": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      },
+      "QuoteNight": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "The night this price covers, `YYYY-MM-DD`."
+          },
+          "priceCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Integer cents for this night. Never major units."
+          }
+        },
+        "required": [
+          "date",
+          "priceCents"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteData": {
+        "type": "object",
+        "properties": {
+          "nights": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "`checkOut - checkIn` in whole days."
+          },
+          "subtotalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "feesCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Zero today; T20/T26 set the real fee schedule."
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `subtotalCents + feesCents`."
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code the room is priced in."
+          },
+          "breakdown": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuoteNight"
+            }
+          },
+          "holdExpiresAt": {
+            "type": "string",
+            "description": "ISO 8601 instant by which T20 would take the hold. A quote holds nothing by itself, so this is advisory until the booking exists."
+          }
+        },
+        "required": [
+          "nights",
+          "subtotalCents",
+          "feesCents",
+          "totalCents",
+          "currency",
+          "breakdown",
+          "holdExpiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "QuoteEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/QuoteData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CreateFavorite": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The hotel to favourite, by uuid."
+          }
+        },
+        "required": [
+          "hotelId"
+        ],
+        "additionalProperties": false
+      },
+      "Favorite": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "hotelId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 instant the favourite was created."
+          }
+        },
+        "required": [
+          "userId",
+          "hotelId",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "FavoriteEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Favorite"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CreateBooking": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "$ref": "#/components/schemas/CreateBooking-__schema0"
+          },
+          "checkIn": {
+            "$ref": "#/components/schemas/CreateBooking-__schema1"
+          },
+          "checkOut": {
+            "$ref": "#/components/schemas/CreateBooking-__schema2"
+          },
+          "guests": {
+            "$ref": "#/components/schemas/CreateBooking-__schema3"
+          },
+          "guestName": {
+            "$ref": "#/components/schemas/CreateBooking-__schema4"
+          },
+          "guestEmail": {
+            "$ref": "#/components/schemas/CreateBooking-__schema5"
+          },
+          "guestPhone": {
+            "$ref": "#/components/schemas/CreateBooking-__schema6"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/CreateBooking-__schema7"
+          }
+        },
+        "required": [
+          "roomId",
+          "checkIn",
+          "checkOut",
+          "guests",
+          "guestName",
+          "guestEmail",
+          "guestPhone"
+        ],
+        "additionalProperties": false
+      },
+      "CreateBooking-__schema0": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+        "description": "The room to book, by uuid."
+      },
+      "CreateBooking-__schema1": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+        "description": "First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp."
+      },
+      "CreateBooking-__schema2": {
+        "type": "string",
+        "format": "date",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+        "description": "Last day the guest leaves, `YYYY-MM-DD`. Strictly after `checkIn`. The stay is half-open, so a checkout equal to another booking check-in never overlaps."
+      },
+      "CreateBooking-__schema3": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20,
+        "description": "Party size, 1-20. Checked against the room again server-side."
+      },
+      "CreateBooking-__schema4": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Lead guest name. Validated, not persisted (T26/T27 consume it)."
+      },
+      "CreateBooking-__schema5": {
+        "type": "string",
+        "format": "email",
+        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
+        "description": "Lead guest email. Validated, not persisted (T26/T27 consume it)."
+      },
+      "CreateBooking-__schema6": {
+        "type": "string",
+        "description": "Lead guest phone. Validated, not persisted (T26/T27 consume it)."
+      },
+      "CreateBooking-__schema7": {
+        "description": "ISO 4217 code to book in. Defaults to the room's price currency, else USD; a room with no `room_prices` row in that currency is a PRICE_UNAVAILABLE error, never a free stay.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CreateBooking-__schema8"
+          }
+        ]
+      },
+      "CreateBooking-__schema8": {
+        "type": "string",
+        "pattern": "^[A-Z]{3}$"
+      },
+      "Booking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Human-readable, e.g. GB-4821. Shown to the guest; never the primary key."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONFIRMED",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "nights": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "`checkOut - checkIn` in whole days. The stay is half-open."
+          },
+          "guestsCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code the booking was priced in. A historical label, not a key."
+          },
+          "subtotalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Integer cents for the stay, before fees."
+          },
+          "feesCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Zero today; T20/T26 set the real fee schedule."
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `subtotalCents + feesCents`."
+          },
+          "hotel": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "addressLine": {
+                "type": "string"
+              },
+              "coverImage": {
+                "nullable": true,
+                "description": "The hotel cover image URL, or null when it has none.",
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Booking-__schema0"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "city",
+              "country",
+              "addressLine",
+              "coverImage"
+            ],
+            "additionalProperties": false
+          },
+          "room": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 instant the booking was created."
+          }
+        },
+        "required": [
+          "id",
+          "reference",
+          "status",
+          "checkIn",
+          "checkOut",
+          "nights",
+          "guestsCount",
+          "currency",
+          "subtotalCents",
+          "feesCents",
+          "totalCents",
+          "hotel",
+          "room",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Booking-__schema0": {
+        "type": "string"
+      },
+      "BookingEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Booking"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "BookingEnvelope-__schema0": {
+        "type": "string"
+      },
+      "BookingListData": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Booking"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `items.length` until the list is paginated."
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "BookingListData-__schema0": {
+        "type": "string"
+      },
+      "BookingListEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/BookingListData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "BookingListEnvelope-__schema0": {
+        "type": "string"
+      },
+      "UploadSign": {
+        "type": "object",
+        "properties": {
+          "cloudName": {
+            "type": "string",
+            "description": "The Cloudinary cloud the browser uploads to."
+          },
+          "apiKey": {
+            "type": "string",
+            "description": "Exposed to the browser; the secret is not."
+          },
+          "timestamp": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Unix seconds the signature is bound to; Cloudinary rejects a stale one."
+          },
+          "folder": {
+            "type": "string",
+            "description": "The caller's own folder, booking/hotels/{hostId}/."
+          },
+          "signature": {
+            "type": "string",
+            "description": "base64 HMAC-SHA1 of \"folder=\" + folder + \"&timestamp=\" + timestamp under the API secret."
+          }
+        },
+        "required": [
+          "cloudName",
+          "apiKey",
+          "timestamp",
+          "folder",
+          "signature"
+        ],
+        "additionalProperties": false
+      },
+      "UploadSignEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/UploadSign"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "AttachUpload": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The hotel the image belongs to, by uuid."
+          },
+          "roomId": {
+            "description": "Set for room-level imagery, omitted for hotel-level.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttachUpload-__schema0"
+              }
+            ]
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The Cloudinary URL the asset uploaded to."
+          },
+          "publicId": {
+            "description": "The Cloudinary publicId, needed for deletes. Must start with the caller's booking/hotels/{hostId}/ folder or the attach is 403 UPLOAD_FOREIGN.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttachUpload-__schema1"
+              }
+            ]
+          },
+          "altText": {
+            "type": "string"
+          },
+          "isCover": {
+            "type": "boolean"
+          },
+          "width": {
+            "description": "Intrinsic width, for CLS.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttachUpload-__schema2"
+              }
+            ]
+          },
+          "height": {
+            "description": "Intrinsic height, for CLS.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttachUpload-__schema3"
+              }
+            ]
+          },
+          "aspect": {
+            "description": "Aspect ratio, e.g. 3:2, 4:3, 16:9, 1:1.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttachUpload-__schema4"
+              }
+            ]
+          }
+        },
+        "required": [
+          "hotelId",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "AttachUpload-__schema0": {
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "AttachUpload-__schema1": {
+        "type": "string",
+        "minLength": 1
+      },
+      "AttachUpload-__schema2": {
+        "type": "integer",
+        "minimum": 0,
+        "exclusiveMinimum": true,
+        "maximum": 9007199254740991
+      },
+      "AttachUpload-__schema3": {
+        "type": "integer",
+        "minimum": 0,
+        "exclusiveMinimum": true,
+        "maximum": 9007199254740991
+      },
+      "AttachUpload-__schema4": {
+        "type": "string"
+      },
+      "AttachUploadEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/HotelImage"
           }
         },
         "required": [

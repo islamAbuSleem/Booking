@@ -25,6 +25,13 @@ export type ApiHotelRoom = components['schemas']['HotelRoom']
 export type ApiHotelImage = components['schemas']['HotelImage']
 export type ApiHotelListData = components['schemas']['HotelListData']
 export type ApiMoney = components['schemas']['Money']
+export type ApiQuoteData = components['schemas']['QuoteData']
+export type ApiQuoteNight = components['schemas']['QuoteNight']
+export type ApiFavorite = components['schemas']['Favorite']
+export type ApiBooking = components['schemas']['Booking']
+export type ApiBookingListData = components['schemas']['BookingListData']
+export type ApiUploadSign = components['schemas']['UploadSign']
+export type ApiAttachUpload = components['schemas']['AttachUpload']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -121,6 +128,18 @@ function normalizeTransportError(error: unknown): ApiRequestError {
 
 interface ApiRequestOptions {
   query?: Record<string, string | number>
+  /**
+   * `POST` for the writes that carry a body — the quote (which changes nothing, the
+   * server prices a stay and answers 200), the favourites insert, and the upload
+   * sign/attach. `DELETE` is a path-only call that answers 204 with no body at all.
+   */
+  method?: 'POST' | 'DELETE'
+  /**
+   * `boolean` is here for `AttachUpload.isCover`. Optional fields stay `undefined`
+   * rather than being dropped by the caller: `$fetch` omits them from the JSON body, so
+   * the API applies its own default, which is what its Zod schema describes.
+   */
+  body?: Record<string, string | number | boolean | undefined>
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -139,7 +158,9 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
       baseURL: base,
       credentials: 'include',
       headers,
+      method: options.method,
       query: options.query,
+      body: options.body,
     })
   }
   catch (error: unknown) {
@@ -147,6 +168,14 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   }
 
   if (isSuccessEnvelope(raw)) return raw.data as T
+  // `unfavorite` is the only call that answers 204, so it is the only one allowed to come
+  // back with no body. The tolerance is scoped to it deliberately: an empty 200 anywhere
+  // else is not a success, and returning `undefined as T` there is a typed lie that every
+  // read call site trusts — `BAD_RESPONSE` is the honest answer and it is a fallback
+  // signal, so a broken response shows fixtures instead of a silent `TypeError`.
+  if (options.method === 'DELETE' && (raw === undefined || raw === null || raw === '')) {
+    return undefined as T
+  }
   if (isFailureEnvelope(raw)) {
     throw new ApiRequestError(raw.error.code, raw.error.message, raw.error.details)
   }
@@ -197,4 +226,104 @@ export async function fetchHotels(params: Record<string, string | number>): Prom
 /** Accepts a uuid or a slug — the frontend links to `/hotels/{slug}`. */
 export async function fetchHotelDetail(id: string): Promise<ApiHotelDetail> {
   return apiFetch<ApiHotelDetail>(`/api/hotels/${encodeURIComponent(id)}`)
+}
+
+/**
+ * `POST /api/bookings/quote` — the T18 body. `currency` is the property's own quoted
+ * currency, read from the detail payload rather than asserted here, so the site never
+ * asks for a currency it has not shown prices in.
+ *
+ * Half-open dates: `checkOut` is the day the guest leaves, not a night.
+ */
+export interface QuoteRequest {
+  roomId: string
+  checkIn: string
+  checkOut: string
+  guests: number
+  currency?: string
+}
+
+export async function fetchQuote(request: QuoteRequest): Promise<ApiQuoteData> {
+  return apiFetch<ApiQuoteData>('/api/bookings/quote', { method: 'POST', body: { ...request } })
+}
+
+/**
+ * T19. `hotelId` is the **uuid**, not the slug — `GET /hotels/:id` accepts either, so a
+ * detail page keyed on `slug` will cheerfully send the wrong one and collect a 404.
+ * A duplicate is a `FAVORITE_EXISTS` 409, not a second 201; reconciling that is the
+ * caller's job because it owns the toggle, not the transport.
+ */
+export async function fetchFavorite(hotelId: string): Promise<ApiFavorite> {
+  return apiFetch<ApiFavorite>('/api/favorites', { method: 'POST', body: { hotelId } })
+}
+
+/** 204, no body. Nothing to unwrap and nothing worth returning. */
+export async function unfavorite(hotelId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/favorites/${encodeURIComponent(hotelId)}`, { method: 'DELETE' })
+}
+
+/**
+ * T20. `GET /api/bookings` — the caller's own trips, newest first. An anonymous session
+ * (no auth yet — T23) answers 401 `UNAUTHORIZED`, which the pages treat as "nothing
+ * answered" and degrade to the fixtures rather than an error state.
+ */
+export async function fetchMyBookings(): Promise<ApiBookingListData> {
+  return apiFetch<ApiBookingListData>('/api/bookings')
+}
+
+/**
+ * T20. `GET /api/bookings/:id`. 404 `BOOKING_NOT_FOUND` and 403 `NOT_BOOKING_OWNER`
+ * are both *answers*, not failures: a trip that is not yours reads as one you cannot
+ * see, so the caller renders its not-found state instead of a fixture or an error.
+ */
+export async function fetchBooking(id: string): Promise<ApiBooking> {
+  return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}`)
+}
+
+/**
+ * T20. `POST /api/bookings/:id/cancel` — no body, so it is a `POST` option without
+ * `body`, unlike the quote and the favourites write. Guarded to `CONFIRMED` on the
+ * server (D55); the 200 body carries the booking in its new `CANCELLED` state, which
+ * is the source of truth for the flip — any other state answers 409
+ * `INVALID_CANCEL_STATE` and the caller must not claim a cancellation.
+ */
+export async function cancelBooking(id: string): Promise<ApiBooking> {
+  return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+}
+
+/**
+ * T21. `POST /api/uploads/sign` — the folder-scoped upload config. Only the API secret
+ * stays server-side; the `apiKey` and `signature` are handed to the browser on purpose.
+ *
+ * This is the one call in the upload flow that goes through `apiFetch`. The Cloudinary
+ * POST that follows is a third-party host, so it uses a raw `XMLHttpRequest` in
+ * `usePhotoUploads` instead — see the comment there.
+ */
+export async function fetchUploadSign(): Promise<ApiUploadSign> {
+  return apiFetch<ApiUploadSign>('/api/uploads/sign', { method: 'POST' })
+}
+
+/**
+ * T21. `POST /api/uploads/attach` — persists the `hotel_images` row for an asset that
+ * already uploaded to Cloudinary. T22 calls this: the wizard has no `hotelId` until it
+ * creates the listing, so T21 stages the Cloudinary result instead of calling this.
+ *
+ * A `publicId` outside the caller's `booking/hotels/{hostId}/` folder is 403
+ * `UPLOAD_FOREIGN`; a `(hotelId, url)` pair already attached is 409.
+ */
+export async function attachUpload(request: ApiAttachUpload): Promise<ApiHotelImage> {
+  return apiFetch<ApiHotelImage>('/api/uploads/attach', { method: 'POST', body: { ...request } })
+}
+
+/**
+ * T21. `DELETE /api/uploads/:publicId` — destroys the asset and removes its row.
+ *
+ * The `publicId` is a Cloudinary path full of slashes (`booking/hotels/{hostId}/lobby`),
+ * so it has to travel as one `%2F`-encoded segment. Interpolating it raw would make
+ * `/api/uploads/` match with an empty param and the path segments route as separate
+ * ones — a 404 that reads like a missing asset. `encodeURIComponent` is what a real HTTP
+ * client does, and Express decodes it back before the handler sees it.
+ */
+export async function deleteUpload(publicId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/uploads/${encodeURIComponent(publicId)}`, { method: 'DELETE' })
 }

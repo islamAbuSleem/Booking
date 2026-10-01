@@ -2,37 +2,152 @@
 /**
  * /bookings/[id] — one trip. Property snapshot, stay facts, the stored price
  * breakdown, and cancel behind a confirm modal that names the reference.
- * Cancel is a local state change on the shared mock store.
+ *
+ * T20: the API is primary; a 401 (sign-in is T23) or a transport failure
+ * degrades to the fixture store, and a 404/403 is an *answer* — a trip that
+ * is not yours reads as one you cannot see, rendered as the not-found state.
+ * Cancel goes through the real endpoint and degrades to the local store the
+ * same way the read does.
  */
-import { HOTEL_BY_ID } from '~/utils/mock'
+import { cancelBooking, fetchBooking, isApiError, isApiFailure } from '~/utils/api'
+import type { ApiBooking } from '~/utils/api'
+import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
+import { useBookings } from '~/composables/useBookings'
 import { formatStayDate, wholeNumber } from '~/utils/format'
 
 const route = useRoute()
 const { t } = useI18n()
-const { bookingById, cancelBooking } = useBookings()
+const { bookingById, cancelBooking: mockCancelBooking } = useBookings()
 
 const id = computed(() => String(route.params.id ?? ''))
-const booking = computed(() => bookingById(id.value))
-const hotel = computed(() => (booking.value ? HOTEL_BY_ID.get(booking.value.hotelId) : undefined))
+
+interface BookingDetailPayload {
+  booking: ApiBooking | null
+  /**
+   * Mock-only: the API's booking carries no guest field, and a trip detail is
+   * always the owner's own trip — printing your own name on it is redundant.
+   * The fixture world keeps the line, the live one drops it.
+   */
+  guestName: string | null
+}
+
+/**
+ * The key carries the route param, so a swap from one trip to another re-fetches
+ * instead of showing the previous booking (context/ui-rules.md).
+ */
+const {
+  data: payload,
+  status,
+  error,
+  refresh,
+} = await useAsyncData<BookingDetailPayload>(
+  () => `booking:${id.value}`,
+  async (): Promise<BookingDetailPayload> => {
+    const bookingId = String(route.params.id ?? '')
+    try {
+      const booking = await fetchBooking(bookingId)
+      return { booking, guestName: null }
+    }
+    catch (fetchError: unknown) {
+      // 404 and 403 are answers, not failures: neither is papered over with a
+      // fixture, and both read as "you cannot see this trip".
+      if (isApiError(fetchError) && (fetchError.code === 'BOOKING_NOT_FOUND' || fetchError.code === 'NOT_BOOKING_OWNER')) {
+        return { booking: null, guestName: null }
+      }
+      // 401 `UNAUTHORIZED` means no session at all, and with auth unwired that
+      // is the everyday case — so it degrades to the fixtures, as a transport
+      // failure does. Every other real envelope error drives the error state.
+      if (isApiFailure(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
+        throw fetchError
+      }
+      const mock = bookingById(bookingId)
+      if (!mock) return { booking: null, guestName: null }
+      return { booking: mockBookingToApi(mock), guestName: mock.guestName }
+    }
+  },
+)
+
+const booking = computed(() => payload.value?.booking ?? null)
+const guestName = computed(() => payload.value?.guestName ?? null)
+
+/** A missing id or a 404/403 answer is a not-found, not an exception — say so in the status line. */
+if (!booking.value && status.value !== 'error') {
+  setResponseStatus(404, 'Booking not found')
+}
+
+/** Skeletons only on the cold request — a cached payload renders straight away. */
+const isLoading = computed(() => status.value === 'pending' && !payload.value)
+const hasFailed = computed(() => status.value === 'error')
+
+/** The cover image from the hotel snapshot, rendered as a URL or omitted. */
+const cover = computed(() => (booking.value ? bookingCoverImage(booking.value) : null))
+
+/**
+ * CONFIRMED only: the API guards the cancel the same way (409
+ * `INVALID_CANCEL_STATE` for any other status), so the button shows only here,
+ * in the live world and the fixture world alike.
+ */
+const cancellable = computed(() => booking.value?.status === 'CONFIRMED')
+
+/**
+ * Neither the API snapshot nor the fixture stores a per-night rate; with nights,
+ * the figure divides out of the subtotal. A stay with no nights has no rate at
+ * all — null renders as "—", never $0 (D45).
+ */
+const nightlyCents = computed<number | null>(() => {
+  const record = booking.value
+  if (!record || record.nights === 0) return null
+  return Math.round(record.subtotalCents / record.nights)
+})
 
 const cancelOpen = ref(false)
+const cancelBusy = ref(false)
 const cancelled = ref(false)
+const cancelFailed = ref(false)
 
-const cancellable = computed(
-  () => booking.value && (booking.value.status === 'PENDING' || booking.value.status === 'CONFIRMED'),
-)
-
-/** The nightly rate is not stored on the mock booking; it divides out exactly. */
-const nightlyCents = computed(() =>
-  booking.value && booking.value.nights > 0
-    ? Math.round(booking.value.subtotalCents / booking.value.nights)
-    : 0,
-)
-
-function confirmCancel(): void {
-  if (!booking.value) return
-  cancelled.value = cancelBooking(booking.value.id)
-  cancelOpen.value = false
+/**
+ * The real cancel first. On success the response *is* the new state, so the
+ * page renders the flip from it. A real envelope error (409
+ * `INVALID_CANCEL_STATE`, a 403, a 404) means the trip was not cancelled —
+ * the claim is not made. Only when nothing answered does the fixture store
+ * own the flip, and `UNAUTHORIZED` counts as nothing answered: it is exactly
+ * what the read above degrades on, so the two can never disagree.
+ */
+async function requestCancel(): Promise<void> {
+  const record = booking.value
+  if (!record || cancelBusy.value) return
+  cancelBusy.value = true
+  cancelFailed.value = false
+  try {
+    const updated = await cancelBooking(record.id)
+    // `apiFetch` hands back `undefined` for a body it could not read, so a 200 with
+    // nothing usable in it is not a confirmed cancellation. Claiming it would show
+    // the success alert beside a CONFIRMED badge and a live Cancel button.
+    if (!updated || updated.status !== 'CANCELLED') {
+      cancelFailed.value = true
+      return
+    }
+    Object.assign(record, updated)
+    cancelled.value = true
+  }
+  catch (cancelError: unknown) {
+    const answered = isApiFailure(cancelError)
+      && !(isApiError(cancelError) && cancelError.code === 'UNAUTHORIZED')
+    if (answered) {
+      cancelFailed.value = true
+    }
+    else if (mockCancelBooking(record.id)) {
+      record.status = 'CANCELLED'
+      cancelled.value = true
+    }
+    else {
+      cancelFailed.value = true
+    }
+  }
+  finally {
+    cancelBusy.value = false
+    cancelOpen.value = false
+  }
 }
 
 useSeoMeta({
@@ -44,7 +159,43 @@ useSeoMeta({
 
 <template>
   <div class="mx-auto max-w-[1280px] px-6 py-10 lg:py-14">
-    <template v-if="booking">
+    <!-- Loading: a static block, no shimmer. -->
+    <div
+      v-if="isLoading"
+      class="border-rule bg-surface rounded-none border p-6"
+    >
+      <p
+        class="sr-only"
+        role="status"
+      >
+        {{ $t('bookings.loadingBooking') }}
+      </p>
+      <BaseSkeleton :rows="6" />
+    </div>
+
+    <!-- Error: a real answer that is not a 404/403. The retry is a retry, not a restart. -->
+    <BaseAlert
+      v-else-if="hasFailed"
+      tone="danger"
+      :title="$t('bookings.bookingLoadError')"
+    >
+      <p>{{ $t('bookings.loadErrorHint') }}</p>
+      <p
+        v-if="error"
+        class="font-mono text-xs"
+      >
+        {{ error.message }}
+      </p>
+      <button
+        type="button"
+        class="border-danger text-danger mt-2 inline-flex h-11 items-center rounded-sm border px-4 text-sm"
+        @click="refresh()"
+      >
+        {{ $t('common.retry') }}
+      </button>
+    </BaseAlert>
+
+    <template v-else-if="booking">
       <nav
         class="text-fg-muted text-sm"
         :aria-label="$t('booking.breadcrumb')"
@@ -78,9 +229,25 @@ useSeoMeta({
         {{ $t('bookings.cancelledBody', { reference: booking.reference }) }}
       </BaseAlert>
 
+      <BaseAlert
+        v-else-if="cancelFailed"
+        tone="danger"
+        :title="$t('bookings.cancelErrorTitle')"
+        class="mt-6 max-w-[720px]"
+      >
+        <p>{{ $t('bookings.cancelErrorBody', { reference: booking.reference }) }}</p>
+        <button
+          type="button"
+          class="border-danger text-danger mt-2 inline-flex h-11 items-center rounded-sm border px-4 text-sm"
+          @click="requestCancel()"
+        >
+          {{ $t('common.retry') }}
+        </button>
+      </BaseAlert>
+
       <div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-12">
         <div class="flex flex-col gap-8 lg:col-span-7">
-          <!-- Property snapshot. -->
+          <!-- Property snapshot, from the booking's own hotel — no second fetch. -->
           <section
             aria-labelledby="booking-property"
             class="border-rule bg-surface rounded-none border p-6"
@@ -93,9 +260,9 @@ useSeoMeta({
             </h2>
             <div class="mt-4 flex items-start gap-4">
               <img
-                v-if="hotel?.images[0]"
-                :src="hotel.images[0].url"
-                :alt="hotel.images[0].alt"
+                v-if="cover"
+                :src="cover"
+                :alt="booking.hotel.name"
                 width="320"
                 height="240"
                 loading="lazy"
@@ -104,19 +271,13 @@ useSeoMeta({
               >
               <div class="min-w-0">
                 <p class="font-display text-display-m">
-                  {{ hotel?.name ?? booking.hotelId }}
+                  {{ booking.hotel.name }}
                 </p>
-                <p
-                  v-if="hotel"
-                  class="text-fg-muted text-label mt-1 uppercase"
-                >
-                  {{ hotel.city }}, {{ hotel.country }}
+                <p class="text-fg-muted text-label mt-1 uppercase">
+                  {{ booking.hotel.city }}, {{ booking.hotel.country }}
                 </p>
-                <p
-                  v-if="hotel"
-                  class="text-fg-muted mt-2 text-sm"
-                >
-                  {{ hotel.addressLine }}
+                <p class="text-fg-muted mt-2 text-sm">
+                  {{ booking.hotel.addressLine }}
                 </p>
               </div>
             </div>
@@ -167,8 +328,11 @@ useSeoMeta({
                 </dd>
               </div>
             </dl>
-            <p class="text-fg-muted mt-4 text-sm">
-              {{ $t('bookings.guestLine', { name: booking.guestName }) }}
+            <p
+              v-if="guestName"
+              class="text-fg-muted mt-4 text-sm"
+            >
+              {{ $t('bookings.guestLine', { name: guestName }) }}
             </p>
           </section>
 
@@ -196,6 +360,7 @@ useSeoMeta({
                 :subtotal-cents="booking.subtotalCents"
                 :fees-cents="booking.feesCents"
                 :total-cents="booking.totalCents"
+                :currency="booking.currency"
               />
             </div>
             <p class="text-fg-muted border-rule mt-4 border-t pt-4 text-sm">
@@ -222,10 +387,11 @@ useSeoMeta({
           </BaseButton>
           <button
             type="button"
-            class="bg-danger text-surface hover:bg-danger flex h-12 items-center justify-center rounded-sm px-6 text-sm font-medium transition-colors duration-150"
-            @click="confirmCancel"
+            class="bg-danger text-surface hover:bg-danger flex h-12 items-center justify-center rounded-sm px-6 text-sm font-medium transition-colors duration-150 disabled:opacity-60"
+            :disabled="cancelBusy"
+            @click="requestCancel()"
           >
-            {{ $t('bookings.cancelConfirm', { reference: booking.reference }) }}
+            {{ cancelBusy ? $t('bookings.cancelCancelling') : $t('bookings.cancelConfirm', { reference: booking.reference }) }}
           </button>
         </div>
       </BaseModal>

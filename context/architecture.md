@@ -207,9 +207,12 @@ silent fallback to zero.
 A stay is a half-open range: `check_in <= d < check_out`, so back-to-back stays never
 double-count.
 
-**Availability rule:** a room is bookable for a requested range when
-`confirmed bookings overlapping the range + overlapping blackouts <= total_inventory`.
-Computed inside a serializable transaction to prevent oversell under concurrency.
+**Availability rule (D52):** a room is bookable for a requested half-open range when
+**every night in the range** has `total_inventory - overlappingBookings(night) >= 1` and
+no blackout (room-scoped or hotel-scoped) covers that night. Overlapping bookings are
+those in status `CONFIRMED` **or** `PENDING` — a `PENDING` row is how T20 holds inventory
+before payment, so ignoring it would oversell by one. Computed inside a serializable
+transaction to prevent oversell under concurrency.
 
 ## Storage
 

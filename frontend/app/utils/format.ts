@@ -3,6 +3,7 @@
  *
  * - `usd()`      — whole dollars, for listing and search cards.
  * - `usdCents()` — 2 decimals, for anything payable.
+ * - `payableCents()` — the same, in the currency the API actually quoted.
  * - `shortDate()`— stay dates, which are date-only `YYYY-MM-DD` and must never shift a
  *                  day because of the viewer's timezone.
  *
@@ -15,12 +16,7 @@ const wholeDollars = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-const payableDollars = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
+const payableFormatters = new Map<string, Intl.NumberFormat>()
 
 const plainNumber = new Intl.NumberFormat('en-US')
 
@@ -42,9 +38,32 @@ export function usd(cents: number): string {
   return wholeDollars.format(cents / 100)
 }
 
-/** Two decimals, currency symbol first. Payable context only. */
+/**
+ * Two decimals, currency symbol first, in the currency the server quoted. The currency
+ * symbol is a claim about the currency, so formatting a EUR quote with the USD formatter
+ * would be a wrong label rather than a cosmetic difference.
+ *
+ * An unrecognised code falls back to USD instead of throwing: the code arrives from an
+ * API payload, and a `RangeError` inside a template would take the whole page down.
+ */
+export function payableCents(cents: number, currency: string): string {
+  const code = /^[A-Z]{3}$/.test(currency) ? currency : 'USD'
+  let formatter = payableFormatters.get(code)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    payableFormatters.set(code, formatter)
+  }
+  return formatter.format(cents / 100)
+}
+
+/** Two decimals in USD. Payable context on the pages that only ever quote USD. */
 export function usdCents(cents: number): string {
-  return payableDollars.format(cents / 100)
+  return payableCents(cents, 'USD')
 }
 
 /** Review counts, guest counts, inventory. Never abbreviated. */

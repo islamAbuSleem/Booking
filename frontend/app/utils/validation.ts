@@ -38,6 +38,13 @@ export function isValidEmail(value: string): boolean {
 
 export const MIN_PASSWORD_LENGTH = 8
 
+/** RFC 4122 textual uuid, the shape every backend id is generated in. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isUuid(value: string): boolean {
+  return UUID_RE.test(value)
+}
+
 export interface LoginValues {
   email: string
   password: string

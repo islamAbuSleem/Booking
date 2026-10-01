@@ -18,9 +18,12 @@ defineProps<{
   valueLabel: string
   decreaseLabel: string
   increaseLabel: string
+  /** BaseInput's field-error contract, on a control that is not an `<input>`. */
+  error?: string
 }>()
 
 const uid = useId()
+const errorId = `${uid}-error`
 
 const decrease = (): void => {
   model.value = Math.max(MIN_GUESTS, model.value - 1)
@@ -41,7 +44,10 @@ const increase = (): void => {
     <div
       role="group"
       class="border-rule-strong bg-surface flex h-12 items-center justify-between rounded-sm border px-2"
+      :class="error ? 'border-danger' : ''"
       :aria-labelledby="`${uid}-label`"
+      :aria-invalid="error ? true : undefined"
+      :aria-describedby="error ? errorId : undefined"
     >
       <span class="tabular pl-1 text-sm">{{ valueLabel }}</span>
 
@@ -91,5 +97,14 @@ const increase = (): void => {
         </button>
       </span>
     </div>
+
+    <p
+      v-if="error"
+      :id="errorId"
+      class="text-danger text-sm"
+      role="alert"
+    >
+      {{ error }}
+    </p>
   </div>
 </template>

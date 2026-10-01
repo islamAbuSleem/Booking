@@ -77,6 +77,33 @@ export const envSchema = z.object({
   GITHUB_CALLBACK_URL: z
     .string()
     .default('http://localhost:3000/api/auth/github/callback'),
+
+  /**
+   * T21 — Cloudinary is optional, exactly like OAuth (T15). Every value is `.default`ed
+   * to a placeholder, so a missing variable does NOT fail boot and the app builds and
+   * tests pass without credentials. `sign` returns the placeholder config, and only a
+   * real browser upload against a placeholder cloud fails at runtime. No Cloudinary SDK
+   * is used anywhere: `sign` is a pure HMAC-SHA1 function and `destroy` is a plain fetch
+   * behind the `CLOUDINARY` DI token, both faked in tests (context/build-plan.md, T21 /
+   * decision D58). The placeholders are unmistakably fake so a real deployment that forgot
+   * to set them is obvious, not silent.
+   */
+  CLOUDINARY_CLOUD_NAME: z
+    .string()
+    .default('booking-upload-placeholder')
+    .describe('Cloudinary cloud name. Placeholder default; set a real cloud to upload.'),
+  CLOUDINARY_API_KEY: z
+    .string()
+    .default('00000000000000000000000')
+    .describe('Cloudinary API key. Returned to the browser on purpose (signed uploads).'),
+  CLOUDINARY_API_SECRET: z
+    .string()
+    .default('cloudinary-upload-placeholder-secret')
+    .describe('Cloudinary API secret. Stays server-side; signs uploads and the destroy.'),
+  CLOUDINARY_UPLOAD_PATH: z
+    .string()
+    .default('booking/hotels/')
+    .describe('The folder prefix owned by the platform; each host appends their own id.'),
 });
 
 /** The exact string `.env.example` used to ship, kept so it can be refused by name. */
