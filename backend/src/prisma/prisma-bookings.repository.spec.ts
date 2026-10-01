@@ -107,6 +107,12 @@ class FakePrisma {
   private aborted = false;
 
   readonly attemptedReferences: string[] = [];
+  /**
+   * Every `isolationLevel` the repository asked for, in order. The oversell guard is only
+   * true at Serializable, so this is recorded rather than ignored: a dropped option would
+   * otherwise leave every test in this file green.
+   */
+  readonly isolationLevels: string[] = [];
 
   /** The 25P02 every further statement on an aborted transaction would get. */
   assertLive(): void {
@@ -166,10 +172,16 @@ class FakePrisma {
    * what makes the two-creates race deterministic — the loser's re-check always runs
    * after the winner's insert committed to the shared state.
    */
-  $transaction<R>(fn: (tx: unknown) => Promise<R>): Promise<R> {
+  $transaction<R>(
+    fn: (tx: unknown) => Promise<R>,
+    options?: { isolationLevel?: string },
+  ): Promise<R> {
     const attempt = this.queue.then(async () => {
       this.transactionCount += 1;
       this.aborted = false;
+      if (options?.isolationLevel !== undefined) {
+        this.isolationLevels.push(options.isolationLevel);
+      }
       if (this.conflictFailures > 0) {
         this.conflictFailures -= 1;
         throw knownError('P2034');
@@ -608,6 +620,17 @@ describe('PrismaBookingRepository.createPending', () => {
     expect(loser).toBeInstanceOf(ApiError);
     expect(loser.getStatus()).toBe(409);
     expect(loser.getResponse()).toMatchObject({ code: 'ROOM_UNAVAILABLE' });
+  });
+
+  it('runs the write at Serializable, the level the re-check depends on', async () => {
+    const prisma = new FakePrisma().withRoom(oneInventoryRoom());
+    const repo = repository(prisma);
+
+    await repo.createPending(input());
+
+    expect(prisma.isolationLevels).toEqual([
+      Prisma.TransactionIsolationLevel.Serializable,
+    ]);
   });
 
   it('retries a P2034 write conflict and succeeds on the re-run', async () => {
