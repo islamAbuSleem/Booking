@@ -110,7 +110,8 @@ const cancelFailed = ref(false)
  * page renders the flip from it. A real envelope error (409
  * `INVALID_CANCEL_STATE`, a 403, a 404) means the trip was not cancelled —
  * the claim is not made. Only when nothing answered does the fixture store
- * own the flip.
+ * own the flip, and `UNAUTHORIZED` counts as nothing answered: it is exactly
+ * what the read above degrades on, so the two can never disagree.
  */
 async function requestCancel(): Promise<void> {
   const record = booking.value
@@ -123,7 +124,9 @@ async function requestCancel(): Promise<void> {
     cancelled.value = true
   }
   catch (cancelError: unknown) {
-    if (isEnvelopeError(cancelError)) {
+    const answered = isEnvelopeError(cancelError)
+      && !(isApiError(cancelError) && cancelError.code === 'UNAUTHORIZED')
+    if (answered) {
       cancelFailed.value = true
     }
     else if (mockCancelBooking(record.id)) {
