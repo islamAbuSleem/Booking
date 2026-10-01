@@ -120,6 +120,13 @@ async function requestCancel(): Promise<void> {
   cancelFailed.value = false
   try {
     const updated = await cancelBooking(record.id)
+    // `apiFetch` hands back `undefined` for a body it could not read, so a 200 with
+    // nothing usable in it is not a confirmed cancellation. Claiming it would show
+    // the success alert beside a CONFIRMED badge and a live Cancel button.
+    if (!updated || updated.status !== 'CANCELLED') {
+      cancelFailed.value = true
+      return
+    }
     Object.assign(record, updated)
     cancelled.value = true
   }
