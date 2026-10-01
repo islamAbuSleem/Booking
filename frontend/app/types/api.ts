@@ -166,6 +166,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Favourite a hotel
+         * @description Creates the `favorites` row for the caller. The guest is the JWT subject: a `userId` in the body is stripped by the schema, never obeyed. A hotel that is already a favourite is a `FAVORITE_EXISTS` 409 rather than a second 201, because `(userId, hotelId)` is a composite primary key and a duplicate insert is a constraint violation worth surfacing. Clients call this optimistically and roll back on the 409.
+         */
+        post: operations["FavoritesController_add"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/{hotelId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Un-favourite a hotel
+         * @description Always 204, including when the caller never favourited that hotel: a toggle that fails on the second click shows an error for a state the guest caused on purpose. Only the caller's own row is touched, because the row is keyed by `(userId, hotelId)` and `userId` is the JWT subject. An unknown `hotelId` is a 204 no-op too, so un-favouriting can never disagree with the toggle that called it.
+         */
+        delete: operations["FavoritesController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/hotels": {
         parameters: {
             query?: never;
@@ -441,6 +481,26 @@ export interface components {
             success: true;
             data: components["schemas"]["QuoteData"];
         };
+        CreateFavorite: {
+            /**
+             * Format: uuid
+             * @description The hotel to favourite, by uuid.
+             */
+            hotelId: string;
+        };
+        Favorite: {
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            hotelId: string;
+            /** @description ISO 8601 instant the favourite was created. */
+            createdAt: string;
+        };
+        FavoriteEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Favorite"];
+        };
     };
     responses: never;
     parameters: never;
@@ -674,6 +734,105 @@ export interface operations {
             };
             /** @description The room has no price in the requested currency. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FavoritesController_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateFavorite"];
+            };
+        };
+        responses: {
+            /** @description The row that was created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FavoriteEnvelope"];
+                };
+            };
+            /** @description The body failed validation — `hotelId` must be a uuid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such hotel. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Already a favourite (`FAVORITE_EXISTS`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FavoritesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel to un-favourite, by uuid. */
+                hotelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone, or was never there. No body either way. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The path parameter is not a uuid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

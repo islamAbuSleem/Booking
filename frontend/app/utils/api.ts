@@ -27,6 +27,7 @@ export type ApiHotelListData = components['schemas']['HotelListData']
 export type ApiMoney = components['schemas']['Money']
 export type ApiQuoteData = components['schemas']['QuoteData']
 export type ApiQuoteNight = components['schemas']['QuoteNight']
+export type ApiFavorite = components['schemas']['Favorite']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -124,10 +125,11 @@ function normalizeTransportError(error: unknown): ApiRequestError {
 interface ApiRequestOptions {
   query?: Record<string, string | number>
   /**
-   * `POST` for the quote only. It writes nothing — the server prices a stay and answers
-   * 200 — but it carries a body, so it cannot ride the query string like the reads.
+   * `POST` for the writes that carry a body — the quote (which changes nothing, the
+   * server prices a stay and answers 200) and the favourites insert. `DELETE` is a
+   * path-only call that answers 204 with no body at all.
    */
-  method?: 'POST'
+  method?: 'POST' | 'DELETE'
   body?: Record<string, string | number>
 }
 
@@ -157,6 +159,14 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   }
 
   if (isSuccessEnvelope(raw)) return raw.data as T
+  // `unfavorite` is the only call that answers 204, so it is the only one allowed to come
+  // back with no body. The tolerance is scoped to it deliberately: an empty 200 anywhere
+  // else is not a success, and returning `undefined as T` there is a typed lie that every
+  // read call site trusts — `BAD_RESPONSE` is the honest answer and it is a fallback
+  // signal, so a broken response shows fixtures instead of a silent `TypeError`.
+  if (options.method === 'DELETE' && (raw === undefined || raw === null || raw === '')) {
+    return undefined as T
+  }
   if (isFailureEnvelope(raw)) {
     throw new ApiRequestError(raw.error.code, raw.error.message, raw.error.details)
   }
@@ -226,4 +236,19 @@ export interface QuoteRequest {
 
 export async function fetchQuote(request: QuoteRequest): Promise<ApiQuoteData> {
   return apiFetch<ApiQuoteData>('/api/bookings/quote', { method: 'POST', body: { ...request } })
+}
+
+/**
+ * T19. `hotelId` is the **uuid**, not the slug — `GET /hotels/:id` accepts either, so a
+ * detail page keyed on `slug` will cheerfully send the wrong one and collect a 404.
+ * A duplicate is a `FAVORITE_EXISTS` 409, not a second 201; reconciling that is the
+ * caller's job because it owns the toggle, not the transport.
+ */
+export async function fetchFavorite(hotelId: string): Promise<ApiFavorite> {
+  return apiFetch<ApiFavorite>('/api/favorites', { method: 'POST', body: { hotelId } })
+}
+
+/** 204, no body. Nothing to unwrap and nothing worth returning. */
+export async function unfavorite(hotelId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/favorites/${encodeURIComponent(hotelId)}`, { method: 'DELETE' })
 }
