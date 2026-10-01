@@ -65,15 +65,17 @@ const CHECKOUT_AFTER_CHECKIN = {
 };
 
 /**
- * The longest stay the API will price. Both endpoints are public, and both walk the range one
- * night at a time in memory, so an unbounded range (`0001-01-01` to `9999-12-31` passes the
- * date shape) would cost one unauthenticated caller millions of night entries and a filtered
- * booking scan per night. 30 nights covers every realistic hotel stay, and the cap is one
- * constant rather than a value per endpoint.
+ * The longest stay the API will take. Every endpoint that reads a date range walks it one
+ * night at a time in memory, and T20 re-runs that walk inside a serializable transaction, so
+ * an unbounded range (`0001-01-01` to `9999-12-31` passes the date shape) would cost one
+ * caller millions of night entries and — on a create — an `Int` overflow in the money
+ * columns. 30 nights covers every realistic hotel stay, and the cap is one constant shared
+ * by the quote, the availability read and the create, so a stay can never be priced and
+ * then refused.
  */
 export const MAX_STAY_NIGHTS = 30;
 
-const STAY_TOO_LONG = {
+export const STAY_TOO_LONG = {
   message: `a stay cannot be longer than ${MAX_STAY_NIGHTS} nights`,
   path: ['checkOut'],
 };
@@ -81,7 +83,7 @@ const STAY_TOO_LONG = {
 const MILLIS_PER_DAY = 86_400_000;
 
 /** Nights in a half-open range, counted as UTC days so no host timezone can shift it. */
-function stayLength(checkIn: string, checkOut: string): number {
+export function stayLength(checkIn: string, checkOut: string): number {
   const from = Date.parse(`${checkIn}T00:00:00.000Z`);
   const to = Date.parse(`${checkOut}T00:00:00.000Z`);
   return Math.round((to - from) / MILLIS_PER_DAY);

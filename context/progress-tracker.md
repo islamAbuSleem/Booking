@@ -66,7 +66,7 @@
 - [x] T17c Hotel detail wiring
 - [x] T18 Availability and quote
 - [x] T19 Favorites
-- [ ] T20 Bookings API
+- [x] T20 Bookings API
 - [ ] T21 Cloudinary upload
 - [ ] T22 Host listing management API
 - [ ] T23 Wire auth into the frontend
@@ -422,6 +422,56 @@
   shortlist has a hotel in it when the row may never have been written. The list endpoint
   is the later ticket that fixes this, and hydration belongs there. Until then a heart can
   read empty when it is filled — visible, logged, and the cheapest honest option.
+- **D55 — The T20 `Booking` read DTO embeds a `hotel` display snapshot and `room.name`**,
+  so T8's detail page renders the property with no second fetch (the ticket's "property
+  snapshot"). Money is a server-computed snapshot in the booking's own currency;
+  `totalCents` is always `subtotalCents + feesCents`; `nights` is `checkOut - checkIn`
+  (half-open, reused from T18). Consequences:
+  - The create body accepts `guestName`/`guestEmail`/`guestPhone`, **Zod-validates them,
+    and does not persist them** — the `bookings` table has no such columns and T12's
+    migration cannot be re-run without a database. T26/T27 (payments) is what books them a
+    home.
+  - `GET /bookings/:id` is 404 `BOOKING_NOT_FOUND` when the row is absent and 403
+    `NOT_BOOKING_OWNER` when it exists but belongs to a different guest.
+  - **Cancel is guarded to `status === 'CONFIRMED'` only** (the ticket's words). Any other
+    status is 409 `INVALID_CANCEL_STATE`. A refund is out of scope (T38); T20 only flips
+    the status. The tension is logged in `bookings.service.ts`: a fresh PENDING booking
+    cannot be cancelled until T26 confirms it.
+  - `reference` = a 2-letter prefix constant (`GB`, matching the schema's `GB-4821`
+    example) + 4 zero-padded digits, regenerated up to 3 times on a `P2002` collision, then
+    a 500 `INTERNAL_ERROR`. A 409 would mislead — the room *is* available; the server just
+    could not mint a reference. Each regeneration re-runs the **whole** transaction: any
+    statement error aborts a Postgres transaction, so an in-transaction retry would meet
+    `25P02 current transaction is aborted` instead of the collision.
+  - The write sits in a `Serializable` `prisma.$transaction`; T18's exported pure
+    predicates re-run the availability check *inside* the transaction on the tx client, and
+    the whole transaction retries on `isRetryableWriteConflict` (`P2034`/`40001`/`40P01`),
+    up to 3 attempts, terminal state 409 `ROOM_UNAVAILABLE`. The oversell proof is the unit
+    test "sells the last unit to exactly one of two interleaved creates", not the e2e.
+- **D56 — T20's frontend wires T8 only; the create flow is deliberately deferred.** The
+  two trip pages read `GET /bookings` and `GET /bookings/:id` and cancel through
+  `POST /bookings/:id/cancel`. The booking *create* button on T7 stays the local mock in
+  T20 — creating a real booking means the payment tickets (T26-T28) that take the hold and
+  charge the card, so wiring a bare create now would be a half feature. Fallback rules: a
+  401 (sign-in is T23, so anonymous is the everyday case) or a transport failure degrades to
+  the fixture store; a 404/403 on the detail is an *answer*, not "nothing" — it renders the
+  not-found state, and no fixture is papered over it. The cancel button shows for
+  `CONFIRMED` only, matching the API guard, in the live world and the fixture world alike.
+- **D57 — The OpenAPI generator clobbered sibling components' schemas; T20's `Booking`
+  shipped with a wrong generated type, and the defect is in `document.ts`, not the ticket.**
+  Each named schema is converted by its *own* `z.toJSONSchema(..., { reused: 'ref' })`
+  call, and Zod names the anonymous sub-schemas it hoists **per call** (`__schema0`,
+  `__schema1`, ...). Those per-call names were all hoisted into one shared
+  `components.schemas` map, so a `__schema0` that is a string in one call was silently
+  replaced by a `__schema0` that is an integer in the next. `Booking.hotel.coverImage`
+  (a `string | null`) therefore generated as `number | null` on the frontend, which the T20
+  agent had to cast around. Fixed by namespacing each component's anonymous defs as
+  `${Name}-__schemaN` (registered CamelCase names stay global, since they are identical
+  across calls) and rewriting the refs through the same rename. This is a T13a-era latent
+  bug that T20 — the first schema with a nested nullable string — finally poked. The fix
+  is in `backend/src/openapi/document.ts`, regenerated `backend/openapi.json`, and a re-run
+  of `gen:api`; the T13a drift-guard test still passes because it compares the in-memory
+  document against the *regenerated* file, so both move together.
 
 ## Notes
 
@@ -441,8 +491,14 @@
   needs a published hotel.
 - Running two `npm run verify` processes at once makes two backend test files fail with
   collection errors. It is the `.output`/`dist` fight `working-notes.md` warns the agents
-  about, and the orchestrator walked straight into it. One verify at a time.
-
+   about, and the orchestrator walked straight into it. One verify at a time.
+- **Two T20 follow-ups, deliberately not folded into T20.** (1) `Booking.room.name` is in
+  the contract but T8's detail has no room line — cheap to add later, so it was left
+  surgical. (2) After cancelling on the detail page, a client-side-cached `/bookings`
+  index still shows the pre-cancel status until reload (the same "stale data across
+  navigations" class as the hotels pages); in fallback mode a detail cancel does not
+  propagate to the index either. Neither blocks T20; note them if the trips pages start to
+  feel stale.
 - NestJS is on **12.1.x**, not 11 as the intake default suggested. The intake options
   predated the current release line; 12 is what `npm view @nestjs/core version` reports.
 - Prisma is on **7.10.x**. Check for breaking changes in the generated client before

@@ -28,6 +28,8 @@ export type ApiMoney = components['schemas']['Money']
 export type ApiQuoteData = components['schemas']['QuoteData']
 export type ApiQuoteNight = components['schemas']['QuoteNight']
 export type ApiFavorite = components['schemas']['Favorite']
+export type ApiBooking = components['schemas']['Booking']
+export type ApiBookingListData = components['schemas']['BookingListData']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -251,4 +253,33 @@ export async function fetchFavorite(hotelId: string): Promise<ApiFavorite> {
 /** 204, no body. Nothing to unwrap and nothing worth returning. */
 export async function unfavorite(hotelId: string): Promise<void> {
   await apiFetch<undefined>(`/api/favorites/${encodeURIComponent(hotelId)}`, { method: 'DELETE' })
+}
+
+/**
+ * T20. `GET /api/bookings` — the caller's own trips, newest first. An anonymous session
+ * (no auth yet — T23) answers 401 `UNAUTHORIZED`, which the pages treat as "nothing
+ * answered" and degrade to the fixtures rather than an error state.
+ */
+export async function fetchMyBookings(): Promise<ApiBookingListData> {
+  return apiFetch<ApiBookingListData>('/api/bookings')
+}
+
+/**
+ * T20. `GET /api/bookings/:id`. 404 `BOOKING_NOT_FOUND` and 403 `NOT_BOOKING_OWNER`
+ * are both *answers*, not failures: a trip that is not yours reads as one you cannot
+ * see, so the caller renders its not-found state instead of a fixture or an error.
+ */
+export async function fetchBooking(id: string): Promise<ApiBooking> {
+  return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}`)
+}
+
+/**
+ * T20. `POST /api/bookings/:id/cancel` — no body, so it is a `POST` option without
+ * `body`, unlike the quote and the favourites write. Guarded to `CONFIRMED` on the
+ * server (D55); the 200 body carries the booking in its new `CANCELLED` state, which
+ * is the source of truth for the flip — any other state answers 409
+ * `INVALID_CANCEL_STATE` and the caller must not claim a cancellation.
+ */
+export async function cancelBooking(id: string): Promise<ApiBooking> {
+  return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
 }

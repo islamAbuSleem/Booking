@@ -33,15 +33,21 @@ export const ERROR_CODES = [
   // T18 — the room exists but has no `room_prices` row in the requested currency. A missing
   // price is an error, never a zero (context/architecture.md, "Pricing").
   'PRICE_UNAVAILABLE',
-
   // T19 — the caller already has this hotel in their favourites. It needs its own code
   // rather than a bare `CONFLICT` because the client branches on it: an optimistic toggle
   // reads this 409 as "already on, keep the filled heart" instead of as a failure to roll
   // back. `translatePrismaError`'s generic P2002 -> CONFLICT cannot express that.
   'FAVORITE_EXISTS',
+  // T19 — OAuth sign-in found an existing account it may not link to.
   'OAUTH_LINK_CONFLICT',
 
-
+  // T20 — bookings. A booking that exists but belongs to a different guest is a 403, not a
+  // 404, so the code states which rule failed rather than hiding the row's existence.
+  'NOT_BOOKING_OWNER',
+  'BOOKING_NOT_FOUND',
+  // T20 — cancel is guarded to CONFIRMED only (D55): a PENDING hold cannot be cancelled
+  // until T26/T27 confirm it, and a COMPLETED stay is past cancelling at all.
+  'INVALID_CANCEL_STATE',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

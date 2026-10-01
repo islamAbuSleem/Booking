@@ -10,7 +10,7 @@
  * fields yet — the Stripe Elements step is T28; this ticket ends at confirm.
  */
 import { getHotelDetail, nightsBetween } from '~/utils/mock'
-import { fetchHotelDetail, fetchQuote, isApiError, isEnvelopeError } from '~/utils/api'
+import { fetchHotelDetail, fetchQuote, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiHotelDetail, ApiHotelRoom, ApiQuoteData, QuoteRequest } from '~/utils/api'
 import { mockHotelToDetail, mockQuoteToApi } from '~/utils/hotelAdapters'
 import { formatStayDate, payableCents, wholeNumber } from '~/utils/format'
@@ -37,7 +37,7 @@ const { data: hotel } = await useAsyncData<ApiHotelDetail | null>(
     }
     catch (fetchError: unknown) {
       if (isApiError(fetchError) && fetchError.code === 'HOTEL_NOT_FOUND') return null
-      if (isEnvelopeError(fetchError)) throw fetchError
+      if (isApiFailure(fetchError)) throw fetchError
       const mock = getHotelDetail(id)
       return mock ? mockHotelToDetail(mock) : null
     }
@@ -146,7 +146,7 @@ const {
         if (quoteFailure.code === 'ROOM_UNAVAILABLE') return { kind: 'unavailable' }
         if (quoteFailure.code === 'PRICE_UNAVAILABLE') return { kind: 'no-price' }
       }
-      if (isEnvelopeError(quoteFailure)) throw quoteFailure
+      if (isApiFailure(quoteFailure)) throw quoteFailure
       // Nothing is listening, which means nothing priced this stay either. The fixture
       // stands in, as on the list and detail pages — but only when the room on screen is
       // itself a fixture, so a live property never shows invented figures.
