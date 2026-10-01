@@ -121,12 +121,22 @@ export class AuthService {
    *
    * Lookup order:
    *   1. The provider tuple `(provider, providerId)` — a returning OAuth user.
-   *   2. The email — an existing password or other-provider account, which is
-   *      then LINKED (the tuple is written onto it) rather than duplicated.
+   *   2. The email — an existing password or unlinked account, which is then
+   *      LINKED (the tuple is written onto it) rather than duplicated. An
+   *      account that already carries a link is left alone: the tuple is never
+   *      overwritten (see below).
    *   3. Otherwise a new `GUEST` account with no password hash.
    *
    * Email is unique across providers (the schema enforces it), so one person
    * stays one account however many providers they connect.
+   *
+   * One account holds ONE provider tuple (`users.oauth_provider` /
+   * `oauth_account_id` are a single nullable pair), so linking on a second
+   * provider has nowhere to go but over the first. That is a silent lockout
+   * for the user (Google works today, GitHub tomorrow, Google never again) and
+   * an account-claim for anyone who controls an address the victim also uses,
+   * so an existing link is a 409 and the user signs in with the provider they
+   * already linked.
    */
   async validateOAuthProfile(profile: OAuthProfile): Promise<Session> {
     const email = profile.email.trim().toLowerCase();
@@ -154,6 +164,31 @@ export class AuthService {
 
     const byEmail = await this.users.findByEmail(email);
     if (byEmail) {
+      // Only a complete link blocks a new one; a half-written pair (provider
+      // without account id) is a broken row, and the incoming tuple repairs it.
+      if (byEmail.oauthProvider && byEmail.oauthAccountId) {
+        if (
+          byEmail.oauthProvider === profile.provider &&
+          byEmail.oauthAccountId === profile.providerId
+        ) {
+          this.logger.log(`[auth] oauth returning ${byEmail.id}`);
+          const token = await this.signToken(
+            byEmail.id,
+            byEmail.email,
+            byEmail.role,
+          );
+          return { user: toPublicUser(byEmail), token };
+        }
+        this.logger.warn(
+          `[auth] oauth link refused for ${byEmail.id}: already linked to ${byEmail.oauthProvider}`,
+        );
+        throw new ApiError(
+          HttpStatus.CONFLICT,
+          'OAUTH_LINK_CONFLICT',
+          'This account is already linked to a different sign-in method',
+        );
+      }
+
       const linked = await this.users.update(byEmail.id, {
         oauthProvider: profile.provider,
         oauthAccountId: profile.providerId,

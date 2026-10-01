@@ -9,7 +9,7 @@
  * other envelope error is a real answer and drives the error state, never
  * a fixture.
  */
-import { fetchMyBookings, isApiError, isEnvelopeError } from '~/utils/api'
+import { fetchMyBookings, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiBooking } from '~/utils/api'
 import { mockBookingToApi } from '~/utils/bookingAdapters'
 import { isUpcomingStatus, useBookings } from '~/composables/useBookings'
@@ -53,7 +53,7 @@ const {
       return { bookings: list.items }
     }
     catch (fetchError: unknown) {
-      if (isEnvelopeError(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
+      if (isApiFailure(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
         throw fetchError
       }
       return { bookings: mockBookings.value.map(mockBookingToApi) }

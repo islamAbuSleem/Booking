@@ -440,7 +440,9 @@
   - `reference` = a 2-letter prefix constant (`GB`, matching the schema's `GB-4821`
     example) + 4 zero-padded digits, regenerated up to 3 times on a `P2002` collision, then
     a 500 `INTERNAL_ERROR`. A 409 would mislead — the room *is* available; the server just
-    could not mint a reference.
+    could not mint a reference. Each regeneration re-runs the **whole** transaction: any
+    statement error aborts a Postgres transaction, so an in-transaction retry would meet
+    `25P02 current transaction is aborted` instead of the collision.
   - The write sits in a `Serializable` `prisma.$transaction`; T18's exported pure
     predicates re-run the availability check *inside* the transaction on the tx client, and
     the whole transaction retries on `isRetryableWriteConflict` (`P2034`/`40001`/`40P01`),
@@ -464,7 +466,7 @@
   replaced by a `__schema0` that is an integer in the next. `Booking.hotel.coverImage`
   (a `string | null`) therefore generated as `number | null` on the frontend, which the T20
   agent had to cast around. Fixed by namespacing each component's anonymous defs as
-  `${Name}~__schemaN` (registered CamelCase names stay global, since they are identical
+  `${Name}-__schemaN` (registered CamelCase names stay global, since they are identical
   across calls) and rewriting the refs through the same rename. This is a T13a-era latent
   bug that T20 — the first schema with a nested nullable string — finally poked. The fix
   is in `backend/src/openapi/document.ts`, regenerated `backend/openapi.json`, and a re-run

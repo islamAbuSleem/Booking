@@ -1,5 +1,9 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
-import { ApiError, badRequest, notFound } from '../../common/errors/api-error.js';
+import {
+  ApiError,
+  badRequest,
+  notFound,
+} from '../../common/errors/api-error.js';
 import {
   AVAILABILITY_REPOSITORY,
   type AvailabilityRepository,
@@ -131,15 +135,21 @@ export class AvailabilityService {
    */
   async quote(request: QuoteRequest): Promise<QuoteData> {
     const room = await this.availability.findRoom(request.roomId);
-    if (!room) throw notFound('ROOM_NOT_FOUND', 'Room not found');
+    // The room is addressed by id here rather than through a hotel, so the hotel's visibility
+    // is checked here for the same reason `hotelAvailability()` checks it: a draft listing
+    // must not be priced or probed. The 404 is deliberately the same code as an unknown
+    // room, because a different one would make room ids enumerable.
+    if (!room || room.hotelStatus !== 'PUBLISHED') {
+      throw notFound('ROOM_NOT_FOUND', 'Room not found');
+    }
 
     // Checked here rather than in the schema because the bound is per room, and a 400 with
     // the room's own limit is more use to a client than a generic validation failure.
     if (request.guests > room.maxGuests) {
-      throw badRequest(
-        `This room sleeps at most ${room.maxGuests} guest(s)`,
-        { maxGuests: room.maxGuests, guests: request.guests },
-      );
+      throw badRequest(`This room sleeps at most ${room.maxGuests} guest(s)`, {
+        maxGuests: room.maxGuests,
+        guests: request.guests,
+      });
     }
 
     const nights = stayNights(request.checkIn, request.checkOut);

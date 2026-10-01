@@ -47,6 +47,8 @@ interface StoredBooking {
   feesCents: number;
   totalCents: number;
   currency: string;
+  /** When a PENDING hold stops holding the room. */
+  holdExpiresAt: Date;
   createdAt: Date;
 }
 
@@ -137,10 +139,13 @@ class FakePrisma {
   }
 
   /** A booking already in the table: an overlap the re-check must see. */
-  withBooking(booking: Omit<StoredBooking, 'id' | 'createdAt'>): this {
+  withBooking(
+    booking: Omit<StoredBooking, 'id' | 'createdAt' | 'holdExpiresAt'>,
+  ): this {
     this.bookings.push({
       ...booking,
       id: `b-${++this.nextId}`,
+      holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
       createdAt: day('2026-05-20'),
     });
     return this;
@@ -308,14 +313,24 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
           return rows.map((row) => toFullRow(row));
         }
         const roomIn = (where.roomId as { in: readonly string[] }).in;
-        const statusIn = (where.status as { in: readonly string[] }).in;
+        // Which rows hold is the OR of `{ CONFIRMED }` and `{ PENDING, holdExpiresAt > now }`,
+        // so the fake reads that shape rather than the older status list.
+        const branches = (where.OR ?? []) as Array<{
+          status: BookingStatus;
+          holdExpiresAt?: { gt: Date };
+        }>;
         const checkInLt = (where.checkIn as { lt: Date }).lt;
         const checkOutGt = (where.checkOut as { gt: Date }).gt;
         return prisma.bookings
           .filter(
             (row) =>
               roomIn.includes(row.roomId) &&
-              statusIn.includes(row.status) &&
+              branches.some(
+                (branch) =>
+                  branch.status === row.status &&
+                  (branch.holdExpiresAt === undefined ||
+                    row.holdExpiresAt > branch.holdExpiresAt.gt),
+              ) &&
               row.checkIn < checkInLt &&
               row.checkOut > checkOutGt,
           )
@@ -369,6 +384,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
           totalCents: number;
           currency: string;
           status: BookingStatus;
+          holdExpiresAt: Date;
         };
         prisma.attemptedReferences.push(data.reference);
         if (prisma.referenceFailures > 0) {
@@ -390,6 +406,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
           feesCents: data.feesCents,
           totalCents: data.totalCents,
           currency: data.currency,
+          holdExpiresAt: data.holdExpiresAt,
           createdAt: new Date(prisma.baseTime + prisma.nextId),
         };
         prisma.bookings.push(row);
@@ -534,6 +551,19 @@ describe('PrismaBookingRepository.createPending', () => {
     // The store form is a UTC-midnight Date, so the row and the math agree on nights.
     expect(prisma.bookings[0]?.checkIn).toEqual(day('2026-06-01'));
     expect(prisma.bookings[0]?.checkOut).toEqual(day('2026-06-04'));
+  });
+
+  it('gives the PENDING hold an expiry, so an abandoned checkout frees the room', async () => {
+    const before = Date.now();
+    const prisma = new FakePrisma().withRoom(oneInventoryRoom());
+    const repo = repository(prisma);
+
+    await repo.createPending(input());
+
+    const held = prisma.bookings[0]?.holdExpiresAt.getTime() ?? 0;
+    // The availability filter only counts a PENDING row while this is in the future.
+    expect(held).toBeGreaterThan(before);
+    expect(held).toBeLessThanOrEqual(Date.now() + 15 * 60 * 1000);
   });
 
   it('answers ROOM_UNAVAILABLE when the in-transaction re-check finds the room held', async () => {

@@ -9,7 +9,7 @@
  * Cancel goes through the real endpoint and degrades to the local store the
  * same way the read does.
  */
-import { cancelBooking, fetchBooking, isApiError, isEnvelopeError } from '~/utils/api'
+import { cancelBooking, fetchBooking, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiBooking } from '~/utils/api'
 import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
 import { useBookings } from '~/composables/useBookings'
@@ -57,7 +57,7 @@ const {
       // 401 `UNAUTHORIZED` means no session at all, and with auth unwired that
       // is the everyday case — so it degrades to the fixtures, as a transport
       // failure does. Every other real envelope error drives the error state.
-      if (isEnvelopeError(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
+      if (isApiFailure(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
         throw fetchError
       }
       const mock = bookingById(bookingId)
@@ -131,7 +131,7 @@ async function requestCancel(): Promise<void> {
     cancelled.value = true
   }
   catch (cancelError: unknown) {
-    const answered = isEnvelopeError(cancelError)
+    const answered = isApiFailure(cancelError)
       && !(isApiError(cancelError) && cancelError.code === 'UNAUTHORIZED')
     if (answered) {
       cancelFailed.value = true

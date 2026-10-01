@@ -26,6 +26,7 @@ export const ERROR_CODES = [
   'EMAIL_TAKEN',
   // T15 — OAuth profile has no usable email, provider error, or link failure.
   'OAUTH_FAILED',
+
   // T18 — availability and quote. ROOM_UNAVAILABLE is the ticket's code for a room that
   // cannot take the stay (sold out, blacked out, or too small for the party).
   'ROOM_UNAVAILABLE',
@@ -37,6 +38,9 @@ export const ERROR_CODES = [
   // reads this 409 as "already on, keep the filled heart" instead of as a failure to roll
   // back. `translatePrismaError`'s generic P2002 -> CONFLICT cannot express that.
   'FAVORITE_EXISTS',
+  // T19 — OAuth sign-in found an existing account it may not link to.
+  'OAUTH_LINK_CONFLICT',
+
   // T20 — bookings. A booking that exists but belongs to a different guest is a 403, not a
   // 404, so the code states which rule failed rather than hiding the row's existence.
   'NOT_BOOKING_OWNER',

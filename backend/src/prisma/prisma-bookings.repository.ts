@@ -7,6 +7,7 @@ import {
 import { Prisma } from '../generated/prisma/client.js';
 import {
   evaluateRoomAvailability,
+  QUOTE_HOLD_DURATION_MS,
   stayNights,
 } from '../modules/bookings/availability.service.js';
 import type { NightDate } from './availability.repository.js';
@@ -261,6 +262,11 @@ export class PrismaBookingRepository implements BookingRepository {
         totalCents: input.totalCents,
         currency: input.currency,
         status: 'PENDING',
+        // The hold lapses: the availability filter only counts a `PENDING` row while
+        // `hold_expires_at` is still in the future, so an abandoned checkout cannot close
+        // a room forever. The window is the quote's own, so a quote and the booking made
+        // from it promise the same minutes.
+        holdExpiresAt: new Date(Date.now() + QUOTE_HOLD_DURATION_MS),
       },
       select: BOOKING_SELECT,
     });

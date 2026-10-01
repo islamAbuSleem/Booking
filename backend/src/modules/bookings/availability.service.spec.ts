@@ -25,12 +25,11 @@ import {
 const HOTEL_ID = '11111111-1111-4111-8111-111111111111';
 const ROOM_ID = '22222222-2222-4222-8222-222222222222';
 
-function room(
-  overrides: Partial<AvailabilityRoom> = {},
-): AvailabilityRoom {
+function room(overrides: Partial<AvailabilityRoom> = {}): AvailabilityRoom {
   return {
     id: ROOM_ID,
     hotelId: HOTEL_ID,
+    hotelStatus: 'PUBLISHED',
     name: 'Deluxe King',
     bedType: 'king',
     maxGuests: 2,
@@ -62,7 +61,8 @@ function blackout(
  * `PrismaService`, so every rule in this file runs with no database and no Nest container.
  */
 class FakeAvailabilityRepository implements AvailabilityRepository {
-  readonly bookingWindows: Array<[readonly string[], NightDate, NightDate]> = [];
+  readonly bookingWindows: Array<[readonly string[], NightDate, NightDate]> =
+    [];
   readonly blackoutWindows: Array<[string, readonly string[]]> = [];
   readonly priceReads: Array<[string, string]> = [];
   private hotelRooms: HotelRooms | null;
@@ -71,7 +71,9 @@ class FakeAvailabilityRepository implements AvailabilityRepository {
   private blackouts: BlackoutWindow[] = [];
   private prices = new Map<string, RoomPrice>();
 
-  constructor(hotel: HotelRooms | null = { id: HOTEL_ID, status: 'PUBLISHED', rooms: [] }) {
+  constructor(
+    hotel: HotelRooms | null = { id: HOTEL_ID, status: 'PUBLISHED', rooms: [] },
+  ) {
     this.hotelRooms = hotel;
   }
 
@@ -202,13 +204,7 @@ describe('evaluateRoomAvailability', () => {
   const THREE_NIGHTS = ['2026-06-01', '2026-06-02', '2026-06-03'];
 
   it('sells a room with inventory left on every night', () => {
-    const result = evaluateRoomAvailability(
-      room(),
-      THREE_NIGHTS,
-      [],
-      [],
-      2,
-    );
+    const result = evaluateRoomAvailability(room(), THREE_NIGHTS, [], [], 2);
 
     expect(result).toEqual({ remaining: [3, 3, 3], available: true });
   });
@@ -383,7 +379,10 @@ describe('AvailabilityService.hotelAvailability', () => {
     const repository = seededRepository();
     const service = new AvailabilityService(repository);
 
-    const result = await service.hotelAvailability('the-larkspur-hotel', query());
+    const result = await service.hotelAvailability(
+      'the-larkspur-hotel',
+      query(),
+    );
 
     expect(result.rooms).toEqual([
       {
@@ -406,7 +405,10 @@ describe('AvailabilityService.hotelAvailability', () => {
     );
     const service = new AvailabilityService(repository);
 
-    const result = await service.hotelAvailability('the-larkspur-hotel', query());
+    const result = await service.hotelAvailability(
+      'the-larkspur-hotel',
+      query(),
+    );
 
     expect(result.rooms).toHaveLength(1);
     expect(result.rooms[0]?.available).toBe(false);
@@ -433,7 +435,9 @@ describe('AvailabilityService.hotelAvailability', () => {
   });
 
   it('404s an unknown hotel, so the endpoint cannot probe a draft listing', async () => {
-    const service = new AvailabilityService(new FakeAvailabilityRepository(null));
+    const service = new AvailabilityService(
+      new FakeAvailabilityRepository(null),
+    );
 
     await expect(
       service.hotelAvailability('nope', query()),
@@ -466,7 +470,10 @@ describe('AvailabilityService.hotelAvailability', () => {
     }).withRooms(room());
     const service = new AvailabilityService(repository);
 
-    const result = await service.hotelAvailability('the-larkspur-hotel', query());
+    const result = await service.hotelAvailability(
+      'the-larkspur-hotel',
+      query(),
+    );
 
     expect(result.rooms[0]?.available).toBe(true);
   });
@@ -573,6 +580,38 @@ describe('AvailabilityService.quote', () => {
     expect((error as ApiError).getStatus()).toBe(404);
     expect((error as ApiError).getResponse()).toMatchObject({
       code: 'ROOM_NOT_FOUND',
+    });
+  });
+
+  it('404s a room of a hotel that is not PUBLISHED, before it looks for a price', async () => {
+    // The quote is addressed by room id, so without this check a room of a draft listing
+    // would be priced for anyone holding its uuid.
+    const repository = new FakeAvailabilityRepository({
+      id: HOTEL_ID,
+      status: 'SUSPENDED',
+      rooms: [room()],
+    })
+      .withRooms(room({ hotelStatus: 'SUSPENDED' }))
+      .withPrice({ amountCents: 20_000, currency: 'USD' });
+    const service = new AvailabilityService(repository);
+
+    await expect(service.quote(quoteRequest())).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'ROOM_NOT_FOUND' },
+    });
+    expect(repository.priceReads).toEqual([]);
+  });
+
+  it('gives a room of an unpublished hotel the same 404 as an unknown room, so ids are not enumerable', async () => {
+    const draft = new AvailabilityService(
+      new FakeAvailabilityRepository().withRooms(
+        room({ hotelStatus: 'PENDING' }),
+      ),
+    );
+
+    await expect(draft.quote(quoteRequest())).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'ROOM_NOT_FOUND', message: 'Room not found' },
     });
   });
 
