@@ -203,6 +203,19 @@ class FakePrisma {
     };
   }
 
+  /** The `HOTEL_SNAPSHOT_SELECT` projection the real read returns. */
+  static hotelRow(hotel: HotelSpec): Record<string, unknown> {
+    return {
+      id: hotel.id,
+      slug: hotel.slug,
+      name: hotel.name,
+      city: hotel.city,
+      country: hotel.country,
+      addressLine: hotel.addressLine,
+      images: hotel.coverImage ? [{ url: hotel.coverImage }] : [],
+    };
+  }
+
   /** The model delegates, shared by the plain reads and the tx client: one state. */
   private delegates(): Record<string, unknown> {
     if (!this.delegatesCache) this.delegatesCache = makeDelegates(this);
@@ -420,17 +433,20 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
     },
     hotel: {
       findUnique: async (args: { where: { id: string }; select?: unknown }) => {
+        prisma.assertLive();
         const hotel = prisma.hotels.get(args.where.id);
         if (!hotel) return null;
-        return {
-          id: hotel.id,
-          slug: hotel.slug,
-          name: hotel.name,
-          city: hotel.city,
-          country: hotel.country,
-          addressLine: hotel.addressLine,
-          images: hotel.coverImage ? [{ url: hotel.coverImage }] : [],
-        };
+        return FakePrisma.hotelRow(hotel);
+      },
+      findMany: async (args: {
+        where: { id: { in: readonly string[] } };
+        select?: unknown;
+      }) => {
+        prisma.assertLive();
+        return args.where.id.in
+          .map((id) => prisma.hotels.get(id))
+          .filter((hotel): hotel is HotelSpec => hotel !== undefined)
+          .map((hotel) => FakePrisma.hotelRow(hotel));
       },
     },
   };
@@ -710,6 +726,43 @@ describe('PrismaBookingRepository reads', () => {
         ?.coverImage,
     ).toBeNull();
     expect(await repo.findHotelSnapshot('nope')).toBeNull();
+  });
+
+  it('reads many hotel snapshots in one call and skips the ids with no hotel', async () => {
+    const prisma = new FakePrisma()
+      .withHotel({
+        id: HOTEL_ID,
+        slug: 'the-larkspur-hotel',
+        name: 'Larkspur House',
+        city: 'Lisbon',
+        country: 'Portugal',
+        addressLine: '12 Rua do Vale',
+        coverImage: null,
+      })
+      .withHotel({
+        id: '55555555-5555-4555-8555-555555555555',
+        slug: 'no-cover',
+        name: 'No Cover',
+        city: 'Porto',
+        country: 'Portugal',
+        addressLine: '1 Rua',
+        coverImage: null,
+      });
+    const repo = repository(prisma);
+
+    const snapshots = await repo.findHotelSnapshots([
+      HOTEL_ID,
+      HOTEL_ID,
+      '55555555-5555-4555-8555-555555555555',
+      'nope',
+    ]);
+
+    // The duplicate id is collapsed, so a long booking list does not grow the `in`.
+    expect(snapshots.map((hotel) => hotel.id)).toEqual([
+      HOTEL_ID,
+      '55555555-5555-4555-8555-555555555555',
+    ]);
+    expect(await repo.findHotelSnapshots([])).toEqual([]);
   });
 
   it("reports the room's price currency, or null when the room is unpriced", async () => {

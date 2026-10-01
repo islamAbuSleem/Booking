@@ -105,6 +105,13 @@ export interface BookingRepository {
   /** `null` when no hotel has that id. */
   findHotelSnapshot(hotelId: string): Promise<BookingHotelSnapshot | null>;
   /**
+   * The same snapshots for many hotels in ONE read, so listing a guest's bookings does
+   * not issue a query per row. Hotels with no such id are simply absent from the result.
+   */
+  findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]>;
+  /**
    * The room's price currency for the currency default, or `null` when the room has no
    * `room_prices` row at all — the caller then falls back to USD, and the 422 the price
    * read produces is the caller's to raise, not this one's.

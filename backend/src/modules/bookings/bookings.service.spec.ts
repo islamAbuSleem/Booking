@@ -111,6 +111,8 @@ class FakeAvailabilityRepository implements AvailabilityRepository {
 
 class FakeBookingsRepository implements BookingRepository {
   readonly created: BookingCreateInput[] = [];
+  /** How many times a hotel snapshot was read, so the list's N+1 is countable. */
+  snapshotReads = 0;
 
   constructor(private readonly w: World) {}
 
@@ -152,6 +154,16 @@ class FakeBookingsRepository implements BookingRepository {
     hotelId: string,
   ): Promise<BookingHotelSnapshot | null> {
     return hotelId === HOTEL_ID ? HOTEL_SNAPSHOT : null;
+  }
+
+  /** One call for the whole list — the count is what the N+1 guard is about. */
+  async findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]> {
+    this.snapshotReads += 1;
+    return [...new Set(hotelIds)]
+      .filter((id) => id === HOTEL_ID)
+      .map(() => HOTEL_SNAPSHOT);
   }
 
   async findRoomPriceCurrency(): Promise<string | null> {
@@ -196,6 +208,18 @@ function service(w: World = world()): BookingsService {
     new FakeAvailabilityRepository(w),
     new FakeBookingsRepository(w),
   );
+}
+
+/** The same service, with the booking repository kept so its reads can be counted. */
+function serviceWithRepository(w: World): {
+  svc: BookingsService;
+  bookings: FakeBookingsRepository;
+} {
+  const bookings = new FakeBookingsRepository(w);
+  return {
+    svc: new BookingsService(new FakeAvailabilityRepository(w), bookings),
+    bookings,
+  };
 }
 
 describe('BookingsService.create', () => {
@@ -363,6 +387,23 @@ describe('BookingsService.list', () => {
     const theirs = await svc.list(SOMEONE_ELSE);
     expect(theirs.total).toBe(1);
     expect(theirs.items[0]?.guestsCount).toBe(2);
+  });
+
+  it('reads the hotel snapshots once for the whole list, not once per row', async () => {
+    const w = world();
+    const { svc, bookings } = serviceWithRepository(w);
+    await svc.create(CALLER, request());
+    await svc.create(
+      CALLER,
+      request({ checkIn: '2026-06-10', checkOut: '2026-06-13' }),
+    );
+
+    bookings.snapshotReads = 0;
+    const mine = await svc.list(CALLER);
+
+    expect(mine.total).toBe(2);
+    expect(bookings.snapshotReads).toBe(1);
+    expect(mine.items.every((item) => item.hotel.id === HOTEL_ID)).toBe(true);
   });
 
   it('is an empty list, not an error, for a caller with no bookings', async () => {

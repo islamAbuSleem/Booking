@@ -290,16 +290,20 @@ export class PrismaBookingRepository implements BookingRepository {
       where: { id: hotelId },
       select: HOTEL_SNAPSHOT_SELECT,
     });
-    if (!row) return null;
-    return {
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      city: row.city,
-      country: row.country,
-      addressLine: row.addressLine,
-      coverImage: row.images[0]?.url ?? null,
-    };
+    return row ? toHotelSnapshot(row) : null;
+  }
+
+  /** One read for the whole list: an `in` filter, never a query per booking. */
+  async findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]> {
+    const distinct = [...new Set(hotelIds)];
+    if (distinct.length === 0) return [];
+    const rows = await this.prisma.hotel.findMany({
+      where: { id: { in: distinct } },
+      select: HOTEL_SNAPSHOT_SELECT,
+    });
+    return rows.map(toHotelSnapshot);
   }
 
   /**
@@ -337,6 +341,22 @@ export class PrismaBookingRepository implements BookingRepository {
     if (count === 0) return null;
     return this.findById(bookingId);
   }
+}
+
+type HotelSnapshotRow = Prisma.HotelGetPayload<{
+  select: typeof HOTEL_SNAPSHOT_SELECT;
+}>;
+
+function toHotelSnapshot(row: HotelSnapshotRow): BookingHotelSnapshot {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    city: row.city,
+    country: row.country,
+    addressLine: row.addressLine,
+    coverImage: row.images[0]?.url ?? null,
+  };
 }
 
 function toBookingRecord(row: BookingRow): BookingRecord {

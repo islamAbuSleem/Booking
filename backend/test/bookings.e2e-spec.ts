@@ -154,6 +154,15 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
     return hotelId === HOTEL_ID ? HOTEL : null;
   }
 
+  /** One read for the whole list, as the Prisma repository does. */
+  async findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]> {
+    return [...new Set(hotelIds)]
+      .filter((id) => id === HOTEL_ID)
+      .map(() => HOTEL);
+  }
+
   async findRoomPriceCurrency(roomId: string): Promise<string | null> {
     return roomId === ROOM_ID ? PRICE.currency : null;
   }
