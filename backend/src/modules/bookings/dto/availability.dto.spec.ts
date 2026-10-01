@@ -1,4 +1,5 @@
 import {
+  MAX_STAY_NIGHTS,
   availabilityQuerySchema,
   quoteRequestSchema,
 } from './availability.dto.js';
@@ -78,6 +79,38 @@ describe('availabilityQuerySchema', () => {
     ).toBe(false);
     expect(
       availabilityQuerySchema.safeParse({ ...range, guests: '2.5' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a stay longer than the cap', () => {
+    const result = availabilityQuerySchema.safeParse({
+      checkIn: '2026-06-01',
+      checkOut: '2026-09-01',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['checkOut']);
+  });
+
+  it('accepts a stay of exactly the cap, because the bound is inclusive', () => {
+    const checkOut = new Date(
+      Date.parse('2026-06-01T00:00:00.000Z') + MAX_STAY_NIGHTS * 86_400_000,
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    expect(
+      availabilityQuerySchema.safeParse({ checkIn: '2026-06-01', checkOut })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects the widest range a valid date can express, so it cannot be used to burn CPU', () => {
+    expect(
+      availabilityQuerySchema.safeParse({
+        checkIn: '0001-01-01',
+        checkOut: '9999-12-31',
+      }).success,
     ).toBe(false);
   });
 });
@@ -165,5 +198,26 @@ describe('quoteRequestSchema', () => {
     });
 
     expect(parsed.checkIn).toBe('2020-01-01');
+  });
+
+  it('rejects a stay longer than the cap, because a quote walks every night', () => {
+    const result = quoteRequestSchema.safeParse({
+      ...valid,
+      checkIn: '2026-06-01',
+      checkOut: '2026-09-01',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['checkOut']);
+  });
+
+  it('rejects the widest range a valid date can express', () => {
+    expect(
+      quoteRequestSchema.safeParse({
+        ...valid,
+        checkIn: '0001-01-01',
+        checkOut: '9999-12-31',
+      }).success,
+    ).toBe(false);
   });
 });

@@ -10,10 +10,11 @@
  * incoming `cookie` header forwarded on the server so SSR requests are
  * authenticated too.
  *
- * A transport failure (`code === 'NETWORK_ERROR'`) or a foreign response from a
- * port the API is not on means there is no backend to talk to. Pages treat those
- * as the mock-fallback signal via `isEnvelopeError`; a real envelope error
- * (validation, 404, …) is rethrown so the error state renders instead.
+ * A transport failure (`code === 'NETWORK_ERROR'`) or a 2xx from a foreign
+ * response on a port the API is not on means there is no backend to talk to.
+ * Pages treat those as the mock-fallback signal via `isApiFailure`; a real
+ * failure — an envelope error (validation, 404, …) or an HTTP error status — is
+ * rethrown so the error state renders instead.
  */
 import type { components } from '~/types/api'
 import type { HotelFilterState, HotelSort } from '~/utils/hotels'
@@ -51,19 +52,23 @@ export function isTransportError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.code === 'NETWORK_ERROR'
 }
 
+/** No backend answered *at all*, or something that answered 2xx but is not the API. Pages fall back to the mock fixtures on these two, and only these. */
 const LOCAL_FAILURES = new Set(['NETWORK_ERROR', 'BAD_RESPONSE'])
 
 /**
- * The API itself answered with a well-formed envelope error — a 404, a 400, a
- * 429. That is a real response, so it drives the error / not-found state and is
- * never hidden behind fixtures. Anything else (no backend, a foreign response
- * from a port the API is not on) is a fallback signal.
+ * The API answered and the answer is a real failure — an envelope error, or an
+ * HTTP error status whose body was not an envelope (`HTTP_502` from a proxy, a
+ * 500 from a crashed process). Both mean the service is there and unhappy, so
+ * they drive the error / not-found state and are never hidden behind fixtures:
+ * a guest must never be shown fixture rooms while a real search is broken.
+ *
+ * Only a transport failure (`NETWORK_ERROR` — nothing listening) or a 2xx from
+ * a foreign service (`BAD_RESPONSE`) means there is no backend here, and those
+ * are the mock-fallback signal.
  */
-export function isEnvelopeError(error: unknown): boolean {
+export function isApiFailure(error: unknown): boolean {
   if (!(error instanceof ApiRequestError)) return false
-  if (LOCAL_FAILURES.has(error.code)) return false
-  if (error.code.startsWith('HTTP_')) return false
-  return true
+  return !LOCAL_FAILURES.has(error.code)
 }
 
 interface SuccessEnvelope {

@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import {
-  HOLDING_BOOKING_STATUSES,
   type AvailabilityRepository,
   type AvailabilityRoom,
   type BlackoutWindow,
@@ -11,6 +10,7 @@ import {
   type RoomPrice,
 } from './availability.repository.js';
 import { PrismaService } from './prisma.service.js';
+import type { HotelVisibility } from './hotels.repository.js';
 
 /** Only the columns the availability math and the response need. */
 const ROOM_SELECT = {
@@ -20,6 +20,16 @@ const ROOM_SELECT = {
   bedType: true,
   maxGuests: true,
   totalInventory: true,
+} satisfies Prisma.RoomSelect;
+
+/**
+ * `findRoom` additionally reads the parent hotel's status, so the quote path can 404 a room of
+ * a draft listing without a second round trip. `findHotelRooms` already has it, and passes it
+ * in, so the two reads share one mapper.
+ */
+const ROOM_WITH_HOTEL_SELECT = {
+  ...ROOM_SELECT,
+  hotel: { select: { status: true } },
 } satisfies Prisma.RoomSelect;
 
 /**
@@ -34,15 +44,29 @@ const ROOM_SELECT = {
  * requested window when it starts before the window ends AND ends after the window starts.
  * The bounds are strict because the ranges are half-open on the same rule: a stay ending
  * exactly on `checkIn` is not in the way, and back-to-back stays never double-count.
+ *
+ * Which rows count as holding is the whole rule, so it is spelled out rather than reduced to
+ * a status list:
+ *   * `CONFIRMED` is a real stay and holds its room for its whole range.
+ *   * `PENDING` is a hold, and a hold lapses. It only holds while `hold_expires_at` is still in
+ *     the future, so an abandoned checkout cannot close a room forever. `COMPLETED` and
+ *     `CANCELLED` hold nothing and appear nowhere.
+ *
+ * `now` is a parameter rather than a `new Date()` inside the builder so the rule is testable
+ * with no clock and no database.
  */
 export function buildOverlappingBookingsWhere(
   roomIds: readonly string[],
   checkIn: NightDate,
   checkOut: NightDate,
+  now: Date = new Date(),
 ): Prisma.BookingWhereInput {
   return {
     roomId: { in: [...roomIds] },
-    status: { in: [...HOLDING_BOOKING_STATUSES] },
+    OR: [
+      { status: 'CONFIRMED' },
+      { status: 'PENDING', holdExpiresAt: { gt: now } },
+    ],
     checkIn: { lt: toUtcDay(checkOut) },
     checkOut: { gt: toUtcDay(checkIn) },
   };
@@ -101,16 +125,16 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     return {
       id: row.id,
       status: row.status,
-      rooms: row.rooms.map(toAvailabilityRoom),
+      rooms: row.rooms.map((room) => toAvailabilityRoom(room, row.status)),
     };
   }
 
   async findRoom(roomId: string): Promise<AvailabilityRoom | null> {
     const row = await this.prisma.room.findUnique({
       where: { id: roomId },
-      select: ROOM_SELECT,
+      select: ROOM_WITH_HOTEL_SELECT,
     });
-    return row ? toAvailabilityRoom(row) : null;
+    return row ? toAvailabilityRoom(row, row.hotel.status) : null;
   }
 
   async findOverlappingBookings(
@@ -169,10 +193,12 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
 
 function toAvailabilityRoom(
   row: Prisma.RoomGetPayload<{ select: typeof ROOM_SELECT }>,
+  hotelStatus: HotelVisibility,
 ): AvailabilityRoom {
   return {
     id: row.id,
     hotelId: row.hotelId,
+    hotelStatus,
     name: row.name,
     bedType: row.bedType,
     maxGuests: row.maxGuests,

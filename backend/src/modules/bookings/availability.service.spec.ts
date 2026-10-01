@@ -29,6 +29,7 @@ function room(overrides: Partial<AvailabilityRoom> = {}): AvailabilityRoom {
   return {
     id: ROOM_ID,
     hotelId: HOTEL_ID,
+    hotelStatus: 'PUBLISHED',
     name: 'Deluxe King',
     bedType: 'king',
     maxGuests: 2,
@@ -579,6 +580,38 @@ describe('AvailabilityService.quote', () => {
     expect((error as ApiError).getStatus()).toBe(404);
     expect((error as ApiError).getResponse()).toMatchObject({
       code: 'ROOM_NOT_FOUND',
+    });
+  });
+
+  it('404s a room of a hotel that is not PUBLISHED, before it looks for a price', async () => {
+    // The quote is addressed by room id, so without this check a room of a draft listing
+    // would be priced for anyone holding its uuid.
+    const repository = new FakeAvailabilityRepository({
+      id: HOTEL_ID,
+      status: 'SUSPENDED',
+      rooms: [room()],
+    })
+      .withRooms(room({ hotelStatus: 'SUSPENDED' }))
+      .withPrice({ amountCents: 20_000, currency: 'USD' });
+    const service = new AvailabilityService(repository);
+
+    await expect(service.quote(quoteRequest())).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'ROOM_NOT_FOUND' },
+    });
+    expect(repository.priceReads).toEqual([]);
+  });
+
+  it('gives a room of an unpublished hotel the same 404 as an unknown room, so ids are not enumerable', async () => {
+    const draft = new AvailabilityService(
+      new FakeAvailabilityRepository().withRooms(
+        room({ hotelStatus: 'PENDING' }),
+      ),
+    );
+
+    await expect(draft.quote(quoteRequest())).rejects.toMatchObject({
+      status: 404,
+      response: { code: 'ROOM_NOT_FOUND', message: 'Room not found' },
     });
   });
 
