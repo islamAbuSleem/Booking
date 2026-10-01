@@ -272,7 +272,7 @@ describe('Booking API (e2e)', () => {
         .expect(200);
       const refs =
         JSON.stringify(response.body).match(
-          /components\/schemas\/([A-Za-z0-9_]+)/g,
+          /components\/schemas\/([A-Za-z0-9_.-]+)/g,
         ) ?? [];
       const known = new Set(Object.keys(response.body.components.schemas));
 

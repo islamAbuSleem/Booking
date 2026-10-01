@@ -84,11 +84,13 @@ function convert(
   // sibling component's schema — `coverImage` (a string) resolving to the integer some
   // other component parked at `__schema0` is exactly that.
   //
-  // So: file each component's anonymous defs under `${name}~__schemaN`. Registered names
+  // So: file each component's anonymous defs under `${name}-__schemaN`. Registered names
   // (`z.metadata`, the CamelCase components) stay global because they are identical
   // across calls; only the anonymous `__`-names are per-call and need the namespace.
+  // The separator is `-` because a `components.schemas` key must match
+  // `^[a-zA-Z0-9.\-_]+$`; anything else makes the document spec-invalid.
   const rename = (local: string) =>
-    local.startsWith('__') ? `${name}~${local}` : local;
+    local.startsWith('__') ? `${name}-${local}` : local;
 
   const hoisted: Record<string, JsonSchema> = {};
   for (const [localKey, schema] of Object.entries(definitions)) {

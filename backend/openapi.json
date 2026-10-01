@@ -1538,7 +1538,7 @@
           "remainingPerNight": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/RoomAvailability~__schema0"
+              "$ref": "#/components/schemas/RoomAvailability-__schema0"
             },
             "description": "Units left on each night, in stay order from `checkIn`. Length is `nights`. A blacked-out or fully booked night is 0; the value never goes negative."
           }
@@ -1550,7 +1550,7 @@
         ],
         "additionalProperties": false
       },
-      "RoomAvailability~__schema0": {
+      "RoomAvailability-__schema0": {
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
@@ -1570,7 +1570,7 @@
         ],
         "additionalProperties": false
       },
-      "HotelAvailabilityData~__schema0": {
+      "HotelAvailabilityData-__schema0": {
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
@@ -1594,7 +1594,7 @@
         ],
         "additionalProperties": false
       },
-      "HotelAvailabilityEnvelope~__schema0": {
+      "HotelAvailabilityEnvelope-__schema0": {
         "type": "integer",
         "minimum": -9007199254740991,
         "maximum": 9007199254740991
@@ -1755,28 +1755,28 @@
         "type": "object",
         "properties": {
           "roomId": {
-            "$ref": "#/components/schemas/CreateBooking~__schema0"
+            "$ref": "#/components/schemas/CreateBooking-__schema0"
           },
           "checkIn": {
-            "$ref": "#/components/schemas/CreateBooking~__schema1"
+            "$ref": "#/components/schemas/CreateBooking-__schema1"
           },
           "checkOut": {
-            "$ref": "#/components/schemas/CreateBooking~__schema2"
+            "$ref": "#/components/schemas/CreateBooking-__schema2"
           },
           "guests": {
-            "$ref": "#/components/schemas/CreateBooking~__schema3"
+            "$ref": "#/components/schemas/CreateBooking-__schema3"
           },
           "guestName": {
-            "$ref": "#/components/schemas/CreateBooking~__schema4"
+            "$ref": "#/components/schemas/CreateBooking-__schema4"
           },
           "guestEmail": {
-            "$ref": "#/components/schemas/CreateBooking~__schema5"
+            "$ref": "#/components/schemas/CreateBooking-__schema5"
           },
           "guestPhone": {
-            "$ref": "#/components/schemas/CreateBooking~__schema6"
+            "$ref": "#/components/schemas/CreateBooking-__schema6"
           },
           "currency": {
-            "$ref": "#/components/schemas/CreateBooking~__schema7"
+            "$ref": "#/components/schemas/CreateBooking-__schema7"
           }
         },
         "required": [
@@ -1790,54 +1790,54 @@
         ],
         "additionalProperties": false
       },
-      "CreateBooking~__schema0": {
+      "CreateBooking-__schema0": {
         "type": "string",
         "format": "uuid",
         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
         "description": "The room to book, by uuid."
       },
-      "CreateBooking~__schema1": {
+      "CreateBooking-__schema1": {
         "type": "string",
         "format": "date",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
         "description": "First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp."
       },
-      "CreateBooking~__schema2": {
+      "CreateBooking-__schema2": {
         "type": "string",
         "format": "date",
         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
         "description": "Last day the guest leaves, `YYYY-MM-DD`. Strictly after `checkIn`. The stay is half-open, so a checkout equal to another booking check-in never overlaps."
       },
-      "CreateBooking~__schema3": {
+      "CreateBooking-__schema3": {
         "type": "integer",
         "minimum": 1,
         "maximum": 20,
         "description": "Party size, 1-20. Checked against the room again server-side."
       },
-      "CreateBooking~__schema4": {
+      "CreateBooking-__schema4": {
         "type": "string",
         "minLength": 1,
         "description": "Lead guest name. Validated, not persisted (T26/T27 consume it)."
       },
-      "CreateBooking~__schema5": {
+      "CreateBooking-__schema5": {
         "type": "string",
         "format": "email",
         "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$",
         "description": "Lead guest email. Validated, not persisted (T26/T27 consume it)."
       },
-      "CreateBooking~__schema6": {
+      "CreateBooking-__schema6": {
         "type": "string",
         "description": "Lead guest phone. Validated, not persisted (T26/T27 consume it)."
       },
-      "CreateBooking~__schema7": {
+      "CreateBooking-__schema7": {
         "description": "ISO 4217 code to book in. Defaults to the room's price currency, else USD; a room with no `room_prices` row in that currency is a PRICE_UNAVAILABLE error, never a free stay.",
         "allOf": [
           {
-            "$ref": "#/components/schemas/CreateBooking~__schema8"
+            "$ref": "#/components/schemas/CreateBooking-__schema8"
           }
         ]
       },
-      "CreateBooking~__schema8": {
+      "CreateBooking-__schema8": {
         "type": "string",
         "pattern": "^[A-Z]{3}$"
       },
@@ -1933,7 +1933,7 @@
                 "description": "The hotel cover image URL, or null when it has none.",
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/Booking~__schema0"
+                    "$ref": "#/components/schemas/Booking-__schema0"
                   }
                 ]
               }
@@ -1984,7 +1984,7 @@
         ],
         "additionalProperties": false
       },
-      "Booking~__schema0": {
+      "Booking-__schema0": {
         "type": "string"
       },
       "BookingEnvelope": {
@@ -2006,7 +2006,7 @@
         ],
         "additionalProperties": false
       },
-      "BookingEnvelope~__schema0": {
+      "BookingEnvelope-__schema0": {
         "type": "string"
       },
       "BookingListData": {
@@ -2031,7 +2031,7 @@
         ],
         "additionalProperties": false
       },
-      "BookingListData~__schema0": {
+      "BookingListData-__schema0": {
         "type": "string"
       },
       "BookingListEnvelope": {
@@ -2053,7 +2053,7 @@
         ],
         "additionalProperties": false
       },
-      "BookingListEnvelope~__schema0": {
+      "BookingListEnvelope-__schema0": {
         "type": "string"
       }
     }
