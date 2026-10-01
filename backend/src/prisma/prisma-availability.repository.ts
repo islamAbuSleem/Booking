@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import {
-  HOLDING_BOOKING_STATUSES,
   type AvailabilityRepository,
   type AvailabilityRoom,
   type BlackoutWindow,
@@ -45,15 +44,29 @@ const ROOM_WITH_HOTEL_SELECT = {
  * requested window when it starts before the window ends AND ends after the window starts.
  * The bounds are strict because the ranges are half-open on the same rule: a stay ending
  * exactly on `checkIn` is not in the way, and back-to-back stays never double-count.
+ *
+ * Which rows count as holding is the whole rule, so it is spelled out rather than reduced to
+ * a status list:
+ *   * `CONFIRMED` is a real stay and holds its room for its whole range.
+ *   * `PENDING` is a hold, and a hold lapses. It only holds while `hold_expires_at` is still in
+ *     the future, so an abandoned checkout cannot close a room forever. `COMPLETED` and
+ *     `CANCELLED` hold nothing and appear nowhere.
+ *
+ * `now` is a parameter rather than a `new Date()` inside the builder so the rule is testable
+ * with no clock and no database.
  */
 export function buildOverlappingBookingsWhere(
   roomIds: readonly string[],
   checkIn: NightDate,
   checkOut: NightDate,
+  now: Date = new Date(),
 ): Prisma.BookingWhereInput {
   return {
     roomId: { in: [...roomIds] },
-    status: { in: [...HOLDING_BOOKING_STATUSES] },
+    OR: [
+      { status: 'CONFIRMED' },
+      { status: 'PENDING', holdExpiresAt: { gt: now } },
+    ],
     checkIn: { lt: toUtcDay(checkOut) },
     checkOut: { gt: toUtcDay(checkIn) },
   };

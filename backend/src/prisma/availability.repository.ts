@@ -9,22 +9,18 @@ import type { HotelVisibility } from './hotels.repository.js';
  * `PrismaAvailabilityRepository` is the one implementation, and it is the only place a
  * Prisma type appears.
  *
- * Two rules are asserted HERE rather than in the service, because both are query filters
- * and a post-filter would be wrong: which booking statuses hold inventory, and which
- * blackouts can reach a room.
+ * Two rules are asserted in the implementation rather than in the service, because both are
+ * query filters and a post-filter would be wrong: which bookings hold inventory (a `CONFIRMED`
+ * stay, and a `PENDING` hold only while `bookings.hold_expires_at` is in the future), and which
+ * blackouts can reach a room. Both live in
+ * `buildOverlappingBookingsWhere` / `buildOverlappingBlackoutsWhere`, so each has one
+ * definition.
  */
 
 /** A calendar day as `YYYY-MM-DD` — the wire form, and the form the math is done in. */
 export type NightDate = string;
 
 export const AVAILABILITY_REPOSITORY = Symbol('AVAILABILITY_REPOSITORY');
-
-/**
- * A `PENDING` row is how T20 holds inventory before Stripe confirms payment, so it occupies
- * a room exactly like a `CONFIRMED` one. Ignoring it would oversell by one; counting
- * `COMPLETED` or `CANCELLED` would under-sell. Kept here so the rule has one definition.
- */
-export const HOLDING_BOOKING_STATUSES = ['PENDING', 'CONFIRMED'] as const;
 
 export interface AvailabilityRoom {
   id: string;

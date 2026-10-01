@@ -305,6 +305,12 @@ model Booking {
 
   status BookingStatus @default(PENDING)
 
+  /// When a PENDING hold stops holding the room. T20 writes it from the quote's
+  /// `holdExpiresAt`; a CONFIRMED row keeps its room on its own and leaves this null. An
+  /// abandoned checkout must not consume inventory forever, so the availability filter only
+  /// counts a PENDING row while this instant is still in the future.
+  holdExpiresAt DateTime? @map("hold_expires_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -315,6 +321,7 @@ model Booking {
 
   @@index([guestId, status])
   @@index([roomId, checkIn, checkOut])
+  @@index([roomId, status, holdExpiresAt])
   @@map("bookings")
 }
 
