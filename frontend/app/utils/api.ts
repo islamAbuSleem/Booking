@@ -154,9 +154,14 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   }
 
   if (isSuccessEnvelope(raw)) return raw.data as T
-  // A 204 carries no body, so there is no envelope to unwrap. It is still a success —
-  // only a body we cannot read is a bad response.
-  if (raw === undefined || raw === null || raw === '') return undefined as T
+  // `unfavorite` is the only call that answers 204, so it is the only one allowed to come
+  // back with no body. The tolerance is scoped to it deliberately: an empty 200 anywhere
+  // else is not a success, and returning `undefined as T` there is a typed lie that every
+  // read call site trusts — `BAD_RESPONSE` is the honest answer and it is a fallback
+  // signal, so a broken response shows fixtures instead of a silent `TypeError`.
+  if (options.method === 'DELETE' && (raw === undefined || raw === null || raw === '')) {
+    return undefined as T
+  }
   if (isFailureEnvelope(raw)) {
     throw new ApiRequestError(raw.error.code, raw.error.message, raw.error.details)
   }
