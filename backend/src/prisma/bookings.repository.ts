@@ -73,6 +73,8 @@ export interface BookingHotelSnapshot {
 /**
  * Everything the write needs, pre-computed by the caller: the money snapshot is the caller's
  * arithmetic on the caller's price read, and the transaction below never re-derives it.
+ * There is no `nights` here on purpose — the transaction derives the count from the dates
+ * it re-checks, so the row can never disagree with its own `checkIn`/`checkOut`.
  */
 export interface BookingCreateInput {
   guestId: string;
@@ -84,7 +86,6 @@ export interface BookingCreateInput {
   subtotalCents: number;
   feesCents: number;
   totalCents: number;
-  nights: number;
 }
 
 export interface BookingRepository {
@@ -104,14 +105,29 @@ export interface BookingRepository {
   /** `null` when no hotel has that id. */
   findHotelSnapshot(hotelId: string): Promise<BookingHotelSnapshot | null>;
   /**
+   * The same snapshots for many hotels in ONE read, so listing a guest's bookings does
+   * not issue a query per row. Hotels with no such id are simply absent from the result.
+   */
+  findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]>;
+  /**
    * The room's price currency for the currency default, or `null` when the room has no
    * `room_prices` row at all — the caller then falls back to USD, and the 422 the price
    * read produces is the caller's to raise, not this one's.
    */
   findRoomPriceCurrency(roomId: string): Promise<string | null>;
-  /** `null` when no booking has that id. `updatedAt` moves with the flip. */
+  /**
+   * The flip is owner- and state-scoped in the `where`, never checked first and written
+   * second: `null` means no row matched — it is gone, it is not the caller's, or it has
+   * already left `from`. A check-then-act would let a concurrent `CONFIRMED -> COMPLETED`
+   * (or a second cancel) be silently overwritten, and would let a caller that forgot to
+   * load its own row write another guest's booking.
+   */
   updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null>;
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { envelopeSchema } from '../../../common/envelope.js';
+import { MAX_STAY_NIGHTS, stayLength } from './availability.dto.js';
 
 /**
  * T20 — the bookings contract, as Zod schemas.
@@ -27,6 +28,7 @@ import { envelopeSchema } from '../../../common/envelope.js';
  * search result, a quote and a create are never asked about different-sized parties.
  */
 const MAX_GUESTS = 20;
+
 
 export const createBookingSchema = z
   .object({
@@ -81,7 +83,17 @@ export const createBookingSchema = z
   .refine((body) => body.checkOut > body.checkIn, {
     message: 'checkOut must be after checkIn',
     path: ['checkOut'],
-  });
+  })
+  // The same cap the quote and the availability read enforce, and for the same reason here:
+  // a create re-runs the range inside a serializable transaction, and the `PENDING` row it
+  // writes holds every night it was given. A stay that can be priced can always be booked.
+  .refine(
+    (body) => stayLength(body.checkIn, body.checkOut) <= MAX_STAY_NIGHTS,
+    {
+      message: `a stay cannot be longer than ${MAX_STAY_NIGHTS} nights`,
+      path: ['checkOut'],
+    },
+  );
 
 export type CreateBooking = z.infer<typeof createBookingSchema>;
 

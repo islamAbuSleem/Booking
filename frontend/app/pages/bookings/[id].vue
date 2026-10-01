@@ -9,7 +9,7 @@
  * Cancel goes through the real endpoint and degrades to the local store the
  * same way the read does.
  */
-import { cancelBooking, fetchBooking, isApiError, isEnvelopeError } from '~/utils/api'
+import { cancelBooking, fetchBooking, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiBooking } from '~/utils/api'
 import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
 import { useBookings } from '~/composables/useBookings'
@@ -57,7 +57,7 @@ const {
       // 401 `UNAUTHORIZED` means no session at all, and with auth unwired that
       // is the everyday case — so it degrades to the fixtures, as a transport
       // failure does. Every other real envelope error drives the error state.
-      if (isEnvelopeError(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
+      if (isApiFailure(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
         throw fetchError
       }
       const mock = bookingById(bookingId)
@@ -110,7 +110,8 @@ const cancelFailed = ref(false)
  * page renders the flip from it. A real envelope error (409
  * `INVALID_CANCEL_STATE`, a 403, a 404) means the trip was not cancelled —
  * the claim is not made. Only when nothing answered does the fixture store
- * own the flip.
+ * own the flip, and `UNAUTHORIZED` counts as nothing answered: it is exactly
+ * what the read above degrades on, so the two can never disagree.
  */
 async function requestCancel(): Promise<void> {
   const record = booking.value
@@ -119,11 +120,20 @@ async function requestCancel(): Promise<void> {
   cancelFailed.value = false
   try {
     const updated = await cancelBooking(record.id)
+    // `apiFetch` hands back `undefined` for a body it could not read, so a 200 with
+    // nothing usable in it is not a confirmed cancellation. Claiming it would show
+    // the success alert beside a CONFIRMED badge and a live Cancel button.
+    if (!updated || updated.status !== 'CANCELLED') {
+      cancelFailed.value = true
+      return
+    }
     Object.assign(record, updated)
     cancelled.value = true
   }
   catch (cancelError: unknown) {
-    if (isEnvelopeError(cancelError)) {
+    const answered = isApiFailure(cancelError)
+      && !(isApiError(cancelError) && cancelError.code === 'UNAUTHORIZED')
+    if (answered) {
       cancelFailed.value = true
     }
     else if (mockCancelBooking(record.id)) {

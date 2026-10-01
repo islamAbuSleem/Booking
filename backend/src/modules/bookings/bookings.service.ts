@@ -10,6 +10,7 @@ import {
 } from '../../prisma/availability.repository.js';
 import {
   BOOKINGS_REPOSITORY,
+  type BookingHotelSnapshot,
   type BookingRecord,
   type BookingRepository,
 } from '../../prisma/bookings.repository.js';
@@ -134,7 +135,6 @@ export class BookingsService {
       subtotalCents,
       feesCents: QUOTE_FEES_CENTS,
       totalCents: subtotalCents + QUOTE_FEES_CENTS,
-      nights: nights.length,
     });
 
     this.logger.log(
@@ -143,11 +143,26 @@ export class BookingsService {
     return this.toDto(record);
   }
 
-  /** `GET /api/bookings` — the caller's own rows, newest first. Nothing else's. */
+  /**
+   * `GET /api/bookings` — the caller's own rows, newest first. Nothing else's.
+   *
+   * The hotel snapshots are read in ONE batch and shared by every row: a per-row read
+   * would issue a query per booking, all at once, on one authenticated request.
+   */
   async list(callerId: string): Promise<BookingListData> {
     const records = await this.bookings.findForOwner(callerId);
-    const items = await Promise.all(
-      records.map((record) => this.toDto(record)),
+    const snapshots = new Map(
+      (
+        await this.bookings.findHotelSnapshots(
+          records.map((record) => record.hotelId),
+        )
+      ).map((hotel) => [hotel.id, hotel]),
+    );
+    const items = records.map((record) =>
+      toBookingDto(
+        record,
+        requireSnapshot(record, snapshots.get(record.hotelId)),
+      ),
     );
     return { items, total: items.length };
   }
@@ -174,8 +189,23 @@ export class BookingsService {
       );
     }
 
-    const updated = await this.bookings.updateStatus(bookingId, 'CANCELLED');
-    if (!updated) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
+    const updated = await this.bookings.updateStatus(
+      bookingId,
+      callerId,
+      'CONFIRMED',
+      'CANCELLED',
+    );
+    if (!updated) {
+      // Nothing matched, so the row moved between the read and the write. Re-read to
+      // tell the two apart: gone is a 404, a state change is the same 409 as above.
+      const current = await this.bookings.findById(bookingId);
+      if (!current) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
+      throw new ApiError(
+        HttpStatus.CONFLICT,
+        'INVALID_CANCEL_STATE',
+        'Only a confirmed booking can be cancelled',
+      );
+    }
 
     this.logger.log(`[bookings] cancelled ${record.reference}`);
     return this.toDto(updated);
@@ -204,38 +234,54 @@ export class BookingsService {
 
   private async toDto(record: BookingRecord): Promise<BookingDto> {
     const hotel = await this.bookings.findHotelSnapshot(record.hotelId);
-    if (!hotel) {
-      // The room was read moments before the write, so a missing hotel is a server state
-      // error, not a caller error the guest can act on.
-      throw new ApiError(
-        HttpStatus.INTERNAL_SERVER_ERROR,
-        'INTERNAL_ERROR',
-        "The booking's hotel is missing",
-      );
-    }
-    return {
-      id: record.id,
-      reference: record.reference,
-      status: record.status,
-      checkIn: record.checkIn,
-      checkOut: record.checkOut,
-      nights: record.nights,
-      guestsCount: record.guestsCount,
-      currency: record.currency,
-      subtotalCents: record.subtotalCents,
-      feesCents: record.feesCents,
-      totalCents: record.totalCents,
-      hotel: {
-        id: hotel.id,
-        slug: hotel.slug,
-        name: hotel.name,
-        city: hotel.city,
-        country: hotel.country,
-        addressLine: hotel.addressLine,
-        coverImage: hotel.coverImage,
-      },
-      room: { name: record.roomName },
-      createdAt: record.createdAt.toISOString(),
-    };
+    return toBookingDto(record, requireSnapshot(record, hotel));
   }
+}
+
+/**
+ * The hotel was read moments before the write, so a missing hotel is a server state
+ * error, not a caller error the guest can act on.
+ */
+function requireSnapshot(
+  record: BookingRecord,
+  hotel: BookingHotelSnapshot | null | undefined,
+): BookingHotelSnapshot {
+  if (!hotel) {
+    throw new ApiError(
+      HttpStatus.INTERNAL_SERVER_ERROR,
+      'INTERNAL_ERROR',
+      "The booking's hotel is missing",
+    );
+  }
+  return hotel;
+}
+
+function toBookingDto(
+  record: BookingRecord,
+  hotel: BookingHotelSnapshot,
+): BookingDto {
+  return {
+    id: record.id,
+    reference: record.reference,
+    status: record.status,
+    checkIn: record.checkIn,
+    checkOut: record.checkOut,
+    nights: record.nights,
+    guestsCount: record.guestsCount,
+    currency: record.currency,
+    subtotalCents: record.subtotalCents,
+    feesCents: record.feesCents,
+    totalCents: record.totalCents,
+    hotel: {
+      id: hotel.id,
+      slug: hotel.slug,
+      name: hotel.name,
+      city: hotel.city,
+      country: hotel.country,
+      addressLine: hotel.addressLine,
+      coverImage: hotel.coverImage,
+    },
+    room: { name: record.roomName },
+    createdAt: record.createdAt.toISOString(),
+  };
 }

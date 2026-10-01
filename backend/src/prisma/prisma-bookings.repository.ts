@@ -7,6 +7,7 @@ import {
 import { Prisma } from '../generated/prisma/client.js';
 import {
   evaluateRoomAvailability,
+  QUOTE_HOLD_DURATION_MS,
   stayNights,
 } from '../modules/bookings/availability.service.js';
 import type { NightDate } from './availability.repository.js';
@@ -17,6 +18,7 @@ import {
   type BookingRepository,
   type BookingStatus,
 } from './bookings.repository.js';
+import { DEFAULT_CURRENCY } from './hotels.repository.js';
 import {
   buildOverlappingBlackoutsWhere,
   buildOverlappingBookingsWhere,
@@ -108,8 +110,42 @@ export class PrismaBookingRepository implements BookingRepository {
 
   async createPending(input: BookingCreateInput): Promise<BookingRecord> {
     for (let attempt = 1; attempt <= BOOKING_TX_MAX_ATTEMPTS; attempt++) {
+      // `null` is a retryable write conflict and the only reason to run the transaction
+      // again; every other failure is thrown from inside.
+      const row = await this.runCreateTransaction(input, attempt);
+      if (row) return toBookingRecord(row);
+    }
+
+    // The last attempt still conflicted. The re-check has by then seen the concurrent
+    // booking, so the correct terminal state is "unavailable", not a crash.
+    throw new ApiError(
+      HttpStatus.CONFLICT,
+      'ROOM_UNAVAILABLE',
+      'The room is not available for those dates',
+    );
+  }
+
+  /**
+   * One attempt of the serializable transaction, re-run with a fresh reference when the
+   * insert collides on one.
+   *
+   * The regeneration deliberately re-runs the WHOLE transaction rather than retrying the
+   * insert inside it. Any statement error — a unique violation included — puts a Postgres
+   * transaction into the aborted state, so the next statement on that connection fails
+   * with `25P02 current transaction is aborted`, not with the collision the recovery
+   * needs to see. Prisma's interactive `$transaction` opens no savepoint per query, so
+   * there is no `ROLLBACK TO SAVEPOINT` to recover with; a new transaction is the only
+   * honest one. `reference` is the only unique column the insert fills in (the id is a
+   * generated uuid), so a `P2002` here is always a reference collision.
+   */
+  private async runCreateTransaction(
+    input: BookingCreateInput,
+    attempt: number,
+  ): Promise<BookingRow | null> {
+    for (let regeneration = 0; ; regeneration++) {
+      const reference = generateBookingReference();
       try {
-        const row = await this.prisma.$transaction(
+        return await this.prisma.$transaction(
           async (tx) => {
             // The room is re-read on the tx client: its `totalInventory` and `maxGuests`
             // at this isolation level are the ones the insert is checked against.
@@ -171,29 +207,69 @@ export class PrismaBookingRepository implements BookingRepository {
               );
             }
 
-            return this.insertWithUniqueReference(tx, input);
+            return this.insert(tx, input, reference, nights.length);
           },
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
         );
-        return toBookingRecord(row);
       } catch (error) {
-        // A domain answer (a 404/409 thrown above) is final: only a write conflict is
-        // worth re-running the transaction.
+        // A domain answer (a 404/409 thrown above) is final: only a write conflict or a
+        // reference collision is worth running the transaction again.
         if (error instanceof ApiError) throw error;
+        if (isPrismaKnownError(error) && error.code === 'P2002') {
+          if (regeneration >= BOOKING_REFERENCE_MAX_REGENERATIONS) {
+            throw new ApiError(
+              HttpStatus.INTERNAL_SERVER_ERROR,
+              'INTERNAL_ERROR',
+              'Could not allocate a booking reference',
+            );
+          }
+          this.logger.warn(
+            `[bookings] reference ${reference} already taken, regenerating`,
+          );
+          continue;
+        }
         if (!isRetryableWriteConflict(error)) throw error;
-        this.logger.warn(
-          `[bookings] retryable write conflict on attempt ${attempt} for room ${input.roomId}, re-running the transaction`,
-        );
+        // The last attempt has no retry after it, so it must not claim one: this log
+        // is the one an operator reads while diagnosing a contended room.
+        if (attempt < BOOKING_TX_MAX_ATTEMPTS) {
+          this.logger.warn(
+            `[bookings] retryable write conflict on attempt ${attempt} for room ${input.roomId}, re-running the transaction`,
+          );
+        }
+        return null;
       }
     }
+  }
 
-    // The last attempt still conflicted. The re-check has by then seen the concurrent
-    // booking, so the correct terminal state is "unavailable", not a crash.
-    throw new ApiError(
-      HttpStatus.CONFLICT,
-      'ROOM_UNAVAILABLE',
-      'The room is not available for those dates',
-    );
+  /** The `PENDING` insert. `nights` is the count the availability math just used. */
+  private async insert(
+    tx: Prisma.TransactionClient,
+    input: BookingCreateInput,
+    reference: string,
+    nights: number,
+  ): Promise<BookingRow> {
+    return tx.booking.create({
+      data: {
+        reference,
+        guestId: input.guestId,
+        roomId: input.roomId,
+        checkIn: toUtcDay(input.checkIn),
+        checkOut: toUtcDay(input.checkOut),
+        guestsCount: input.guests,
+        nights,
+        subtotalCents: input.subtotalCents,
+        feesCents: input.feesCents,
+        totalCents: input.totalCents,
+        currency: input.currency,
+        status: 'PENDING',
+        // The hold lapses: the availability filter only counts a `PENDING` row while
+        // `hold_expires_at` is still in the future, so an abandoned checkout cannot close
+        // a room forever. The window is the quote's own, so a quote and the booking made
+        // from it promise the same minutes.
+        holdExpiresAt: new Date(Date.now() + QUOTE_HOLD_DURATION_MS),
+      },
+      select: BOOKING_SELECT,
+    });
   }
 
   async findById(bookingId: string): Promise<BookingRecord | null> {
@@ -220,91 +296,73 @@ export class PrismaBookingRepository implements BookingRepository {
       where: { id: hotelId },
       select: HOTEL_SNAPSHOT_SELECT,
     });
-    if (!row) return null;
-    return {
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      city: row.city,
-      country: row.country,
-      addressLine: row.addressLine,
-      coverImage: row.images[0]?.url ?? null,
-    };
+    return row ? toHotelSnapshot(row) : null;
   }
 
+  /** One read for the whole list: an `in` filter, never a query per booking. */
+  async findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]> {
+    const distinct = [...new Set(hotelIds)];
+    if (distinct.length === 0) return [];
+    const rows = await this.prisma.hotel.findMany({
+      where: { id: { in: distinct } },
+      select: HOTEL_SNAPSHOT_SELECT,
+    });
+    return rows.map(toHotelSnapshot);
+  }
+
+  /**
+   * The currency `POST /api/bookings` defaults to when the body carries none. `USD` wins
+   * when the room has a price in it, because that is the quote endpoint's own default:
+   * ordering by currency would pick `EGP` for a room priced in both, and the guest would
+   * be charged in a different currency than the one they accepted. Anything else falls
+   * to the first currency in sorted order, which is deterministic even if it is not
+   * meaningful.
+   */
   async findRoomPriceCurrency(roomId: string): Promise<string | null> {
-    const row = await this.prisma.roomPrice.findFirst({
+    const rows = await this.prisma.roomPrice.findMany({
       where: { roomId },
-      orderBy: { currency: 'asc' },
       select: { currency: true },
     });
-    return row ? row.currency : null;
+    const currencies = rows.map((row) => row.currency).sort();
+    if (currencies.includes(DEFAULT_CURRENCY)) return DEFAULT_CURRENCY;
+    return currencies[0] ?? null;
   }
 
   async updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null> {
-    // `updateMany` rather than `update`: the caller read the row just before, so a
-    // count of zero is "gone", not an exception worth a filter branch.
+    // `updateMany` rather than `update`, with the owner and the expected status in the
+    // `where`: the flip only happens on a row that is still the caller's and still in
+    // `from`, so a cancel that raced another cancel is a count of zero, not a second
+    // 200. `updatedAt` moves with the flip.
     const { count } = await this.prisma.booking.updateMany({
-      where: { id: bookingId },
-      data: { status },
+      where: { id: bookingId, guestId: ownerId, status: from },
+      data: { status: to },
     });
     if (count === 0) return null;
     return this.findById(bookingId);
   }
+}
 
-  /**
-   * The insert with a regenerated reference on a `P2002` collision. `reference` is the
-   * only unique column the insert fills in (the id is a generated uuid), so a P2002 from
-   * this insert is always a reference collision, and regenerating is the whole recovery.
-   * A unique violation does not abort the surrounding transaction in Postgres, so the
-   * retry stays inside the one the caller opened.
-   */
-  private async insertWithUniqueReference(
-    tx: Prisma.TransactionClient,
-    input: BookingCreateInput,
-  ): Promise<BookingRow> {
-    for (let regeneration = 0; ; regeneration++) {
-      const reference = generateBookingReference();
-      try {
-        return await tx.booking.create({
-          data: {
-            reference,
-            guestId: input.guestId,
-            roomId: input.roomId,
-            checkIn: toUtcDay(input.checkIn),
-            checkOut: toUtcDay(input.checkOut),
-            guestsCount: input.guests,
-            nights: input.nights,
-            subtotalCents: input.subtotalCents,
-            feesCents: input.feesCents,
-            totalCents: input.totalCents,
-            currency: input.currency,
-            status: 'PENDING',
-          },
-          select: BOOKING_SELECT,
-        });
-      } catch (error) {
-        const collision = isPrismaKnownError(error) && error.code === 'P2002';
-        if (collision && regeneration < BOOKING_REFERENCE_MAX_REGENERATIONS) {
-          this.logger.warn(
-            `[bookings] reference ${reference} already taken, regenerating`,
-          );
-          continue;
-        }
-        if (collision) {
-          throw new ApiError(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            'INTERNAL_ERROR',
-            'Could not allocate a booking reference',
-          );
-        }
-        throw error;
-      }
-    }
-  }
+type HotelSnapshotRow = Prisma.HotelGetPayload<{
+  select: typeof HOTEL_SNAPSHOT_SELECT;
+}>;
+
+function toHotelSnapshot(row: HotelSnapshotRow): BookingHotelSnapshot {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    city: row.city,
+    country: row.country,
+    addressLine: row.addressLine,
+    coverImage: row.images[0]?.url ?? null,
+  };
 }
 
 function toBookingRecord(row: BookingRow): BookingRecord {

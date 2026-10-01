@@ -37,6 +37,8 @@ export class FavoritesService {
   /**
    * `POST /api/favorites`. The hotel is looked up first so a bad id is a `HOTEL_NOT_FOUND`,
    * the code the hotel routes already use, rather than the 400 the foreign key would give.
+   * The lookup is not the only guarantee: a hotel deleted between the two round trips is
+   * the same 404, because the repository translates that foreign-key failure too.
    */
   async add(userId: string, hotelId: string): Promise<FavoriteDto> {
     if (!(await this.favorites.hotelExists(hotelId))) {

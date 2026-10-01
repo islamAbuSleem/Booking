@@ -9,14 +9,20 @@
  * other envelope error is a real answer and drives the error state, never
  * a fixture.
  */
-import { getBookingsForGuest } from '~/utils/mock'
-import { fetchMyBookings, isApiError, isEnvelopeError } from '~/utils/api'
+import { fetchMyBookings, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiBooking } from '~/utils/api'
 import { mockBookingToApi } from '~/utils/bookingAdapters'
-import { isUpcomingStatus } from '~/composables/useBookings'
+import { isUpcomingStatus, useBookings } from '~/composables/useBookings'
 import { formatStayDate, payableCents, wholeNumber } from '~/utils/format'
 
 const { t } = useI18n()
+
+/**
+ * The shared fixture store, not the immutable arrays in `~/utils/mock`: a cancel the
+ * detail page's fallback performed has to be visible here, or navigating back shows
+ * the old status.
+ */
+const { bookings: mockBookings } = useBookings()
 
 type Tab = 'upcoming' | 'past'
 
@@ -47,10 +53,10 @@ const {
       return { bookings: list.items }
     }
     catch (fetchError: unknown) {
-      if (isEnvelopeError(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
+      if (isApiFailure(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
         throw fetchError
       }
-      return { bookings: getBookingsForGuest().map(mockBookingToApi) }
+      return { bookings: mockBookings.value.map(mockBookingToApi) }
     }
   },
 )
@@ -75,7 +81,12 @@ const visible = computed(() => {
 /** Skeletons only when there is nothing to show — never on a background refresh. */
 const isLoading = computed(() => status.value === 'pending' && !data.value)
 const hasFailed = computed(() => status.value === 'error')
-const isEmpty = computed(() => !isLoading.value && !hasFailed.value && bookings.value.length === 0)
+/**
+ * The current tab's rows, not the whole payload: a guest with only upcoming trips
+ * who opens "Past (0)" must get the empty state, not an empty table and a
+ * pagination that self-hides.
+ */
+const isEmpty = computed(() => !isLoading.value && !hasFailed.value && rows.value.length === 0)
 
 function select(next: Tab): void {
   tab.value = next

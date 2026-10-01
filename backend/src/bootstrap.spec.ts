@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedOrigins } from './bootstrap.js';
+import { allowedOrigins } from './modules/auth/oauth-origin.js';
 
 describe('allowedOrigins', () => {
   it('falls back to the local frontend when the variable is absent', () => {

@@ -157,7 +157,7 @@ export interface paths {
         put?: never;
         /**
          * Price a stay and check it is bookable
-         * @description Server-side arithmetic only: the client-sent total is never trusted (D3). Availability is decided before the price is read, so a sold-out room never leaks a price, and a room with no `room_prices` row in the requested currency is a `PRICE_UNAVAILABLE` error rather than a free stay. Writes nothing — the inventory is held when T20 writes the PENDING booking, and `holdExpiresAt` is how long the guest has to get there.
+         * @description Server-side arithmetic only: the client-sent total is never trusted (D3). Availability is decided before the price is read, so a sold-out room never leaks a price, and a room with no `room_prices` row in the requested currency is a `PRICE_UNAVAILABLE` error rather than a free stay. Writes nothing — the inventory is held when T20 writes the PENDING booking, and `holdExpiresAt` is how long the guest has to get there: a hold only holds the room while that instant is still in the future.
          */
         post: operations["BookingsController_quote"];
         delete?: never;
@@ -566,19 +566,19 @@ export interface components {
             room: components["schemas"]["AvailabilityRoom"];
             available: boolean;
             /** @description Units left on each night, in stay order from `checkIn`. Length is `nights`. A blacked-out or fully booked night is 0; the value never goes negative. */
-            remainingPerNight: components["schemas"]["RoomAvailability~__schema0"][];
+            remainingPerNight: components["schemas"]["RoomAvailability-__schema0"][];
         };
-        "RoomAvailability~__schema0": number;
+        "RoomAvailability-__schema0": number;
         HotelAvailabilityData: {
             rooms: components["schemas"]["RoomAvailability"][];
         };
-        "HotelAvailabilityData~__schema0": number;
+        "HotelAvailabilityData-__schema0": number;
         HotelAvailabilityEnvelope: {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["HotelAvailabilityData"];
         };
-        "HotelAvailabilityEnvelope~__schema0": number;
+        "HotelAvailabilityEnvelope-__schema0": number;
         QuoteNight: {
             /**
              * Format: date
@@ -628,44 +628,44 @@ export interface components {
             data: components["schemas"]["Favorite"];
         };
         CreateBooking: {
-            roomId: components["schemas"]["CreateBooking~__schema0"];
-            checkIn: components["schemas"]["CreateBooking~__schema1"];
-            checkOut: components["schemas"]["CreateBooking~__schema2"];
-            guests: components["schemas"]["CreateBooking~__schema3"];
-            guestName: components["schemas"]["CreateBooking~__schema4"];
-            guestEmail: components["schemas"]["CreateBooking~__schema5"];
-            guestPhone: components["schemas"]["CreateBooking~__schema6"];
-            currency?: components["schemas"]["CreateBooking~__schema7"];
+            roomId: components["schemas"]["CreateBooking-__schema0"];
+            checkIn: components["schemas"]["CreateBooking-__schema1"];
+            checkOut: components["schemas"]["CreateBooking-__schema2"];
+            guests: components["schemas"]["CreateBooking-__schema3"];
+            guestName: components["schemas"]["CreateBooking-__schema4"];
+            guestEmail: components["schemas"]["CreateBooking-__schema5"];
+            guestPhone: components["schemas"]["CreateBooking-__schema6"];
+            currency?: components["schemas"]["CreateBooking-__schema7"];
         };
         /**
          * Format: uuid
          * @description The room to book, by uuid.
          */
-        "CreateBooking~__schema0": string;
+        "CreateBooking-__schema0": string;
         /**
          * Format: date
          * @description First night, `YYYY-MM-DD`. Stored as a Postgres DATE, never a timestamp.
          */
-        "CreateBooking~__schema1": string;
+        "CreateBooking-__schema1": string;
         /**
          * Format: date
          * @description Last day the guest leaves, `YYYY-MM-DD`. Strictly after `checkIn`. The stay is half-open, so a checkout equal to another booking check-in never overlaps.
          */
-        "CreateBooking~__schema2": string;
+        "CreateBooking-__schema2": string;
         /** @description Party size, 1-20. Checked against the room again server-side. */
-        "CreateBooking~__schema3": number;
+        "CreateBooking-__schema3": number;
         /** @description Lead guest name. Validated, not persisted (T26/T27 consume it). */
-        "CreateBooking~__schema4": string;
+        "CreateBooking-__schema4": string;
         /**
          * Format: email
          * @description Lead guest email. Validated, not persisted (T26/T27 consume it).
          */
-        "CreateBooking~__schema5": string;
+        "CreateBooking-__schema5": string;
         /** @description Lead guest phone. Validated, not persisted (T26/T27 consume it). */
-        "CreateBooking~__schema6": string;
+        "CreateBooking-__schema6": string;
         /** @description ISO 4217 code to book in. Defaults to the room's price currency, else USD; a room with no `room_prices` row in that currency is a PRICE_UNAVAILABLE error, never a free stay. */
-        "CreateBooking~__schema7": components["schemas"]["CreateBooking~__schema8"];
-        "CreateBooking~__schema8": string;
+        "CreateBooking-__schema7": components["schemas"]["CreateBooking-__schema8"];
+        "CreateBooking-__schema8": string;
         Booking: {
             /** Format: uuid */
             id: string;
@@ -697,7 +697,7 @@ export interface components {
                 country: string;
                 addressLine: string;
                 /** @description The hotel cover image URL, or null when it has none. */
-                coverImage: components["schemas"]["Booking~__schema0"] | null;
+                coverImage: components["schemas"]["Booking-__schema0"] | null;
             };
             room: {
                 name: string;
@@ -705,25 +705,25 @@ export interface components {
             /** @description ISO 8601 instant the booking was created. */
             createdAt: string;
         };
-        "Booking~__schema0": string;
+        "Booking-__schema0": string;
         BookingEnvelope: {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["Booking"];
         };
-        "BookingEnvelope~__schema0": string;
+        "BookingEnvelope-__schema0": string;
         BookingListData: {
             items: components["schemas"]["Booking"][];
             /** @description Always `items.length` until the list is paginated. */
             total: number;
         };
-        "BookingListData~__schema0": string;
+        "BookingListData-__schema0": string;
         BookingListEnvelope: {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["BookingListData"];
         };
-        "BookingListEnvelope~__schema0": string;
+        "BookingListEnvelope-__schema0": string;
         UploadSign: {
             /** @description The Cloudinary cloud the browser uploads to. */
             cloudName: string;
@@ -995,7 +995,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description The room is sold out, blacked out, or too small for the party. */
+            /** @description The room is sold out or blacked out for those dates. */
             409: {
                 headers: {
                     [name: string]: unknown;

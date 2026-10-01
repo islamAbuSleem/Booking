@@ -47,6 +47,8 @@ interface StoredBooking {
   feesCents: number;
   totalCents: number;
   currency: string;
+  /** When a PENDING hold stops holding the room. */
+  holdExpiresAt: Date;
   createdAt: Date;
 }
 
@@ -86,7 +88,7 @@ interface HotelSpec {
 class FakePrisma {
   readonly rooms = new Map<string, RoomSpec>();
   readonly hotels = new Map<string, HotelSpec>();
-  readonly priceCurrencies = new Map<string, string>();
+  readonly priceCurrencies = new Map<string, string[]>();
   readonly bookings: StoredBooking[] = [];
   readonly blackouts: StoredBlackout[] = [];
   // Public: the delegates factory outside the class reads and writes them.
@@ -98,8 +100,28 @@ class FakePrisma {
   private conflictFailures = 0;
   private queue: Promise<unknown> = Promise.resolve();
   private transactionCount = 0;
+  /**
+   * Postgres aborts the whole transaction on any statement error, so the statement after
+   * a failed insert fails with `25P02 current transaction is aborted` rather than with the
+   * error the caller just saw. The fake models that, because an in-transaction recovery
+   * would otherwise look correct here and fail on a real round trip.
+   */
+  private aborted = false;
 
   readonly attemptedReferences: string[] = [];
+  /**
+   * Every `isolationLevel` the repository asked for, in order. The oversell guard is only
+   * true at Serializable, so this is recorded rather than ignored: a dropped option would
+   * otherwise leave every test in this file green.
+   */
+  readonly isolationLevels: string[] = [];
+
+  /** The 25P02 every further statement on an aborted transaction would get. */
+  assertLive(): void {
+    if (this.aborted) {
+      throw new Error('25P02: current transaction is aborted');
+    }
+  }
 
   withRoom(room: RoomSpec): this {
     this.rooms.set(room.id, room);
@@ -111,16 +133,19 @@ class FakePrisma {
     return this;
   }
 
-  withPriceCurrency(roomId: string, currency: string): this {
-    this.priceCurrencies.set(roomId, currency);
+  withPriceCurrencies(roomId: string, ...currencies: string[]): this {
+    this.priceCurrencies.set(roomId, currencies);
     return this;
   }
 
   /** A booking already in the table: an overlap the re-check must see. */
-  withBooking(booking: Omit<StoredBooking, 'id' | 'createdAt'>): this {
+  withBooking(
+    booking: Omit<StoredBooking, 'id' | 'createdAt' | 'holdExpiresAt'>,
+  ): this {
     this.bookings.push({
       ...booking,
       id: `b-${++this.nextId}`,
+      holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000),
       createdAt: day('2026-05-20'),
     });
     return this;
@@ -152,14 +177,28 @@ class FakePrisma {
    * what makes the two-creates race deterministic — the loser's re-check always runs
    * after the winner's insert committed to the shared state.
    */
-  $transaction<R>(fn: (tx: unknown) => Promise<R>): Promise<R> {
+  $transaction<R>(
+    fn: (tx: unknown) => Promise<R>,
+    options?: { isolationLevel?: string },
+  ): Promise<R> {
     const attempt = this.queue.then(async () => {
       this.transactionCount += 1;
+      this.aborted = false;
+      if (options?.isolationLevel !== undefined) {
+        this.isolationLevels.push(options.isolationLevel);
+      }
       if (this.conflictFailures > 0) {
         this.conflictFailures -= 1;
         throw knownError('P2034');
       }
-      return fn(this.delegates());
+      try {
+        return await fn(this.delegates());
+      } catch (error) {
+        // A failed statement leaves the transaction aborted; a fresh `$transaction`
+        // clears it above.
+        this.aborted = true;
+        throw error;
+      }
     });
     // The queue swallows both outcomes so the next transaction still runs: a failure is
     // not a stuck queue.
@@ -178,6 +217,19 @@ class FakePrisma {
     return {
       ...row,
       room: { name: room?.name ?? 'Room', hotelId: room?.hotelId ?? 'hotel' },
+    };
+  }
+
+  /** The `HOTEL_SNAPSHOT_SELECT` projection the real read returns. */
+  static hotelRow(hotel: HotelSpec): Record<string, unknown> {
+    return {
+      id: hotel.id,
+      slug: hotel.slug,
+      name: hotel.name,
+      city: hotel.city,
+      country: hotel.country,
+      addressLine: hotel.addressLine,
+      images: hotel.coverImage ? [{ url: hotel.coverImage }] : [],
     };
   }
 
@@ -223,6 +275,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
   return {
     room: {
       findUnique: async (args: { where: { id: string }; select?: unknown }) => {
+        prisma.assertLive();
         const room = prisma.rooms.get(args.where.id);
         if (!room) return null;
         return {
@@ -238,6 +291,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
         where: Prisma.BookingWhereInput;
         orderBy?: Prisma.BookingOrderByWithRelationInput;
       }) => {
+        prisma.assertLive();
         const where = args.where;
         // Two shapes share this delegate. The owner read is the plain `{ guestId }`
         // filter; the overlap read is the pure T18 predicate, and is interpreted here
@@ -259,14 +313,24 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
           return rows.map((row) => toFullRow(row));
         }
         const roomIn = (where.roomId as { in: readonly string[] }).in;
-        const statusIn = (where.status as { in: readonly string[] }).in;
+        // Which rows hold is the OR of `{ CONFIRMED }` and `{ PENDING, holdExpiresAt > now }`,
+        // so the fake reads that shape rather than the older status list.
+        const branches = (where.OR ?? []) as Array<{
+          status: BookingStatus;
+          holdExpiresAt?: { gt: Date };
+        }>;
         const checkInLt = (where.checkIn as { lt: Date }).lt;
         const checkOutGt = (where.checkOut as { gt: Date }).gt;
         return prisma.bookings
           .filter(
             (row) =>
               roomIn.includes(row.roomId) &&
-              statusIn.includes(row.status) &&
+              branches.some(
+                (branch) =>
+                  branch.status === row.status &&
+                  (branch.holdExpiresAt === undefined ||
+                    row.holdExpiresAt > branch.holdExpiresAt.gt),
+              ) &&
               row.checkIn < checkInLt &&
               row.checkOut > checkOutGt,
           )
@@ -283,13 +347,20 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
         return row ? toFullRow(row) : null;
       },
       updateMany: async (args: {
-        where: { id: string };
+        where: { id: string; guestId: string; status: BookingStatus };
         data: { status: BookingStatus };
       }) => {
         const row = prisma.bookings.find(
           (candidate) => candidate.id === args.where.id,
         );
-        if (!row) return { count: 0 };
+        // The owner and the expected status are part of the write, not a prior read.
+        if (
+          !row ||
+          row.guestId !== args.where.guestId ||
+          row.status !== args.where.status
+        ) {
+          return { count: 0 };
+        }
         row.status = args.data.status;
         return { count: 1 };
       },
@@ -297,6 +368,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
         data: Record<string, unknown>;
         select?: unknown;
       }) => {
+        prisma.assertLive();
         // The production call site is the generated create input; the fake just reads
         // back the fields it stores, typed as it stores them.
         const data = args.data as {
@@ -312,6 +384,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
           totalCents: number;
           currency: string;
           status: BookingStatus;
+          holdExpiresAt: Date;
         };
         prisma.attemptedReferences.push(data.reference);
         if (prisma.referenceFailures > 0) {
@@ -333,6 +406,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
           feesCents: data.feesCents,
           totalCents: data.totalCents,
           currency: data.currency,
+          holdExpiresAt: data.holdExpiresAt,
           createdAt: new Date(prisma.baseTime + prisma.nextId),
         };
         prisma.bookings.push(row);
@@ -341,6 +415,7 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
     },
     blackoutDate: {
       findMany: async (args: { where: Prisma.BlackoutDateWhereInput }) => {
+        prisma.assertLive();
         const where = args.where;
         const and = (where as { AND?: unknown[] }).AND;
         expect(and).toHaveLength(2);
@@ -377,28 +452,30 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
       },
     },
     roomPrice: {
-      findFirst: async (args: {
+      findMany: async (args: {
         where: { roomId: string };
-        orderBy?: unknown;
         select?: unknown;
       }) => {
-        const currency = prisma.priceCurrencies.get(args.where.roomId);
-        return currency ? { currency } : null;
+        const currencies = prisma.priceCurrencies.get(args.where.roomId);
+        return currencies ? currencies.map((currency) => ({ currency })) : [];
       },
     },
     hotel: {
       findUnique: async (args: { where: { id: string }; select?: unknown }) => {
+        prisma.assertLive();
         const hotel = prisma.hotels.get(args.where.id);
         if (!hotel) return null;
-        return {
-          id: hotel.id,
-          slug: hotel.slug,
-          name: hotel.name,
-          city: hotel.city,
-          country: hotel.country,
-          addressLine: hotel.addressLine,
-          images: hotel.coverImage ? [{ url: hotel.coverImage }] : [],
-        };
+        return FakePrisma.hotelRow(hotel);
+      },
+      findMany: async (args: {
+        where: { id: { in: readonly string[] } };
+        select?: unknown;
+      }) => {
+        prisma.assertLive();
+        return args.where.id.in
+          .map((id) => prisma.hotels.get(id))
+          .filter((hotel): hotel is HotelSpec => hotel !== undefined)
+          .map((hotel) => FakePrisma.hotelRow(hotel));
       },
     },
   };
@@ -433,7 +510,6 @@ function input(
     subtotalCents: 60_000,
     feesCents: 0,
     totalCents: 60_000,
-    nights: 3,
     ...overrides,
   };
 }
@@ -475,6 +551,19 @@ describe('PrismaBookingRepository.createPending', () => {
     // The store form is a UTC-midnight Date, so the row and the math agree on nights.
     expect(prisma.bookings[0]?.checkIn).toEqual(day('2026-06-01'));
     expect(prisma.bookings[0]?.checkOut).toEqual(day('2026-06-04'));
+  });
+
+  it('gives the PENDING hold an expiry, so an abandoned checkout frees the room', async () => {
+    const before = Date.now();
+    const prisma = new FakePrisma().withRoom(oneInventoryRoom());
+    const repo = repository(prisma);
+
+    await repo.createPending(input());
+
+    const held = prisma.bookings[0]?.holdExpiresAt.getTime() ?? 0;
+    // The availability filter only counts a PENDING row while this is in the future.
+    expect(held).toBeGreaterThan(before);
+    expect(held).toBeLessThanOrEqual(Date.now() + 15 * 60 * 1000);
   });
 
   it('answers ROOM_UNAVAILABLE when the in-transaction re-check finds the room held', async () => {
@@ -563,6 +652,17 @@ describe('PrismaBookingRepository.createPending', () => {
     expect(loser.getResponse()).toMatchObject({ code: 'ROOM_UNAVAILABLE' });
   });
 
+  it('runs the write at Serializable, the level the re-check depends on', async () => {
+    const prisma = new FakePrisma().withRoom(oneInventoryRoom());
+    const repo = repository(prisma);
+
+    await repo.createPending(input());
+
+    expect(prisma.isolationLevels).toEqual([
+      Prisma.TransactionIsolationLevel.Serializable,
+    ]);
+  });
+
   it('retries a P2034 write conflict and succeeds on the re-run', async () => {
     const prisma = new FakePrisma().withRoom(oneInventoryRoom());
     prisma.failNextWriteConflicts(1);
@@ -598,6 +698,8 @@ describe('PrismaBookingRepository.createPending', () => {
     const record = await repo.createPending(input());
 
     expect(prisma.attemptedReferences).toHaveLength(3);
+    // Each regeneration is a whole new transaction: the aborted one cannot be used.
+    expect(prisma.transactionAttempts).toBe(3);
     expect(record.reference).toBe(prisma.attemptedReferences[2]);
     expect(prisma.bookings[0]?.reference).toBe(record.reference);
   });
@@ -679,24 +781,90 @@ describe('PrismaBookingRepository reads', () => {
     expect(await repo.findHotelSnapshot('nope')).toBeNull();
   });
 
+  it('reads many hotel snapshots in one call and skips the ids with no hotel', async () => {
+    const prisma = new FakePrisma()
+      .withHotel({
+        id: HOTEL_ID,
+        slug: 'the-larkspur-hotel',
+        name: 'Larkspur House',
+        city: 'Lisbon',
+        country: 'Portugal',
+        addressLine: '12 Rua do Vale',
+        coverImage: null,
+      })
+      .withHotel({
+        id: '55555555-5555-4555-8555-555555555555',
+        slug: 'no-cover',
+        name: 'No Cover',
+        city: 'Porto',
+        country: 'Portugal',
+        addressLine: '1 Rua',
+        coverImage: null,
+      });
+    const repo = repository(prisma);
+
+    const snapshots = await repo.findHotelSnapshots([
+      HOTEL_ID,
+      HOTEL_ID,
+      '55555555-5555-4555-8555-555555555555',
+      'nope',
+    ]);
+
+    // The duplicate id is collapsed, so a long booking list does not grow the `in`.
+    expect(snapshots.map((hotel) => hotel.id)).toEqual([
+      HOTEL_ID,
+      '55555555-5555-4555-8555-555555555555',
+    ]);
+    expect(await repo.findHotelSnapshots([])).toEqual([]);
+  });
+
   it("reports the room's price currency, or null when the room is unpriced", async () => {
     const prisma = new FakePrisma()
       .withRoom(oneInventoryRoom())
-      .withPriceCurrency(ROOM_ID, 'EUR');
+      .withPriceCurrencies(ROOM_ID, 'EUR');
     const repo = repository(prisma);
 
     expect(await repo.findRoomPriceCurrency(ROOM_ID)).toBe('EUR');
     expect(await repo.findRoomPriceCurrency('nope')).toBeNull();
   });
 
-  it('flips the status on update and reports null for a missing row', async () => {
+  it('defaults to USD for a room priced in several currencies, like the quote does', async () => {
+    const prisma = new FakePrisma()
+      .withRoom(oneInventoryRoom())
+      .withPriceCurrencies(ROOM_ID, 'EGP', 'USD', 'EUR');
+    const repo = repository(prisma);
+
+    // Alphabetically first would be EGP, which the quote endpoint never defaults to.
+    expect(await repo.findRoomPriceCurrency(ROOM_ID)).toBe('USD');
+  });
+
+  it('flips the status only for the owner and only out of the expected state', async () => {
     const prisma = new FakePrisma().withRoom(oneInventoryRoom());
     const repo = repository(prisma);
     const record = await repo.createPending(input());
 
-    const updated = await repo.updateStatus(record.id, 'CANCELLED');
-    expect(updated?.status).toBe('CANCELLED');
+    const updated = await repo.updateStatus(
+      record.id,
+      GUEST_A,
+      'CONFIRMED',
+      'CANCELLED',
+    );
+    expect(updated).toBeNull();
+    expect(prisma.bookings[0]?.status).toBe('PENDING');
+
+    await repo.updateStatus(record.id, GUEST_B, 'PENDING', 'CANCELLED');
+    expect(prisma.bookings[0]?.status).toBe('PENDING');
+
+    const confirmed = await repo.updateStatus(
+      record.id,
+      GUEST_A,
+      'PENDING',
+      'CANCELLED',
+    );
+    expect(confirmed?.status).toBe('CANCELLED');
     expect(prisma.bookings[0]?.status).toBe('CANCELLED');
-    expect(await repo.updateStatus('nope', 'CANCELLED')).toBeNull();
+    expect(
+      await repo.updateStatus('nope', GUEST_A, 'PENDING', 'CANCELLED'),
+    ).toBeNull();
   });
 });

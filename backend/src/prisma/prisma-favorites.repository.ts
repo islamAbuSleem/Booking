@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { notFound } from '../common/errors/api-error.js';
 import { isPrismaKnownError } from '../common/errors/prisma-error.js';
 import { Prisma } from '../generated/prisma/client.js';
 import {
@@ -50,6 +51,13 @@ export class PrismaFavoritesRepository implements FavoritesRepository {
       });
     } catch (error) {
       if (isDuplicateFavoriteError(error)) return null;
+      // `P2003` is the hotel vanishing between the caller's lookup and this insert. The
+      // caller already answered that with a 404, and letting the exception filter have it
+      // would turn the same condition into an undocumented 400 that a client reads as
+      // "your body was malformed".
+      if (isPrismaKnownError(error) && error.code === 'P2003') {
+        throw notFound('HOTEL_NOT_FOUND', 'Hotel not found');
+      }
       throw error;
     }
   }

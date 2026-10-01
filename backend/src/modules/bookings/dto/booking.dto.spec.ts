@@ -1,3 +1,4 @@
+import { MAX_STAY_NIGHTS } from './availability.dto.js';
 import { bookingIdParam, createBookingSchema } from './booking.dto.js';
 
 /**
@@ -117,6 +118,38 @@ describe('createBookingSchema', () => {
     expect(
       createBookingSchema.safeParse({ ...valid, roomId: '1 OR 1=1' }).success,
     ).toBe(false);
+  });
+
+  it('rejects a stay longer than the shared cap, which would overflow the money columns', () => {
+    // One over `MAX_STAY_NIGHTS` is a 400, not a 500 from the `Int` overflow, and it is
+    // the same bound the quote and the availability read use.
+    const checkOut = new Date(
+      Date.parse(`${valid.checkIn}T00:00:00.000Z`) +
+        (MAX_STAY_NIGHTS + 1) * 86_400_000,
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    expect(createBookingSchema.safeParse({ ...valid, checkOut }).success).toBe(
+      false,
+    );
+    expect(
+      createBookingSchema.safeParse({ ...valid, checkOut: '2026-06-30' })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a stay spanning the whole representable calendar', () => {
+    const result = createBookingSchema.safeParse({
+      ...valid,
+      checkIn: '0001-01-01',
+      checkOut: '9999-12-31',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain(
+      `${MAX_STAY_NIGHTS} nights`,
+    );
   });
 
   it('does not require checkIn to be in the future: the ticket sets no such rule', () => {

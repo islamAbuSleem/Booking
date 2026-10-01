@@ -14,7 +14,7 @@ import {
   type BookingRepository,
   type BookingStatus,
 } from '../../prisma/bookings.repository.js';
-import { QUOTE_FEES_CENTS } from './availability.service.js';
+import { QUOTE_FEES_CENTS, stayNights } from './availability.service.js';
 import { BookingsService } from './bookings.service.js';
 import { createBookingSchema, type CreateBooking } from './dto/booking.dto.js';
 
@@ -111,6 +111,8 @@ class FakeAvailabilityRepository implements AvailabilityRepository {
 
 class FakeBookingsRepository implements BookingRepository {
   readonly created: BookingCreateInput[] = [];
+  /** How many times a hotel snapshot was read, so the list's N+1 is countable. */
+  snapshotReads = 0;
 
   constructor(private readonly w: World) {}
 
@@ -127,7 +129,7 @@ class FakeBookingsRepository implements BookingRepository {
       checkIn: input.checkIn,
       checkOut: input.checkOut,
       guestsCount: input.guests,
-      nights: input.nights,
+      nights: stayNights(input.checkIn, input.checkOut).length,
       subtotalCents: input.subtotalCents,
       feesCents: input.feesCents,
       totalCents: input.totalCents,
@@ -154,17 +156,31 @@ class FakeBookingsRepository implements BookingRepository {
     return hotelId === HOTEL_ID ? HOTEL_SNAPSHOT : null;
   }
 
+  /** One call for the whole list — the count is what the N+1 guard is about. */
+  async findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]> {
+    this.snapshotReads += 1;
+    return [...new Set(hotelIds)]
+      .filter((id) => id === HOTEL_ID)
+      .map(() => HOTEL_SNAPSHOT);
+  }
+
   async findRoomPriceCurrency(): Promise<string | null> {
     return this.w.priceCurrency;
   }
 
   async updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null> {
     const record = this.w.bookings.get(bookingId);
-    if (!record) return null;
-    const updated = { ...record, status };
+    if (!record || record.guestId !== ownerId || record.status !== from) {
+      return null;
+    }
+    const updated = { ...record, status: to };
     this.w.bookings.set(bookingId, updated);
     return updated;
   }
@@ -192,6 +208,18 @@ function service(w: World = world()): BookingsService {
     new FakeAvailabilityRepository(w),
     new FakeBookingsRepository(w),
   );
+}
+
+/** The same service, with the booking repository kept so its reads can be counted. */
+function serviceWithRepository(w: World): {
+  svc: BookingsService;
+  bookings: FakeBookingsRepository;
+} {
+  const bookings = new FakeBookingsRepository(w);
+  return {
+    svc: new BookingsService(new FakeAvailabilityRepository(w), bookings),
+    bookings,
+  };
 }
 
 describe('BookingsService.create', () => {
@@ -359,6 +387,23 @@ describe('BookingsService.list', () => {
     const theirs = await svc.list(SOMEONE_ELSE);
     expect(theirs.total).toBe(1);
     expect(theirs.items[0]?.guestsCount).toBe(2);
+  });
+
+  it('reads the hotel snapshots once for the whole list, not once per row', async () => {
+    const w = world();
+    const { svc, bookings } = serviceWithRepository(w);
+    await svc.create(CALLER, request());
+    await svc.create(
+      CALLER,
+      request({ checkIn: '2026-06-10', checkOut: '2026-06-13' }),
+    );
+
+    bookings.snapshotReads = 0;
+    const mine = await svc.list(CALLER);
+
+    expect(mine.total).toBe(2);
+    expect(bookings.snapshotReads).toBe(1);
+    expect(mine.items.every((item) => item.hotel.id === HOTEL_ID)).toBe(true);
   });
 
   it('is an empty list, not an error, for a caller with no bookings', async () => {

@@ -26,6 +26,7 @@ import {
   type UsersRepository,
 } from '../src/modules/users/users.repository.js';
 import { PasswordService } from '../src/modules/auth/password.service.js';
+import { stayNights } from '../src/modules/bookings/availability.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 /**
@@ -41,10 +42,13 @@ import { PrismaService } from '../src/prisma/prisma.service.js';
 
 const HOTEL_ID = '11111111-1111-4111-8111-111111111111';
 const ROOM_ID = '22222222-2222-4222-8222-222222222222';
+const SOLD_OUT_ROOM_ID = '55555555-5555-4555-8555-555555555555';
 const UNKNOWN_BOOKING = '99999999-9999-4999-8999-999999999999';
 
 const ADA_ID = '33333333-3333-4333-8333-333333333333';
 const BO_ID = '44444444-4444-4444-8444-444444444444';
+/** A guest nobody in this file logs in as, so the seeded hold stays out of every list. */
+const HOLD_GUEST_ID = '66666666-6666-4666-8666-666666666666';
 const PASSWORD = 'correct-password-1';
 
 const HOTEL: BookingHotelSnapshot = {
@@ -66,6 +70,39 @@ const ROOM: AvailabilityRoom = {
   totalInventory: 5,
 };
 
+/**
+ * One unit, already held for the same nights by another guest. Without a sold-out room
+ * the overlap pre-check can never fail here, and 409 `ROOM_UNAVAILABLE` — a documented
+ * T20 contract a client branches on — would go untested.
+ */
+const SOLD_OUT_ROOM: AvailabilityRoom = {
+  id: SOLD_OUT_ROOM_ID,
+  hotelId: HOTEL_ID,
+  name: 'Sold Out Twin',
+  bedType: 'twin',
+  maxGuests: 2,
+  totalInventory: 1,
+};
+
+const SOLD_OUT_HOLD: BookingRecord = {
+  id: '20000000-0000-4000-8000-000000000001',
+  reference: 'GB-9001',
+  status: 'CONFIRMED',
+  guestId: HOLD_GUEST_ID,
+  roomId: SOLD_OUT_ROOM_ID,
+  hotelId: HOTEL_ID,
+  roomName: SOLD_OUT_ROOM.name,
+  checkIn: '2026-06-01',
+  checkOut: '2026-06-04',
+  guestsCount: 2,
+  nights: 3,
+  subtotalCents: 60_000,
+  feesCents: 0,
+  totalCents: 60_000,
+  currency: 'USD',
+  createdAt: new Date('2026-05-01T10:00:00.000Z'),
+};
+
 const PRICE: RoomPrice = { amountCents: 20_000, currency: 'USD' };
 
 /**
@@ -79,12 +116,13 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
   // AvailabilityRepository — one PUBLISHED hotel and one priced room, nothing overlapping.
   async findHotelRooms(idOrSlug: string): Promise<HotelRooms | null> {
     return idOrSlug === HOTEL_ID
-      ? { id: HOTEL_ID, status: 'PUBLISHED', rooms: [ROOM] }
+      ? { id: HOTEL_ID, status: 'PUBLISHED', rooms: [ROOM, SOLD_OUT_ROOM] }
       : null;
   }
 
   async findRoom(roomId: string): Promise<AvailabilityRoom | null> {
-    return roomId === ROOM_ID ? ROOM : null;
+    if (roomId === ROOM_ID) return ROOM;
+    return roomId === SOLD_OUT_ROOM_ID ? SOLD_OUT_ROOM : null;
   }
 
   async findOverlappingBookings(
@@ -109,7 +147,7 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
     roomId: string,
     currency: string,
   ): Promise<RoomPrice | null> {
-    if (roomId !== ROOM_ID) return null;
+    if (roomId !== ROOM_ID && roomId !== SOLD_OUT_ROOM_ID) return null;
     return PRICE.currency === currency ? PRICE : null;
   }
 
@@ -128,7 +166,7 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
       checkIn: input.checkIn,
       checkOut: input.checkOut,
       guestsCount: input.guests,
-      nights: input.nights,
+      nights: stayNights(input.checkIn, input.checkOut).length,
       subtotalCents: input.subtotalCents,
       feesCents: input.feesCents,
       totalCents: input.totalCents,
@@ -153,17 +191,30 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
     return hotelId === HOTEL_ID ? HOTEL : null;
   }
 
+  /** One read for the whole list, as the Prisma repository does. */
+  async findHotelSnapshots(
+    hotelIds: readonly string[],
+  ): Promise<BookingHotelSnapshot[]> {
+    return [...new Set(hotelIds)]
+      .filter((id) => id === HOTEL_ID)
+      .map(() => HOTEL);
+  }
+
   async findRoomPriceCurrency(roomId: string): Promise<string | null> {
-    return roomId === ROOM_ID ? PRICE.currency : null;
+    return roomId === ROOM_ID || roomId === SOLD_OUT_ROOM_ID
+      ? PRICE.currency
+      : null;
   }
 
   async updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null> {
     const row = this.bookings.get(bookingId);
-    if (!row) return null;
-    const updated = { ...row, status };
+    if (!row || row.guestId !== ownerId || row.status !== from) return null;
+    const updated = { ...row, status: to };
     this.bookings.set(bookingId, updated);
     return updated;
   }
@@ -179,6 +230,8 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
   reset(): void {
     this.bookings.clear();
     this.seq = 0;
+    // The sold-out room's single unit is held by another guest in every test.
+    this.bookings.set(SOLD_OUT_HOLD.id, SOLD_OUT_HOLD);
   }
 }
 
@@ -355,6 +408,16 @@ describe('Bookings API (e2e)', () => {
 
       expect(response.body.data.totalCents).toBe(60_000);
       expect(response.body.data.subtotalCents).toBe(60_000);
+    });
+
+    it('409s ROOM_UNAVAILABLE when the only unit is already held', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/api/bookings')
+        .set('Cookie', adaCookie)
+        .send({ ...CREATE_BODY, roomId: SOLD_OUT_ROOM_ID })
+        .expect(409);
+
+      expect(response.body.error).toMatchObject({ code: 'ROOM_UNAVAILABLE' });
     });
 
     it('404s ROOM_NOT_FOUND for a room that does not exist', async () => {
