@@ -28,6 +28,26 @@ import { envelopeSchema } from '../../../common/envelope.js';
  */
 const MAX_GUESTS = 20;
 
+/**
+ * A stay is at most a year. `z.iso.date()` accepts any year, so without this bound a
+ * `0001-01-01` to `9999-12-31` body asks the availability math to walk 3.65M nights
+ * twice — once in the pre-check and once again inside the serializable transaction, while
+ * it holds the transaction open. A `PENDING` row then holds every one of those nights,
+ * and `price.amountCents * nights` overflows the `Int` money columns into a 500.
+ */
+const MAX_STAY_NIGHTS = 365;
+
+/**
+ * Whole nights between two `YYYY-MM-DD` days, without materialising the nights — this
+ * runs on every create, so the answer is arithmetic rather than an array.
+ */
+function stayLength(checkIn: string, checkOut: string): number {
+  const from = Date.parse(`${checkIn}T00:00:00.000Z`);
+  const to = Date.parse(`${checkOut}T00:00:00.000Z`);
+  if (Number.isNaN(from) || Number.isNaN(to)) return 0;
+  return Math.round((to - from) / 86_400_000);
+}
+
 export const createBookingSchema = z
   .object({
     roomId: z.uuid().describe('The room to book, by uuid.'),
@@ -81,7 +101,14 @@ export const createBookingSchema = z
   .refine((body) => body.checkOut > body.checkIn, {
     message: 'checkOut must be after checkIn',
     path: ['checkOut'],
-  });
+  })
+  .refine(
+    (body) => stayLength(body.checkIn, body.checkOut) <= MAX_STAY_NIGHTS,
+    {
+      message: `a stay cannot be longer than ${MAX_STAY_NIGHTS} nights`,
+      path: ['checkOut'],
+    },
+  );
 
 export type CreateBooking = z.infer<typeof createBookingSchema>;
 

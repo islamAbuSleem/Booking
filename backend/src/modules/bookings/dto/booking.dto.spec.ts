@@ -119,6 +119,35 @@ describe('createBookingSchema', () => {
     ).toBe(false);
   });
 
+  it('rejects a stay longer than a year, which would overflow the money columns', () => {
+    // A year exactly is fine; one night more is a 400, not a 500 from the Int overflow.
+    expect(
+      createBookingSchema.safeParse({
+        ...valid,
+        checkIn: '2026-06-01',
+        checkOut: '2027-06-02',
+      }).success,
+    ).toBe(false);
+    expect(
+      createBookingSchema.safeParse({
+        ...valid,
+        checkIn: '2026-06-01',
+        checkOut: '2027-06-01',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a stay spanning the whole representable calendar', () => {
+    const result = createBookingSchema.safeParse({
+      ...valid,
+      checkIn: '0001-01-01',
+      checkOut: '9999-12-31',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain('365 nights');
+  });
+
   it('does not require checkIn to be in the future: the ticket sets no such rule', () => {
     expect(
       createBookingSchema.parse({
