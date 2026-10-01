@@ -73,6 +73,8 @@ export interface BookingHotelSnapshot {
 /**
  * Everything the write needs, pre-computed by the caller: the money snapshot is the caller's
  * arithmetic on the caller's price read, and the transaction below never re-derives it.
+ * There is no `nights` here on purpose — the transaction derives the count from the dates
+ * it re-checks, so the row can never disagree with its own `checkIn`/`checkOut`.
  */
 export interface BookingCreateInput {
   guestId: string;
@@ -84,7 +86,6 @@ export interface BookingCreateInput {
   subtotalCents: number;
   feesCents: number;
   totalCents: number;
-  nights: number;
 }
 
 export interface BookingRepository {

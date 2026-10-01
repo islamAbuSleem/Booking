@@ -134,7 +134,6 @@ export class BookingsService {
       subtotalCents,
       feesCents: QUOTE_FEES_CENTS,
       totalCents: subtotalCents + QUOTE_FEES_CENTS,
-      nights: nights.length,
     });
 
     this.logger.log(

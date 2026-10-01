@@ -459,7 +459,6 @@ function input(
     subtotalCents: 60_000,
     feesCents: 0,
     totalCents: 60_000,
-    nights: 3,
     ...overrides,
   };
 }

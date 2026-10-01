@@ -14,7 +14,7 @@ import {
   type BookingRepository,
   type BookingStatus,
 } from '../../prisma/bookings.repository.js';
-import { QUOTE_FEES_CENTS } from './availability.service.js';
+import { QUOTE_FEES_CENTS, stayNights } from './availability.service.js';
 import { BookingsService } from './bookings.service.js';
 import { createBookingSchema, type CreateBooking } from './dto/booking.dto.js';
 
@@ -127,7 +127,7 @@ class FakeBookingsRepository implements BookingRepository {
       checkIn: input.checkIn,
       checkOut: input.checkOut,
       guestsCount: input.guests,
-      nights: input.nights,
+      nights: stayNights(input.checkIn, input.checkOut).length,
       subtotalCents: input.subtotalCents,
       feesCents: input.feesCents,
       totalCents: input.totalCents,

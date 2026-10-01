@@ -26,6 +26,7 @@ import {
   type UsersRepository,
 } from '../src/modules/users/users.repository.js';
 import { PasswordService } from '../src/modules/auth/password.service.js';
+import { stayNights } from '../src/modules/bookings/availability.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 /**
@@ -128,7 +129,7 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
       checkIn: input.checkIn,
       checkOut: input.checkOut,
       guestsCount: input.guests,
-      nights: input.nights,
+      nights: stayNights(input.checkIn, input.checkOut).length,
       subtotalCents: input.subtotalCents,
       feesCents: input.feesCents,
       totalCents: input.totalCents,
