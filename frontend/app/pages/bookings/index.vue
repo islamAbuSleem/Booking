@@ -9,14 +9,20 @@
  * other envelope error is a real answer and drives the error state, never
  * a fixture.
  */
-import { getBookingsForGuest } from '~/utils/mock'
 import { fetchMyBookings, isApiError, isEnvelopeError } from '~/utils/api'
 import type { ApiBooking } from '~/utils/api'
 import { mockBookingToApi } from '~/utils/bookingAdapters'
-import { isUpcomingStatus } from '~/composables/useBookings'
+import { isUpcomingStatus, useBookings } from '~/composables/useBookings'
 import { formatStayDate, payableCents, wholeNumber } from '~/utils/format'
 
 const { t } = useI18n()
+
+/**
+ * The shared fixture store, not the immutable arrays in `~/utils/mock`: a cancel the
+ * detail page's fallback performed has to be visible here, or navigating back shows
+ * the old status.
+ */
+const { bookings: mockBookings } = useBookings()
 
 type Tab = 'upcoming' | 'past'
 
@@ -50,7 +56,7 @@ const {
       if (isEnvelopeError(fetchError) && (!isApiError(fetchError) || fetchError.code !== 'UNAUTHORIZED')) {
         throw fetchError
       }
-      return { bookings: getBookingsForGuest().map(mockBookingToApi) }
+      return { bookings: mockBookings.value.map(mockBookingToApi) }
     }
   },
 )
