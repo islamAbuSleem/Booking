@@ -312,13 +312,17 @@ export class PrismaBookingRepository implements BookingRepository {
 
   async updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null> {
-    // `updateMany` rather than `update`: the caller read the row just before, so a
-    // count of zero is "gone", not an exception worth a filter branch.
+    // `updateMany` rather than `update`, with the owner and the expected status in the
+    // `where`: the flip only happens on a row that is still the caller's and still in
+    // `from`, so a cancel that raced another cancel is a count of zero, not a second
+    // 200. `updatedAt` moves with the flip.
     const { count } = await this.prisma.booking.updateMany({
-      where: { id: bookingId },
-      data: { status },
+      where: { id: bookingId, guestId: ownerId, status: from },
+      data: { status: to },
     });
     if (count === 0) return null;
     return this.findById(bookingId);

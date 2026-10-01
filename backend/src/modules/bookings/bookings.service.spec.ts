@@ -160,11 +160,15 @@ class FakeBookingsRepository implements BookingRepository {
 
   async updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null> {
     const record = this.w.bookings.get(bookingId);
-    if (!record) return null;
-    const updated = { ...record, status };
+    if (!record || record.guestId !== ownerId || record.status !== from) {
+      return null;
+    }
+    const updated = { ...record, status: to };
     this.w.bookings.set(bookingId, updated);
     return updated;
   }

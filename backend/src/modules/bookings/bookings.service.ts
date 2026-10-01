@@ -173,8 +173,23 @@ export class BookingsService {
       );
     }
 
-    const updated = await this.bookings.updateStatus(bookingId, 'CANCELLED');
-    if (!updated) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
+    const updated = await this.bookings.updateStatus(
+      bookingId,
+      callerId,
+      'CONFIRMED',
+      'CANCELLED',
+    );
+    if (!updated) {
+      // Nothing matched, so the row moved between the read and the write. Re-read to
+      // tell the two apart: gone is a 404, a state change is the same 409 as above.
+      const current = await this.bookings.findById(bookingId);
+      if (!current) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
+      throw new ApiError(
+        HttpStatus.CONFLICT,
+        'INVALID_CANCEL_STATE',
+        'Only a confirmed booking can be cancelled',
+      );
+    }
 
     this.logger.log(`[bookings] cancelled ${record.reference}`);
     return this.toDto(updated);

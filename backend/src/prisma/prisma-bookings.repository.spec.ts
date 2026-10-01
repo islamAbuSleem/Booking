@@ -307,13 +307,20 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
         return row ? toFullRow(row) : null;
       },
       updateMany: async (args: {
-        where: { id: string };
+        where: { id: string; guestId: string; status: BookingStatus };
         data: { status: BookingStatus };
       }) => {
         const row = prisma.bookings.find(
           (candidate) => candidate.id === args.where.id,
         );
-        if (!row) return { count: 0 };
+        // The owner and the expected status are part of the write, not a prior read.
+        if (
+          !row ||
+          row.guestId !== args.where.guestId ||
+          row.status !== args.where.status
+        ) {
+          return { count: 0 };
+        }
         row.status = args.data.status;
         return { count: 1 };
       },
@@ -716,14 +723,33 @@ describe('PrismaBookingRepository reads', () => {
     expect(await repo.findRoomPriceCurrency('nope')).toBeNull();
   });
 
-  it('flips the status on update and reports null for a missing row', async () => {
+  it('flips the status only for the owner and only out of the expected state', async () => {
     const prisma = new FakePrisma().withRoom(oneInventoryRoom());
     const repo = repository(prisma);
     const record = await repo.createPending(input());
 
-    const updated = await repo.updateStatus(record.id, 'CANCELLED');
-    expect(updated?.status).toBe('CANCELLED');
+    const updated = await repo.updateStatus(
+      record.id,
+      GUEST_A,
+      'CONFIRMED',
+      'CANCELLED',
+    );
+    expect(updated).toBeNull();
+    expect(prisma.bookings[0]?.status).toBe('PENDING');
+
+    await repo.updateStatus(record.id, GUEST_B, 'PENDING', 'CANCELLED');
+    expect(prisma.bookings[0]?.status).toBe('PENDING');
+
+    const confirmed = await repo.updateStatus(
+      record.id,
+      GUEST_A,
+      'PENDING',
+      'CANCELLED',
+    );
+    expect(confirmed?.status).toBe('CANCELLED');
     expect(prisma.bookings[0]?.status).toBe('CANCELLED');
-    expect(await repo.updateStatus('nope', 'CANCELLED')).toBeNull();
+    expect(
+      await repo.updateStatus('nope', GUEST_A, 'PENDING', 'CANCELLED'),
+    ).toBeNull();
   });
 });

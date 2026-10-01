@@ -160,11 +160,13 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
 
   async updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null> {
     const row = this.bookings.get(bookingId);
-    if (!row) return null;
-    const updated = { ...row, status };
+    if (!row || row.guestId !== ownerId || row.status !== from) return null;
+    const updated = { ...row, status: to };
     this.bookings.set(bookingId, updated);
     return updated;
   }

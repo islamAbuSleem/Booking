@@ -110,9 +110,17 @@ export interface BookingRepository {
    * read produces is the caller's to raise, not this one's.
    */
   findRoomPriceCurrency(roomId: string): Promise<string | null>;
-  /** `null` when no booking has that id. `updatedAt` moves with the flip. */
+  /**
+   * The flip is owner- and state-scoped in the `where`, never checked first and written
+   * second: `null` means no row matched — it is gone, it is not the caller's, or it has
+   * already left `from`. A check-then-act would let a concurrent `CONFIRMED -> COMPLETED`
+   * (or a second cancel) be silently overwritten, and would let a caller that forgot to
+   * load its own row write another guest's booking.
+   */
   updateStatus(
     bookingId: string,
-    status: BookingStatus,
+    ownerId: string,
+    from: BookingStatus,
+    to: BookingStatus,
   ): Promise<BookingRecord | null>;
 }
