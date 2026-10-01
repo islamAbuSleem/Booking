@@ -37,14 +37,22 @@ export class RestCloudinaryClient implements CloudinaryClient {
     const apiKey = this.config.get<string>('CLOUDINARY_API_KEY') ?? '';
     const apiSecret = this.config.get<string>('CLOUDINARY_API_SECRET') ?? '';
 
+    // The documented destroy call is `POST /v1_1/{cloud}/image/destroy` with `public_id` in
+    // the body. The legacy `/image/destroy/{public_id}` path form is GET/form-POST only, and
+    // it reads the id as a literal path segment, so a folder-scoped id like
+    // `booking/hotels/{hostId}/lobby` would not resolve through it.
     const url =
-      `https://api.cloudinary.com/${encodeURIComponent(cloudName)}` +
-      `/image/destroy/${encodeURIComponent(publicId)}`;
+      `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}` +
+      `/image/destroy`;
     const basic = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
 
     const response = await fetch(url, {
-      method: 'DELETE',
-      headers: { authorization: `Basic ${basic}` },
+      method: 'POST',
+      headers: {
+        authorization: `Basic ${basic}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ public_id: publicId }),
     });
     if (!response.ok) {
       // Log the publicId only; the credential and the full URL stay out of the line.
