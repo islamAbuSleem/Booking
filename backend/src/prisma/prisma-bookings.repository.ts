@@ -17,6 +17,7 @@ import {
   type BookingRepository,
   type BookingStatus,
 } from './bookings.repository.js';
+import { DEFAULT_CURRENCY } from './hotels.repository.js';
 import {
   buildOverlappingBlackoutsWhere,
   buildOverlappingBookingsWhere,
@@ -301,13 +302,22 @@ export class PrismaBookingRepository implements BookingRepository {
     };
   }
 
+  /**
+   * The currency `POST /api/bookings` defaults to when the body carries none. `USD` wins
+   * when the room has a price in it, because that is the quote endpoint's own default:
+   * ordering by currency would pick `EGP` for a room priced in both, and the guest would
+   * be charged in a different currency than the one they accepted. Anything else falls
+   * to the first currency in sorted order, which is deterministic even if it is not
+   * meaningful.
+   */
   async findRoomPriceCurrency(roomId: string): Promise<string | null> {
-    const row = await this.prisma.roomPrice.findFirst({
+    const rows = await this.prisma.roomPrice.findMany({
       where: { roomId },
-      orderBy: { currency: 'asc' },
       select: { currency: true },
     });
-    return row ? row.currency : null;
+    const currencies = rows.map((row) => row.currency).sort();
+    if (currencies.includes(DEFAULT_CURRENCY)) return DEFAULT_CURRENCY;
+    return currencies[0] ?? null;
   }
 
   async updateStatus(

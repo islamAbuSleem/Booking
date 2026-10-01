@@ -86,7 +86,7 @@ interface HotelSpec {
 class FakePrisma {
   readonly rooms = new Map<string, RoomSpec>();
   readonly hotels = new Map<string, HotelSpec>();
-  readonly priceCurrencies = new Map<string, string>();
+  readonly priceCurrencies = new Map<string, string[]>();
   readonly bookings: StoredBooking[] = [];
   readonly blackouts: StoredBlackout[] = [];
   // Public: the delegates factory outside the class reads and writes them.
@@ -125,8 +125,8 @@ class FakePrisma {
     return this;
   }
 
-  withPriceCurrency(roomId: string, currency: string): this {
-    this.priceCurrencies.set(roomId, currency);
+  withPriceCurrencies(roomId: string, ...currencies: string[]): this {
+    this.priceCurrencies.set(roomId, currencies);
     return this;
   }
 
@@ -410,13 +410,12 @@ function makeDelegates(prisma: FakePrisma): Record<string, unknown> {
       },
     },
     roomPrice: {
-      findFirst: async (args: {
+      findMany: async (args: {
         where: { roomId: string };
-        orderBy?: unknown;
         select?: unknown;
       }) => {
-        const currency = prisma.priceCurrencies.get(args.where.roomId);
-        return currency ? { currency } : null;
+        const currencies = prisma.priceCurrencies.get(args.where.roomId);
+        return currencies ? currencies.map((currency) => ({ currency })) : [];
       },
     },
     hotel: {
@@ -716,11 +715,21 @@ describe('PrismaBookingRepository reads', () => {
   it("reports the room's price currency, or null when the room is unpriced", async () => {
     const prisma = new FakePrisma()
       .withRoom(oneInventoryRoom())
-      .withPriceCurrency(ROOM_ID, 'EUR');
+      .withPriceCurrencies(ROOM_ID, 'EUR');
     const repo = repository(prisma);
 
     expect(await repo.findRoomPriceCurrency(ROOM_ID)).toBe('EUR');
     expect(await repo.findRoomPriceCurrency('nope')).toBeNull();
+  });
+
+  it('defaults to USD for a room priced in several currencies, like the quote does', async () => {
+    const prisma = new FakePrisma()
+      .withRoom(oneInventoryRoom())
+      .withPriceCurrencies(ROOM_ID, 'EGP', 'USD', 'EUR');
+    const repo = repository(prisma);
+
+    // Alphabetically first would be EGP, which the quote endpoint never defaults to.
+    expect(await repo.findRoomPriceCurrency(ROOM_ID)).toBe('USD');
   });
 
   it('flips the status only for the owner and only out of the expected state', async () => {
