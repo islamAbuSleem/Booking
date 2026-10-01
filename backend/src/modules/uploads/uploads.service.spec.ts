@@ -104,7 +104,7 @@ describe('UploadsService.sign', () => {
     expect(result.timestamp).toBeTypeOf('number');
     // The signature is HMAC-SHA1 of the real secret — a placeholder secret would differ.
     expect(result.signature).toBe(
-      computeUploadSignature('real-secret', result.timestamp),
+      computeUploadSignature('real-secret', result.folder, result.timestamp),
     );
   });
 
@@ -123,6 +123,7 @@ describe('UploadsService.sign', () => {
     expect(result.signature).toBe(
       computeUploadSignature(
         PLACEHOLDER_CONFIG.CLOUDINARY_API_SECRET,
+        result.folder,
         result.timestamp,
       ),
     );

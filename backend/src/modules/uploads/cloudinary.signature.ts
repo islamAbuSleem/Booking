@@ -6,22 +6,27 @@ import { createHmac } from 'node:crypto';
  * credentials (context/code-standards.md, "Dependency inversion").
  *
  * Cloudinary's signed-upload signature is `base64(HMAC-SHA1(apiSecret, message))` where
- * `message` is the stringified request params; for an upload that is `"timestamp=" +
- * timestamp`. The browser POSTs `{ api_key, timestamp, signature, folder }` and Cloudinary
- * re-computes the same HMAC to verify it. Only the secret stays server-side; the
- * `api_key` is handed to the browser on purpose.
+ * `message` is every signed request param, sorted alphabetically and joined with `&` —
+ * for this upload `"folder=" + folder + "&timestamp=" + timestamp`. The browser POSTs
+ * `{ api_key, timestamp, signature, folder }` and Cloudinary re-computes the same HMAC
+ * from exactly those params to verify it. `folder` is therefore **signed**, not a free-text
+ * hint: a caller cannot move an asset out of the host folder the config handed them, and a
+ * mismatch between what we sign and what the browser sends is an `Invalid Signature`.
+ * Only the secret stays server-side; the `api_key` is handed to the browser on purpose.
  */
 
 /**
- * `base64(HMAC-SHA1(apiSecret, "timestamp=" + timestamp))` — Cloudinary's upload
- * signature, computed with Node's `crypto` rather than the Cloudinary SDK.
+ * `base64(HMAC-SHA1(apiSecret, "folder=" + folder + "&timestamp=" + timestamp))` —
+ * Cloudinary's upload signature, computed with Node's `crypto` rather than the Cloudinary
+ * SDK. Every param the browser sends and Cloudinary verifies is in the message.
  */
 export function computeUploadSignature(
   apiSecret: string,
+  folder: string,
   timestamp: number,
 ): string {
   return createHmac('sha1', apiSecret)
-    .update(`timestamp=${timestamp}`)
+    .update(`folder=${folder}&timestamp=${timestamp}`)
     .digest('base64');
 }
 

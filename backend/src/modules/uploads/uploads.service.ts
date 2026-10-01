@@ -47,19 +47,22 @@ export class UploadsService {
 
   /**
    * `POST /api/uploads/sign`. Pure: the timestamp is the only thing that moves, and the
-   * signature is `base64(HMAC-SHA1(secret, "timestamp=" + timestamp))`. When the Cloudinary
-   * credentials are placeholders the config still returns — a real upload is the one thing
-   * that fails at runtime, not this.
+   * signature is `base64(HMAC-SHA1(secret, "folder=" + folder + "&timestamp=" + timestamp))`
+   * — the folder is inside the signature, so the browser cannot retarget the upload. When the
+   * Cloudinary credentials are placeholders the config still returns — a real upload is the
+   * one thing that fails at runtime, not this.
    */
   sign(callerId: string): UploadSignData {
     const timestamp = Math.floor(Date.now() / 1000);
+    const folder = hostFolderPrefix(this.uploadPath(), callerId);
     return {
       cloudName: this.config.get<string>('CLOUDINARY_CLOUD_NAME') ?? '',
       apiKey: this.config.get<string>('CLOUDINARY_API_KEY') ?? '',
       timestamp,
-      folder: hostFolderPrefix(this.uploadPath(), callerId),
+      folder,
       signature: computeUploadSignature(
         this.config.get<string>('CLOUDINARY_API_SECRET') ?? '',
+        folder,
         timestamp,
       ),
     };

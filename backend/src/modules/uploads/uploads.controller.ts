@@ -52,7 +52,8 @@ export class UploadsController {
       'Returns the config the browser needs to POST straight to Cloudinary: the cloud name, ' +
       'the (exposed-on-purpose) API key, a unix-seconds timestamp, the caller\'s own ' +
       '`booking/hotels/{hostId}/` folder, and a `signature` of ' +
-      '`base64(HMAC-SHA1(secret, "timestamp=" + timestamp))` that Cloudinary re-verifies. ' +
+      '`base64(HMAC-SHA1(secret, "folder=" + folder + "&timestamp=" + timestamp))` that ' +
+      'Cloudinary re-verifies. ' +
       'Only the secret stays server-side. Answers 200, not 201: nothing is created here.',
   })
   @ApiResponse({

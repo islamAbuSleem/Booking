@@ -16,7 +16,8 @@ import { imageSummarySchema } from '../../hotels/dto/hotel.dto.js';
  * `apiKey` is returned on purpose: a signed upload exposes the key, and only the secret
  * (used to compute `signature`) stays server-side. `folder` is the caller's own
  * `booking/hotels/{hostId}/`, and `signature` is `base64(HMAC-SHA1(secret,
- * "timestamp=" + timestamp))`, which Cloudinary re-verifies.
+ * "folder=" + folder + "&timestamp=" + timestamp))`, which Cloudinary re-verifies. The
+ * folder is inside the signature, so a caller cannot retarget the upload elsewhere.
  */
 export const uploadSignSchema = z.object({
   cloudName: z.string().describe('The Cloudinary cloud the browser uploads to.'),
@@ -27,7 +28,9 @@ export const uploadSignSchema = z.object({
   folder: z.string().describe('The caller\'s own folder, booking/hotels/{hostId}/.'),
   signature: z
     .string()
-    .describe('base64 HMAC-SHA1 of "timestamp=" + timestamp under the API secret.'),
+    .describe(
+      'base64 HMAC-SHA1 of "folder=" + folder + "&timestamp=" + timestamp under the API secret.',
+    ),
 });
 
 export type UploadSignData = z.infer<typeof uploadSignSchema>;
