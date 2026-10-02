@@ -65,6 +65,19 @@ export const ERROR_CODES = [
   // T24 — the stay is not in a reviewable state. Only COMPLETED stays can be reviewed;
   // anything else (PENDING, CONFIRMED, CANCELLED) is a 400, not a silent no-op.
   'INVALID_REVIEW_STATE',
+  // T26 — payments.
+  // `INVALID_PAYMENT_STATE`: only a PENDING booking can take an intent. Anything else
+  // (CONFIRMED, COMPLETED, CANCELLED) is a 400 — the money for those states is settled
+  // or gone, and an intent now would charge for nothing.
+  'INVALID_PAYMENT_STATE',
+  // `PAYMENT_NOT_FOUND`: no intent has been created for the booking yet.
+  'PAYMENT_NOT_FOUND',
+  // `STRIPE_NOT_CONFIGURED`: the route ran without `STRIPE_SECRET_KEY` (503). Keys are
+  // optional at boot (T15/T21 precedent), so the failure names the missing key instead
+  // of crashing on a null client.
+  'STRIPE_NOT_CONFIGURED',
+  // `PAYMENT_FAILED`: the provider answered something the contract cannot use.
+  'PAYMENT_FAILED',
   // T25 — admin moderation and suspension.
   // `ADMIN_REQUIRED`: every `/api/admin/*` route, so the client distinguishes "sign in"
   // (401) from "signed in as the wrong role" (this) instead of rendering one login wall.

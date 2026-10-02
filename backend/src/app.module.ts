@@ -11,6 +11,7 @@ import { UsersModule } from './modules/users/users.module.js';
 import { HostModule } from './modules/host/host.module.js';
 import { ReviewsModule } from './modules/reviews/reviews.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     HostModule,
     ReviewsModule,
     AdminModule,
+    PaymentsModule,
     HealthModule,
   ],
 })

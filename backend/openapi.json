@@ -2410,6 +2410,142 @@
         ]
       }
     },
+    "/api/payments/intent": {
+      "post": {
+        "description": "Idempotent by construction: the Stripe idempotency key derives from the booking reference, so a retry is the same Stripe call rather than a second charge, and the single payment row is upserted. The browser confirms the returned `clientSecret` with Stripe.js; confirmation itself arrives via webhook in T27.",
+        "operationId": "PaymentsController_createIntent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The intent to confirm, with the server-computed amount.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntentEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation, or the booking is not PENDING.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking belongs to a different guest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create the Stripe PaymentIntent for a pending booking",
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
+    "/api/payments/{bookingId}": {
+      "get": {
+        "operationId": "PaymentsController_getPayment",
+        "parameters": [
+          {
+            "name": "bookingId",
+            "required": true,
+            "in": "path",
+            "description": "The booking, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The payment row, if an intent has been created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking belongs to a different guest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking, or no payment started for it yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read the payment for a booking",
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "description": "Always 200. `status` is \"ok\" only when the database answered; `db` carries reachability on its own, so a monitor can alert on it without parsing a status string.",
@@ -5509,6 +5645,138 @@
           },
           "data": {
             "$ref": "#/components/schemas/AdminReview"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "IntentRequest": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "bookingId"
+        ],
+        "additionalProperties": false
+      },
+      "IntentData": {
+        "type": "object",
+        "properties": {
+          "clientSecret": {
+            "type": "string"
+          },
+          "paymentIntentId": {
+            "type": "string"
+          },
+          "amountCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "description": "ISO 4217 code, as stored on the booking."
+          }
+        },
+        "required": [
+          "clientSecret",
+          "paymentIntentId",
+          "amountCents",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "IntentEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/IntentData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "bookingId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "stripePaymentIntentId": {
+            "type": "string"
+          },
+          "amountCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "requires_payment",
+              "succeeded",
+              "refunded",
+              "failed"
+            ]
+          },
+          "receiptUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "bookingId",
+          "stripePaymentIntentId",
+          "amountCents",
+          "currency",
+          "status",
+          "receiptUrl",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "PaymentEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Payment"
           }
         },
         "required": [

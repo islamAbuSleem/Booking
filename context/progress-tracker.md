@@ -74,7 +74,7 @@
 - [x] T25 Admin moderation
 
 ### Phase 3 — Advanced
-- [ ] T26 Stripe payment intent
+- [x] T26 Stripe payment intent
 - [ ] T27 Stripe webhook
 - [ ] T28 Checkout UI
 - [ ] T29 Rate limiting
@@ -555,6 +555,13 @@
   mode; live rows show hide/unhide by status. A real 403 never degrades to fixtures,
   and mock mutations re-fetch so the local overrides stay the single source they
   always were.
+- **D70 — T26 never trusts a client-sent amount because the request has no amount
+  field at all.** The intent body is `{ bookingId }` only; the total comes from the
+  booking snapshot the server wrote. Idempotency is two-layered: a deterministic
+  `payments-intent:<reference>` key for Stripe (human-matchable in support) plus a
+  one-row-per-booking upsert locally. `stripe@22.6.2` is pinned exact, and keys stay
+  optional at boot — the client builds lazily and answers 503 `STRIPE_NOT_CONFIGURED`
+  only when a payment actually runs without credentials.
 
 ## Notes
 
