@@ -12,7 +12,8 @@
     "or": "or",
     "edit": "Edit",
     "save": "Save changes",
-    "remove": "Remove"
+    "remove": "Remove",
+    "unexpectedError": "Something went wrong. Please try again."
   },
   "nav": {
     "stays": "Stays",
@@ -22,7 +23,8 @@
     "listYourProperty": "List your property",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "menu": "Menu"
+    "menu": "Menu",
+    "dashboard": "Dashboard"
   },
   "search": {
     "destination": "Destination",
@@ -154,7 +156,9 @@
     "coordinatesLabel": "Coordinates",
     "notFoundTitle": "That property is not listed",
     "notFoundBody": "The link is broken, or the property has been taken down. The full list of stays is one click away.",
-    "browseStays": "Browse all stays"
+    "browseStays": "Browse all stays",
+    "reviewsLoadError": "Reviews could not be loaded",
+    "reviewsLoadHint": "The list failed to load. The rating above is unaffected."
   },
   "status": {
     "published": "Published",
@@ -286,7 +290,8 @@
     "creatingAccount": "Creating account…",
     "haveAccount": "Already have an account?",
     "hostIntent": "I want to list a property",
-    "hostIntentHint": "Hosts get the property dashboard after signing in."
+    "hostIntentHint": "Hosts get the property dashboard after signing in.",
+    "emailExists": "An account with that email already exists."
   },
   "host": {
     "title": "Your properties",
@@ -357,7 +362,24 @@
     "summaryHeading": "Summary",
     "savedTitle": "Changes saved",
     "savedBody": "{name} is up to date on this device. The host API persists it.",
-    "editTitle": "Edit listing"
+    "editTitle": "Edit listing",
+    "emptyTitle": "No properties yet",
+    "emptyHint": "Create your first listing to start taking bookings.",
+    "noBookingsHint": "No bookings yet. New reservations will appear here.",
+    "fieldAddress": "Street address",
+    "fieldCountry": "Country",
+    "fieldStarRating": "Star rating",
+    "fieldCheckIn": "Check-in time",
+    "fieldCheckOut": "Check-out time",
+    "roomDescription": "Description",
+    "roomBedType": "Bed type",
+    "roomInventory": "Rooms of this type",
+    "roomDescriptionRequired": "Give the room a one-line description.",
+    "roomBedTypeRequired": "Name the bed type (e.g. King, Twin).",
+    "roomInventoryRequired": "How many rooms of this type can be sold at once?",
+    "creatingListing": "Creating listing…",
+    "roomPriceLocked": "Nightly prices are set per currency and can’t be changed here yet",
+    "saving": "Saving…"
   },
   "admin": {
     "title": "Moderation",
@@ -410,6 +432,28 @@
     "hideBody": "The review leaves the site immediately. The guest is not notified in this build.",
     "hideConfirm": "Yes, hide it",
     "reviewsEmptyTitle": "No open reports",
-    "reviewsEmptyHint": "Flagged reviews land here for a decision."
+    "reviewsEmptyHint": "Flagged reviews land here for a decision.",
+    "unhide": "Unhide",
+    "unhideTitle": "Show review by {name}?",
+    "unhideBody": "The review by {name} will be visible on the property page again.",
+    "unhideConfirm": "Show review",
+    "statHidden": "Hidden reviews",
+    "hiddenState": "Hidden",
+    "visibleState": "Visible"
+  },
+  "reviews": {
+    "formTitle": "Write a review",
+    "formHint": "Only you can review this stay, and only once.",
+    "ratingLabel": "Rating (1–5)",
+    "titleLabel": "Headline",
+    "bodyLabel": "Your stay",
+    "submitReview": "Submit review",
+    "submittingReview": "Submitting…",
+    "successTitle": "Review submitted",
+    "successBody": "Thanks — your review is now visible on the property page.",
+    "alreadyReviewed": "You have already reviewed this stay.",
+    "notCompletedNote": "You can review this stay once it is completed.",
+    "reviewError": "The review could not be submitted. Your words are still here — try again.",
+    "fieldsRequired": "Give your review a headline and a few words."
   }
 }

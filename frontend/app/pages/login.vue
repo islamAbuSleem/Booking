@@ -1,21 +1,23 @@
 <script setup lang="ts">
 /**
- * /login — narrow and calm, directly on the paper. Inline field errors from
- * the shared schema; a top banner only for a sign-in that validation passed
- * but the mock account lookup failed. Submit honours `?redirect=` or `/`.
+ * /login — narrow and calm, directly on the paper. Inline field errors from the shared
+ * schema; a top banner for a submit that passed validation but the API refused.
  *
- * Mock rule: the three fixture accounts (guest/host/admin @example.com) sign
- * in as themselves; anything else is an unknown account. The API (T14) is the
- * real check — this just exercises both states without a backend.
+ * The API is the authority on the credentials (T14): there is no fixture lookup left, and
+ * a wrong password and an unknown email both come back as the same `INVALID_CREDENTIALS`
+ * 401, which is what the single message here reports.
+ *
+ * Submit honours `?redirect=` so a dashboard bounce lands where the visitor was going.
  */
-import { USERS } from '~/utils/mock'
 import { loginSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
+import { ApiRequestError } from '~/utils/api'
+import { useAuth } from '~/composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const { signInAs } = useSession()
+const { login, startOAuth, pending } = useAuth()
 
 const email = ref('')
 const password = ref('')
@@ -23,11 +25,12 @@ const remember = ref(false)
 const fieldErrors = ref<FieldErrors>({})
 const touched = ref({ email: false, password: false })
 const formError = ref('')
-const pending = ref(false)
 
 const redirectTarget = computed(() => {
   const raw = route.query.redirect
-  return typeof raw === 'string' && raw.startsWith('/') ? raw : '/'
+  // `startsWith('/')` also admits `//evil.example`, which the browser would treat as a
+  // different origin. A single leading slash is the whole rule.
+  return typeof raw === 'string' && /^\/(?!\/)/.test(raw) ? raw : '/'
 })
 
 function validate(): boolean {
@@ -40,37 +43,23 @@ async function submit(): Promise<void> {
   touched.value = { email: true, password: true }
   formError.value = ''
   if (!validate() || pending.value) return
-  pending.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    const match = USERS.find(user => user.email.toLowerCase() === email.value.trim().toLowerCase())
-    if (!match) {
-      formError.value = t('auth.invalidCredentials')
-      return
-    }
-    signInAs(match)
+    await login({ email: email.value.trim(), password: password.value })
     await router.push(redirectTarget.value)
   }
-  finally {
-    pending.value = false
+  catch (error) {
+    formError.value = error instanceof ApiRequestError
+      ? t('auth.invalidCredentials')
+      : t('common.unexpectedError')
   }
+  // A failed submit keeps the form filled: the values above are never cleared, so the
+  // visitor can correct a typo instead of retyping everything.
 }
 
-function signInWith(_provider: 'google' | 'github'): void {
+function signInWith(provider: 'google' | 'github'): void {
   if (pending.value) return
-  // Mock OAuth: both providers resolve to the guest fixture. T15 wires the
-  // real provider round trip; there is no code exchange to perform here.
-  const guest = USERS[0]
-  if (!guest) return
-  signInAs(guest)
-  void router.push(redirectTarget.value)
+  startOAuth(provider, redirectTarget.value)
 }
-
-useSeoMeta({
-  title: () => `${t('auth.loginTitle')} · ${t('common.brand')}`,
-  description: () => t('auth.loginDescription'),
-  robots: 'noindex, nofollow',
-})
 </script>
 
 <template>

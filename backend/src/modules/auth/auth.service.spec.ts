@@ -12,6 +12,7 @@ function record(overrides: Partial<UserRecord> = {}): UserRecord {
     avatarUrl: null,
     passwordHash: null,
     role: 'GUEST',
+    status: 'ACTIVE',
     oauthProvider: null,
     oauthAccountId: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),

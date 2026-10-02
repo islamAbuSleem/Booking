@@ -91,6 +91,7 @@ describe('JwtAuthGuard', () => {
       avatarUrl: null,
       passwordHash: 'hash',
       role: 'HOST' as const,
+      status: 'ACTIVE' as const,
       oauthProvider: null,
       oauthAccountId: null,
       createdAt: new Date(),

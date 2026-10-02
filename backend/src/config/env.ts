@@ -104,6 +104,14 @@ export const envSchema = z.object({
     .string()
     .default('booking/hotels/')
     .describe('The folder prefix owned by the platform; each host appends their own id.'),
+  /**
+   * T26 — Stripe is optional in local dev and in tests, exactly like OAuth (T15) and
+   * Cloudinary (T21). A missing key does NOT fail boot: the client is constructed lazily
+   * and throws a 503 only when a payment route actually runs without credentials, so the
+   * app builds and the whole suite passes with no keys. Test mode only — no live keys,
+   * ever (D7). `STRIPE_WEBHOOK_SECRET` belongs to T27 and is validated there.
+   */
+  STRIPE_SECRET_KEY: z.string().optional(),
 });
 
 /** The exact string `.env.example` used to ship, kept so it can be refused by name. */

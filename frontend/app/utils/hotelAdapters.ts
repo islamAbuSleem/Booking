@@ -6,10 +6,11 @@
  * path feeds the same API-typed components as the live path. Nothing here is
  * authoritative — delete it when the backend is assumed present.
  */
-import type { ApiHotelCard, ApiHotelDetail, ApiHotelImage, ApiHotelRoom, ApiQuoteData } from '~/utils/api'
+import type { ApiHotelCard, ApiHotelDetail, ApiHotelImage, ApiHotelRoom, ApiQuoteData, ApiReview } from '~/utils/api'
+import type { ReviewView } from '~/components/ReviewCard.vue'
 import { quote } from '~/utils/mock'
 import { stayNights } from '~/utils/date'
-import type { MockHotel, MockImage, MockRoom } from '~/utils/mock/types'
+import type { MockHotel, MockImage, MockReview, MockRoom } from '~/utils/mock/types'
 
 const IMAGE_DIMS: Record<MockImage['aspect'], { width: number, height: number }> = {
   '3:2': { width: 800, height: 533 },
@@ -118,5 +119,35 @@ export function mockQuoteToApi(
       priceCents: price.nightlyCents,
     })),
     holdExpiresAt: new Date(Date.now() + MOCK_HOLD_MS).toISOString(),
+  }
+}
+
+/**
+ * Live review → card view. The API carries no author location and its `createdAt` is an
+ * instant, so the location is dropped (never invented) and the date is truncated to the
+ * day — `formatStayDate` pins dates to UTC midnight and a full instant would shift it.
+ */
+export function apiReviewToView(review: ApiReview): ReviewView {
+  return {
+    id: review.id,
+    authorName: review.author.name,
+    authorLocation: null,
+    rating: review.rating,
+    title: review.title,
+    body: review.body,
+    stayedOn: review.createdAt.slice(0, 10),
+  }
+}
+
+/** Fixture review → card view. The mock already speaks the card's shape. */
+export function mockReviewToView(review: MockReview): ReviewView {
+  return {
+    id: review.id,
+    authorName: review.authorName,
+    authorLocation: review.authorLocation,
+    rating: review.rating,
+    title: review.title,
+    body: review.body,
+    stayedOn: review.createdAt,
   }
 }

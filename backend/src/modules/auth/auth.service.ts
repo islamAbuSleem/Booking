@@ -109,6 +109,8 @@ export class AuthService {
       );
     }
 
+    this.ensureActive(user);
+
     await this.rehashIfNeeded(user.id, user.passwordHash, input.password);
 
     this.logger.log(`[auth] login ${user.id}`);
@@ -154,6 +156,7 @@ export class AuthService {
     );
     if (byOAuth) {
       this.logger.log(`[auth] oauth returning ${byOAuth.id}`);
+      this.ensureActive(byOAuth);
       const token = await this.signToken(
         byOAuth.id,
         byOAuth.email,
@@ -172,6 +175,7 @@ export class AuthService {
           byEmail.oauthAccountId === profile.providerId
         ) {
           this.logger.log(`[auth] oauth returning ${byEmail.id}`);
+          this.ensureActive(byEmail);
           const token = await this.signToken(
             byEmail.id,
             byEmail.email,
@@ -195,6 +199,7 @@ export class AuthService {
         ...(byEmail.avatarUrl ? {} : { avatarUrl: profile.avatarUrl }),
       });
       this.logger.log(`[auth] oauth linked ${linked.id}`);
+      this.ensureActive(linked);
       const token = await this.signToken(linked.id, linked.email, linked.role);
       return { user: toPublicUser(linked), token };
     }
@@ -216,6 +221,21 @@ export class AuthService {
   async findSessionUser(id: string): Promise<PublicUser | null> {
     const user = await this.users.findById(id);
     return user ? toPublicUser(user) : null;
+  }
+
+  /**
+   * Suspension stops auth, not the row. Checked after the credential verifies (so the
+   * answer never leaks whether the email exists) and before any token is signed — in
+   * `login` and on every OAuth path that returns an existing account.
+   */
+  private ensureActive(user: { id: string; status: string }): void {
+    if (user.status !== 'SUSPENDED') return;
+    this.logger.warn(`[auth] refused suspended account ${user.id}`);
+    throw new ApiError(
+      HttpStatus.FORBIDDEN,
+      'ACCOUNT_SUSPENDED',
+      'This account has been suspended',
+    );
   }
 
   private async signToken(
