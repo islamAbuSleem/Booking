@@ -189,6 +189,7 @@ async function seededUser(
     avatarUrl: null,
     passwordHash: await passwords.hash(PASSWORD),
     role: 'GUEST',
+    status: 'ACTIVE',
     oauthProvider: null,
     oauthAccountId: null,
     createdAt: new Date(),

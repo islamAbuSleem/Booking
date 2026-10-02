@@ -116,6 +116,7 @@ describe('Auth API (e2e)', () => {
       avatarUrl: null,
       passwordHash: seeded,
       role: 'GUEST',
+      status: 'ACTIVE',
       oauthProvider: null,
       oauthAccountId: null,
       createdAt: new Date(),

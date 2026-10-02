@@ -587,6 +587,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform totals for the moderation console */
+        get: operations["AdminController_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/listings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listings for moderation, optionally filtered by status
+         * @description Every status, not just PUBLISHED: the pending queue is the point of this route.
+         */
+        get: operations["AdminController_listings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/listings/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Approve, reject, or suspend a listing
+         * @description PUBLISHED approves, REJECTED refuses, SUSPENDED pulls a live listing.
+         */
+        patch: operations["AdminController_setListingStatus"];
+        trace?: never;
+    };
+    "/api/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search users, optionally filtered by query and role
+         * @description The query matches name or email, case-insensitive.
+         */
+        get: operations["AdminController_users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/users/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Suspend or reactivate a user
+         * @description SUSPENDED stops login and every JWT-authenticated route for the account; ACTIVE restores it. An admin cannot suspend their own account (400 `ADMIN_SELF_SUSPEND`).
+         */
+        patch: operations["AdminController_setUserStatus"];
+        trace?: never;
+    };
+    "/api/admin/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reviews for moderation, optionally filtered by status
+         * @description Both VISIBLE and HIDDEN — hiding is reversible, so both directions list.
+         */
+        get: operations["AdminController_reviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/reviews/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Hide or re-show a review
+         * @description HIDDEN removes it from every public list; VISIBLE restores it.
+         */
+        patch: operations["AdminController_setReviewStatus"];
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1238,6 +1375,149 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ReviewableData"];
+        };
+        AdminListingsQuery: {
+            /** @enum {string} */
+            status?: "PENDING" | "PUBLISHED" | "REJECTED" | "SUSPENDED";
+        };
+        AdminListingStatus: {
+            /** @enum {string} */
+            status: "PENDING" | "PUBLISHED" | "REJECTED" | "SUSPENDED";
+        };
+        AdminUsersQuery: {
+            query?: string;
+            /** @enum {string} */
+            role?: "GUEST" | "HOST" | "ADMIN";
+        };
+        AdminUserStatus: {
+            /** @enum {string} */
+            status: "ACTIVE" | "SUSPENDED";
+        };
+        AdminReviewsQuery: {
+            /** @enum {string} */
+            status?: "VISIBLE" | "HIDDEN";
+        };
+        AdminReviewStatus: {
+            /** @enum {string} */
+            status: "VISIBLE" | "HIDDEN";
+        };
+        AdminHotel: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            city: string;
+            country: string;
+            /** @enum {string} */
+            status: "PENDING" | "PUBLISHED" | "REJECTED" | "SUSPENDED";
+            host: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                email: string;
+            };
+            roomsCount: number;
+            createdAt: string;
+        };
+        AdminUser: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            name: string;
+            /** @enum {string} */
+            role: "GUEST" | "HOST" | "ADMIN";
+            /** @enum {string} */
+            status: "ACTIVE" | "SUSPENDED";
+            createdAt: string;
+        };
+        AdminReview: {
+            /** Format: uuid */
+            id: string;
+            hotel: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            rating: number;
+            title: string;
+            body: string;
+            /** @enum {string} */
+            status: "VISIBLE" | "HIDDEN";
+            createdAt: string;
+        };
+        AdminStatsData: {
+            usersTotal: number;
+            usersByRole: {
+                GUEST: number;
+                HOST: number;
+                ADMIN: number;
+            };
+            hotelsTotal: number;
+            hotelsByStatus: {
+                PENDING: number;
+                PUBLISHED: number;
+                REJECTED: number;
+                SUSPENDED: number;
+            };
+            bookingsTotal: number;
+            bookingsByStatus: {
+                PENDING: number;
+                CONFIRMED: number;
+                COMPLETED: number;
+                CANCELLED: number;
+            };
+            reviewsTotal: number;
+            reviewsHidden: number;
+        };
+        AdminStats: components["schemas"]["AdminStatsData"];
+        AdminStatsEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AdminStatsData"];
+        };
+        AdminHotelListData: {
+            items: components["schemas"]["AdminHotel"][];
+        };
+        AdminHotelListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AdminHotelListData"];
+        };
+        AdminHotelEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AdminHotel"];
+        };
+        AdminUserListData: {
+            items: components["schemas"]["AdminUser"][];
+        };
+        AdminUserListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AdminUserListData"];
+        };
+        AdminUserEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AdminUser"];
+        };
+        AdminReviewListData: {
+            items: components["schemas"]["AdminReview"][];
+        };
+        AdminReviewListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AdminReviewListData"];
+        };
+        AdminReviewEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AdminReview"];
         };
     };
     responses: never;
@@ -2783,6 +3063,362 @@ export interface operations {
                 };
             };
             /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AdminController_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User, hotel, booking, and review totals with breakdowns. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStatsEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Signed in, but not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AdminController_listings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching hotels, newest first, with their hosts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminHotelListEnvelope"];
+                };
+            };
+            /** @description The query string failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Signed in, but not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AdminController_setListingStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The hotel with its new status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminHotelEnvelope"];
+                };
+            };
+            /** @description The body failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Signed in, but not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such hotel. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AdminController_users: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching users, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserListEnvelope"];
+                };
+            };
+            /** @description The query string failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Signed in, but not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AdminController_setUserStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The user, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user with their new status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserEnvelope"];
+                };
+            };
+            /** @description The body failed validation, or the admin targeted themselves. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Signed in, but not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such user. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AdminController_reviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching reviews, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReviewListEnvelope"];
+                };
+            };
+            /** @description The query string failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Signed in, but not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AdminController_setReviewStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The review, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The review with its new status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminReviewEnvelope"];
+                };
+            };
+            /** @description The body failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Signed in, but not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such review. */
             404: {
                 headers: {
                     [name: string]: unknown;
