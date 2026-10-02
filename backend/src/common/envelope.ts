@@ -32,4 +32,7 @@ export const errorEnvelopeSchema = z.object({
   error: errorBodySchema,
 });
 
+export const apiErrorEnvelopeSchema = errorEnvelopeSchema;
+
 export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
+export type ApiErrorEnvelope = z.infer<typeof apiErrorEnvelopeSchema>;

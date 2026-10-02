@@ -15,6 +15,8 @@ import {
   type UserRecord,
   type UsersRepository,
 } from '../src/modules/users/users.repository.js';
+import { HOST_REPOSITORY } from '../src/modules/host/host.repository.js';
+import { StubHostRepository } from '../src/modules/host/host.stub.js';
 import { PasswordService } from '../src/modules/auth/password.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
@@ -159,6 +161,8 @@ describe('Uploads API (e2e)', () => {
           ]),
         ),
       )
+      .overrideProvider(HOST_REPOSITORY)
+      .useValue(new StubHostRepository())
       .overrideProvider(UPLOADS_REPOSITORY)
       .useValue(uploads)
       .overrideProvider(CLOUDINARY)

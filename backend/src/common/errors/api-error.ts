@@ -53,6 +53,11 @@ export const ERROR_CODES = [
   // this host may neither attach nor delete. The folder-prefix rule is the DB-free check
   // the ticket specifies (D58); a listing-ownership check is T22's, not this one's.
   'UPLOAD_FOREIGN',
+  // T22 — host listing management. Every host route is scoped to the caller's own
+  // listings, so a hotel/room/blackout owned by someone else is a 403, not a 404: the
+  // code states which rule failed rather than hiding the row's existence (same shape
+  // as T20's NOT_BOOKING_OWNER).
+  'NOT_HOTEL_OWNER',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -82,6 +87,14 @@ export class ApiError extends HttpException {
 
 export function badRequest(message: string, details?: unknown): ApiError {
   return new ApiError(HttpStatus.BAD_REQUEST, 'BAD_REQUEST', message, details);
+}
+
+export function forbidden(
+  code: ErrorCode,
+  message: string,
+  details?: unknown,
+): ApiError {
+  return new ApiError(HttpStatus.FORBIDDEN, code, message, details);
 }
 
 export function notFound(
