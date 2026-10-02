@@ -44,6 +44,10 @@ export type ApiUpdateHotel = components['schemas']['UpdateHotel']
 export type ApiCreateRoom = components['schemas']['CreateRoom']
 export type ApiUpdateRoom = components['schemas']['UpdateRoom']
 export type ApiCreateBlackout = components['schemas']['CreateBlackout']
+export type ApiReview = components['schemas']['Review']
+export type ApiReviewListData = components['schemas']['ReviewListData']
+export type ApiReviewable = components['schemas']['ReviewableData']
+export type ApiCreateReview = components['schemas']['CreateReview']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -365,6 +369,29 @@ export async function deleteBlackout(blackoutId: string): Promise<void> {
 /** Every booking on the caller's rooms, newest first — the "incoming" table. */
 export async function fetchHostBookings(): Promise<ApiHostBookingListData> {
   return apiFetch<ApiHostBookingListData>('/api/host/hotels/bookings')
+}
+
+/**
+ * T24. A hotel's visible reviews, newest first. Takes the same uuid-or-slug the detail
+ * route does, so the page never resolves the slug first and waterfalls.
+ */
+export async function fetchHotelReviews(hotelIdOrSlug: string, page = 1, pageSize = 10): Promise<ApiReviewListData> {
+  return apiFetch<ApiReviewListData>(`/api/hotels/${encodeURIComponent(hotelIdOrSlug)}/reviews`, {
+    query: { page, pageSize },
+  })
+}
+
+/** T24. One review per completed stay — a second write for the same booking 409s. */
+export async function createReview(hotelId: string, body: ApiCreateReview): Promise<ApiReview> {
+  return apiFetch<ApiReview>(`/api/hotels/${encodeURIComponent(hotelId)}/reviews`, { method: 'POST', json: body })
+}
+
+/**
+ * T24. Whether the caller may review this booking right now. A negative answer is data
+ * (`canReview: false` + reason), not an error — the form branches on it.
+ */
+export async function fetchReviewable(bookingId: string): Promise<ApiReviewable> {
+  return apiFetch<ApiReviewable>(`/api/bookings/${encodeURIComponent(bookingId)}/reviewable`)
 }
 
 /**

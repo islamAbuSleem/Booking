@@ -58,6 +58,13 @@ export const ERROR_CODES = [
   // code states which rule failed rather than hiding the row's existence (same shape
   // as T20's NOT_BOOKING_OWNER).
   'NOT_HOTEL_OWNER',
+  // T24 — reviews. One review per completed stay: the unique `bookingId` is the
+  // authority, and a second write for the same stay is a 409 the form branches on
+  // (showing the existing review instead of failing silently).
+  'ALREADY_REVIEWED',
+  // T24 — the stay is not in a reviewable state. Only COMPLETED stays can be reviewed;
+  // anything else (PENDING, CONFIRMED, CANCELLED) is a 400, not a silent no-op.
+  'INVALID_REVIEW_STATE',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
