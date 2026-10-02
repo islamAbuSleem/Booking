@@ -5,6 +5,8 @@ import { DTO_SCHEMAS as BOOKINGS_DTO_SCHEMAS } from '../modules/bookings/dto/boo
 import { DTO_SCHEMAS as AUTH_DTO_SCHEMAS } from '../modules/auth/dto/auth.dto.js';
 import { DTO_SCHEMAS as FAVORITES_DTO_SCHEMAS } from '../modules/favorites/dto/favorite.dto.js';
 import { DTO_SCHEMAS } from '../modules/hotels/dto/hotel.dto.js';
+import { DTO_SCHEMAS as HOST_DTO_SCHEMAS } from '../modules/host/dto/host.api.js';
+import { DTO_SCHEMAS as REVIEWS_DTO_SCHEMAS } from '../modules/reviews/dto/review.dto.js';
 import { DTO_SCHEMAS as UPLOADS_DTO_SCHEMAS } from '../modules/uploads/dto/uploads.dto.js';
 import { DTO_SCHEMAS as USER_DTO_SCHEMAS } from '../modules/users/dto/user.dto.js';
 
@@ -36,6 +38,11 @@ export const CONTRACT_SCHEMAS = {
   // untyped `z.string()` (D54). `AttachUploadEnvelope` wraps the T16 `HotelImage`
   // component, not a copy of it.
   ...UPLOADS_DTO_SCHEMAS,
+  // T22 — host listing management components.
+  ...HOST_DTO_SCHEMAS,
+  // T24 — reviews. `ALREADY_REVIEWED` and `INVALID_REVIEW_STATE` join `ERROR_CODES`
+  // the same way; the `ApiErrorEnvelope` code stays an untyped `z.string()` (D54).
+  ...REVIEWS_DTO_SCHEMAS,
 } as const satisfies Record<string, z.ZodType>;
 
 export type ContractSchemaName = keyof typeof CONTRACT_SCHEMAS;

@@ -68,9 +68,9 @@
 - [x] T19 Favorites
 - [x] T20 Bookings API
 - [x] T21 Cloudinary upload
-- [ ] T22 Host listing management API
-- [ ] T23 Wire auth into the frontend
-- [ ] T24 Reviews
+- [x] T22 Host listing management API
+- [x] T23 Wire auth into the frontend
+- [x] T24 Reviews
 - [ ] T25 Admin moderation
 
 ### Phase 3 — Advanced
@@ -488,6 +488,56 @@
   image to any `hotelId` if the `publicId` prefix matches their own folder — T22's host-ownership
   query-filter rule is what closes this. If T22 lands without that check, a host could attach
   images to another host's hotel.
+- **D60 — T22 ownership failures are 403 `NOT_HOTEL_OWNER`, never a bare `Error` and never
+  the P2025 404.** The first draft threw `new Error('NOT_HOTEL_OWNER')`, which the exception
+  filter renders as a 500, and the room/blackout writes went straight to Prisma, where a
+  foreign id would have answered P2025/404 — letting host B probe host A's ids by status
+  code. The service now pre-checks (`findRoomHost`/`findBlackoutHost`) and throws
+  `forbidden('NOT_HOTEL_OWNER')`. Unknown ids answer 403 alike: missing and foreign are
+  indistinguishable on purpose. Pinned by `test/host.e2e-spec.ts` (8 tests).
+- **D61 — T22 is backend-complete but the ticket is not done: T10 still reads mocks.**
+  The ticket's UI line ("T10 wires to real data") is outstanding — `dashboard/host/*`
+  still renders fixtures. It was sequenced after T23 on purpose (the wiring needs a real
+  session), not skipped. The checkbox stays open until the dashboard reads the API.
+- **D62 — `useAuth` state lives in `useState`, not a per-call `ref`.** The header, the
+  route middleware, and pages each call `useAuth()` independently; a plain `ref` would give
+  each caller its own session copy and the header would never reflect a login performed
+  elsewhere. `useState` is also serialised into the SSR payload, and `app/plugins/auth.ts`
+  hydrates it before first render so there is no signed-out flash. The mock `useSession`
+  is deleted — a grep for it returns only the comment in `useAuth` that names its
+  replacement.
+- **D63 — T22 wiring is API-first with a fixture fallback, behind a view-model seam.**
+  `dashboard/host/*` reads the host endpoints via `useAsyncData` and maps both the live
+  payloads and the fixtures into the same view models, so the template never branches on
+  the source. Four honest limits, all owned by the API rather than papered over in the
+  form: (1) the host list carries no review aggregates, so ratings render "—" until T24/T41;
+  (2) room prices have no write endpoint until multi-currency (T39), so the edit page shows
+  the price as a locked line; (3) hotel-scoped blackouts are not returned by the detail
+  payload, so only room-scoped ones seed the edit list; (4) the wizard creates listings at
+  lat/lng 0,0 — no location picker exists (maps are a placeholder per D28) and an invented
+  coordinate would be worse than a zero one. The wizard collects the fields the create
+  schema actually requires (address, country, stars, check-in/out, room description/bed/inventory)
+  and `amenityIds` was added to create/update because the ticket promises amenities CRUD.
+  Publishing is refused unconditionally on the host route (`FORBIDDEN` even for admins) —
+  it is T25 moderation's job, so the route has one rule for every caller.
+- **D64 — `BaseInput` accepts `time`, and the wizard's star rating rides as text.**
+  `BaseSelect` is string-modelled, so the 1–5 rating is selected as `'3'` and converted
+  with `Number()` at the submit edge rather than widening the shared component's model.
+- **D65 — T24 checks five rules cheapest-first, each with its own answer.** Missing
+  booking → 404 `BOOKING_NOT_FOUND`; foreign booking → 403 `NOT_BOOKING_OWNER` (the T20
+  code); booking from another hotel → 404 (posted *under* a hotel, so "not found here");
+  non-COMPLETED stay → 400 `INVALID_REVIEW_STATE`; second review → 409
+  `ALREADY_REVIEWED` on the unique `bookingId`. The aggregate is derived at read time
+  from the same VISIBLE rows — "recalculate on write" is a no-op by construction, and
+  there is no column to drift. `GET reviewable` returns data, not errors, for the two
+  negative states.
+- **D66 — the reviews list resolves uuid-or-slug so it never waterfalls behind the
+  detail fetch.** Both run concurrently on the raw route param. The card renders a
+  `ReviewView`, not the mock shape: the API carries no author location (dropped, never
+  invented) and its `createdAt` instant is truncated to the day, because
+  `formatStayDate` pins UTC midnight and a full instant would shift it. Fixture reviews
+  render only under a fixture hotel. The booking-detail form renders only for a live
+  COMPLETED booking with `canReview: true`; fixtures are read-only.
 
 ## Notes
 

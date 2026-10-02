@@ -25,6 +25,8 @@ import {
   type UserRecord,
   type UsersRepository,
 } from '../src/modules/users/users.repository.js';
+import { HOST_REPOSITORY } from '../src/modules/host/host.repository.js';
+import { StubHostRepository } from '../src/modules/host/host.stub.js';
 import { PasswordService } from '../src/modules/auth/password.service.js';
 import { stayNights } from '../src/modules/bookings/availability.service.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
@@ -318,6 +320,8 @@ describe('Bookings API (e2e)', () => {
           ]),
         ),
       )
+      .overrideProvider(HOST_REPOSITORY)
+      .useValue(new StubHostRepository())
       .overrideProvider(AVAILABILITY_REPOSITORY)
       .useValue(world)
       .overrideProvider(BOOKINGS_REPOSITORY)

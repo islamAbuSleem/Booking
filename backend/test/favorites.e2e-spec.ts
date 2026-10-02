@@ -14,6 +14,8 @@ import {
   type FavoriteRecord,
   type FavoritesRepository,
 } from '../src/prisma/favorites.repository.js';
+import { HOST_REPOSITORY } from '../src/modules/host/host.repository.js';
+import { StubHostRepository } from '../src/modules/host/host.stub.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 /**
@@ -139,6 +141,8 @@ describe('Favorites API (e2e)', () => {
       })
       .overrideProvider(USERS_REPOSITORY)
       .useValue(users)
+      .overrideProvider(HOST_REPOSITORY)
+      .useValue(new StubHostRepository())
       .overrideProvider(FAVORITES_REPOSITORY)
       .useValue(favorites)
       .compile();
