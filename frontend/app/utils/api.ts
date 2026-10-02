@@ -32,6 +32,18 @@ export type ApiBooking = components['schemas']['Booking']
 export type ApiBookingListData = components['schemas']['BookingListData']
 export type ApiUploadSign = components['schemas']['UploadSign']
 export type ApiAttachUpload = components['schemas']['AttachUpload']
+export type ApiHostHotelListItem = components['schemas']['HostHotelListItem']
+export type ApiHostHotelListData = components['schemas']['HostHotelListData']
+export type ApiHostHotelDetail = components['schemas']['HostHotelDetail']
+export type ApiHostRoom = components['schemas']['RoomDetail']
+export type ApiHostBlackout = components['schemas']['BlackoutDate']
+export type ApiHostBooking = components['schemas']['HostBookingListItem']
+export type ApiHostBookingListData = components['schemas']['HostBookingListData']
+export type ApiCreateHotel = components['schemas']['CreateHotel']
+export type ApiUpdateHotel = components['schemas']['UpdateHotel']
+export type ApiCreateRoom = components['schemas']['CreateRoom']
+export type ApiUpdateRoom = components['schemas']['UpdateRoom']
+export type ApiCreateBlackout = components['schemas']['CreateBlackout']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -132,14 +144,17 @@ interface ApiRequestOptions {
    * `POST` for the writes that carry a body — the quote (which changes nothing, the
    * server prices a stay and answers 200), the favourites insert, and the upload
    * sign/attach. `DELETE` is a path-only call that answers 204 with no body at all.
+   * `PATCH` for the updates that carry a partial body.
    */
-  method?: 'POST' | 'DELETE'
+  method?: 'POST' | 'DELETE' | 'PATCH'
   /**
-   * `boolean` is here for `AttachUpload.isCover`. Optional fields stay `undefined`
-   * rather than being dropped by the caller: `$fetch` omits them from the JSON body, so
-   * the API applies its own default, which is what its Zod schema describes.
+   * Flat key/value bodies stay a `Record` so `$fetch` omits `undefined` optionals and
+   * the API applies its own defaults. Bodies with nested arrays (room prices, room
+   * images) cannot be expressed that way, so they travel as `json` instead — one or
+   * the other, never both.
    */
   body?: Record<string, string | number | boolean | undefined>
+  json?: unknown
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -160,7 +175,7 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
       headers,
       method: options.method,
       query: options.query,
-      body: options.body,
+      body: options.json !== undefined ? options.json : options.body,
     })
   }
   catch (error: unknown) {
@@ -289,6 +304,67 @@ export async function fetchBooking(id: string): Promise<ApiBooking> {
  */
 export async function cancelBooking(id: string): Promise<ApiBooking> {
   return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+}
+
+/**
+ * T22. The host's own listings. Scoped server-side to the caller — a 403
+ * `NOT_HOTEL_OWNER` is the answer for someone else's id, and the list never contains
+ * it in the first place. Anonymous callers 401, which pages treat as the mock-fallback
+ * signal exactly like the bookings pages do.
+ */
+export async function fetchMyHotels(): Promise<ApiHostHotelListData> {
+  return apiFetch<ApiHostHotelListData>('/api/host/hotels')
+}
+
+/** Accepts a uuid or a slug, like the public detail route. */
+export async function fetchMyHotel(id: string): Promise<ApiHostHotelDetail> {
+  return apiFetch<ApiHostHotelDetail>(`/api/host/hotels/${encodeURIComponent(id)}`)
+}
+
+/** Creates the listing `PENDING`. The slug comes back on the detail for the edit link. */
+export async function createHotel(body: ApiCreateHotel): Promise<ApiHostHotelDetail> {
+  return apiFetch<ApiHostHotelDetail>('/api/host/hotels', { method: 'POST', json: body })
+}
+
+/** A host can suspend their own listing here, but never publish it (403 `FORBIDDEN`). */
+export async function updateHotel(id: string, body: ApiUpdateHotel): Promise<ApiHostHotelDetail> {
+  return apiFetch<ApiHostHotelDetail>(`/api/host/hotels/${encodeURIComponent(id)}`, { method: 'PATCH', json: body })
+}
+
+/** 204, no body. Rooms, images and blackouts cascade server-side. */
+export async function deleteHotel(id: string): Promise<void> {
+  await apiFetch<undefined>(`/api/host/hotels/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function createRoom(hotelId: string, body: ApiCreateRoom): Promise<ApiHostRoom> {
+  return apiFetch<ApiHostRoom>(`/api/host/hotels/${encodeURIComponent(hotelId)}/rooms`, { method: 'POST', json: body })
+}
+
+export async function updateRoom(roomId: string, body: ApiUpdateRoom): Promise<ApiHostRoom> {
+  return apiFetch<ApiHostRoom>(`/api/host/hotels/rooms/${encodeURIComponent(roomId)}`, { method: 'PATCH', json: body })
+}
+
+/** 204, no body. Only when no confirmed booking needs the room. */
+export async function deleteRoom(roomId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/host/hotels/rooms/${encodeURIComponent(roomId)}`, { method: 'DELETE' })
+}
+
+/**
+ * `roomId: null` closes the whole hotel for the range, otherwise just that room.
+ * Dates are `YYYY-MM-DD`, inclusive on both ends.
+ */
+export async function createBlackout(hotelId: string, body: ApiCreateBlackout): Promise<ApiHostBlackout> {
+  return apiFetch<ApiHostBlackout>(`/api/host/hotels/${encodeURIComponent(hotelId)}/blackouts`, { method: 'POST', json: body })
+}
+
+/** 204, no body. */
+export async function deleteBlackout(blackoutId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/host/hotels/blackouts/${encodeURIComponent(blackoutId)}`, { method: 'DELETE' })
+}
+
+/** Every booking on the caller's rooms, newest first — the "incoming" table. */
+export async function fetchHostBookings(): Promise<ApiHostBookingListData> {
+  return apiFetch<ApiHostBookingListData>('/api/host/hotels/bookings')
 }
 
 /**

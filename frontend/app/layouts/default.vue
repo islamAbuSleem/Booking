@@ -1,11 +1,19 @@
 <script setup lang="ts">
 const route = useRoute()
+const { current: user, isSignedIn, isHost, logout } = useAuth()
 
 const nav = computed(() => [
   { to: '/', label: 'nav.stays' },
   { to: '/hotels', label: 'nav.destinations' },
   { to: '/bookings', label: 'nav.trips' },
+  ...(isHost.value ? [{ to: '/dashboard/host', label: 'nav.dashboard' }] : []),
 ])
+
+/** `LOGOUT` is a plain function so the form never renders a real submit button. */
+async function onLogout(): Promise<void> {
+  await logout()
+  await navigateTo('/')
+}
 </script>
 
 <template>
@@ -43,19 +51,39 @@ const nav = computed(() => [
         </nav>
 
         <div class="flex items-center gap-5">
-          <NuxtLink
-            to="/dashboard/host/new"
-            class="text-link text-sm underline-offset-4 hover:underline"
-          >
-            {{ $t('nav.listYourProperty') }}
-          </NuxtLink>
-          <BaseButton
-            variant="primary"
-            size="sm"
-            to="/login"
-          >
-            {{ $t('nav.signIn') }}
-          </BaseButton>
+          <template v-if="isSignedIn">
+            <NuxtLink
+              to="/dashboard/host/new"
+              class="text-link text-sm underline-offset-4 hover:underline"
+            >
+              {{ $t('nav.listYourProperty') }}
+            </NuxtLink>
+            <span class="text-fg-muted text-sm">
+              {{ user?.name }}
+            </span>
+            <BaseButton
+              variant="secondary"
+              size="sm"
+              @click="onLogout"
+            >
+              {{ $t('nav.signOut') }}
+            </BaseButton>
+          </template>
+          <template v-else>
+            <NuxtLink
+              to="/dashboard/host/new"
+              class="text-link text-sm underline-offset-4 hover:underline"
+            >
+              {{ $t('nav.listYourProperty') }}
+            </NuxtLink>
+            <BaseButton
+              variant="primary"
+              size="sm"
+              to="/login"
+            >
+              {{ $t('nav.signIn') }}
+            </BaseButton>
+          </template>
         </div>
       </div>
     </header>

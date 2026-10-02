@@ -12,7 +12,8 @@
     "or": "or",
     "edit": "Edit",
     "save": "Save changes",
-    "remove": "Remove"
+    "remove": "Remove",
+    "unexpectedError": "Something went wrong. Please try again."
   },
   "nav": {
     "stays": "Stays",
@@ -22,7 +23,8 @@
     "listYourProperty": "List your property",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "menu": "Menu"
+    "menu": "Menu",
+    "dashboard": "Dashboard"
   },
   "search": {
     "destination": "Destination",
@@ -286,7 +288,8 @@
     "creatingAccount": "Creating account…",
     "haveAccount": "Already have an account?",
     "hostIntent": "I want to list a property",
-    "hostIntentHint": "Hosts get the property dashboard after signing in."
+    "hostIntentHint": "Hosts get the property dashboard after signing in.",
+    "emailExists": "An account with that email already exists."
   },
   "host": {
     "title": "Your properties",
@@ -357,7 +360,24 @@
     "summaryHeading": "Summary",
     "savedTitle": "Changes saved",
     "savedBody": "{name} is up to date on this device. The host API persists it.",
-    "editTitle": "Edit listing"
+    "editTitle": "Edit listing",
+    "emptyTitle": "No properties yet",
+    "emptyHint": "Create your first listing to start taking bookings.",
+    "noBookingsHint": "No bookings yet. New reservations will appear here.",
+    "fieldAddress": "Street address",
+    "fieldCountry": "Country",
+    "fieldStarRating": "Star rating",
+    "fieldCheckIn": "Check-in time",
+    "fieldCheckOut": "Check-out time",
+    "roomDescription": "Description",
+    "roomBedType": "Bed type",
+    "roomInventory": "Rooms of this type",
+    "roomDescriptionRequired": "Give the room a one-line description.",
+    "roomBedTypeRequired": "Name the bed type (e.g. King, Twin).",
+    "roomInventoryRequired": "How many rooms of this type can be sold at once?",
+    "creatingListing": "Creating listing…",
+    "roomPriceLocked": "Nightly prices are set per currency and can’t be changed here yet",
+    "saving": "Saving…"
   },
   "admin": {
     "title": "Moderation",
