@@ -8,6 +8,9 @@ import { BookingsModule } from './modules/bookings/bookings.module.js';
 import { FavoritesModule } from './modules/favorites/favorites.module.js';
 import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { UsersModule } from './modules/users/users.module.js';
+import { HostModule } from './modules/host/host.module.js';
+import { ReviewsModule } from './modules/reviews/reviews.module.js';
+import { AdminModule } from './modules/admin/admin.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -22,6 +25,9 @@ import { PrismaModule } from './prisma/prisma.module.js';
     FavoritesModule,
     UploadsModule,
     HotelsModule,
+    HostModule,
+    ReviewsModule,
+    AdminModule,
     HealthModule,
   ],
 })

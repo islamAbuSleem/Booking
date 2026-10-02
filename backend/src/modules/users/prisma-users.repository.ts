@@ -73,6 +73,7 @@ export class PrismaUsersRepository implements UsersRepository {
           ? { passwordHash: patch.passwordHash }
           : {}),
         ...(patch.role !== undefined ? { role: patch.role } : {}),
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
         ...(patch.oauthProvider !== undefined
           ? { oauthProvider: patch.oauthProvider }
           : {}),
@@ -92,6 +93,7 @@ interface PrismaUserRow {
   avatarUrl: string | null;
   passwordHash: string | null;
   role: 'GUEST' | 'HOST' | 'ADMIN';
+  status: 'ACTIVE' | 'SUSPENDED';
   oauthProvider: string | null;
   oauthAccountId: string | null;
   createdAt: Date;
@@ -105,6 +107,7 @@ function toRecord(row: PrismaUserRow): UserRecord {
     avatarUrl: row.avatarUrl,
     passwordHash: row.passwordHash,
     role: row.role,
+    status: row.status,
     oauthProvider: row.oauthProvider,
     oauthAccountId: row.oauthAccountId,
     createdAt: row.createdAt,

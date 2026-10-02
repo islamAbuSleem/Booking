@@ -10,6 +10,7 @@ describe('UsersService', () => {
       avatarUrl: null,
       passwordHash: 'hash',
       role: 'GUEST' as const,
+      status: 'ACTIVE' as const,
       oauthProvider: null,
       oauthAccountId: null,
       createdAt: new Date(),
