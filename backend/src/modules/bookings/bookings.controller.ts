@@ -15,9 +15,11 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { MUTATION_THROTTLE } from '../../common/throttle/app-throttler.guard.js';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import { AvailabilityService } from './availability.service.js';
 import { BookingsService } from './bookings.service.js';
@@ -59,6 +61,7 @@ export class BookingsController {
 
   @Post('quote')
   @Public()
+  @Throttle({ default: MUTATION_THROTTLE })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Price a stay and check it is bookable',
@@ -103,6 +106,7 @@ export class BookingsController {
   }
 
   @Post()
+  @Throttle({ default: MUTATION_THROTTLE })
   @ApiOperation({
     summary: 'Book a room',
     description:
@@ -220,6 +224,7 @@ export class BookingsController {
   }
 
   @Post(':id/cancel')
+  @Throttle({ default: MUTATION_THROTTLE })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: "Cancel the caller's booking",
