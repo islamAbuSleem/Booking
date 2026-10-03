@@ -347,6 +347,19 @@ export class PrismaBookingRepository implements BookingRepository {
     if (count === 0) return null;
     return this.findById(bookingId);
   }
+
+  async transitionStatus(
+    bookingId: string,
+    from: BookingStatus,
+    to: BookingStatus,
+  ): Promise<BookingRecord | null> {
+    const { count } = await this.prisma.booking.updateMany({
+      where: { id: bookingId, status: from },
+      data: { status: to },
+    });
+    if (count === 0) return null;
+    return this.findById(bookingId);
+  }
 }
 
 type HotelSnapshotRow = Prisma.HotelGetPayload<{

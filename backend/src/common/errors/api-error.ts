@@ -53,6 +53,44 @@ export const ERROR_CODES = [
   // this host may neither attach nor delete. The folder-prefix rule is the DB-free check
   // the ticket specifies (D58); a listing-ownership check is T22's, not this one's.
   'UPLOAD_FOREIGN',
+  // T22 — host listing management. Every host route is scoped to the caller's own
+  // listings, so a hotel/room/blackout owned by someone else is a 403, not a 404: the
+  // code states which rule failed rather than hiding the row's existence (same shape
+  // as T20's NOT_BOOKING_OWNER).
+  'NOT_HOTEL_OWNER',
+  // T24 — reviews. One review per completed stay: the unique `bookingId` is the
+  // authority, and a second write for the same stay is a 409 the form branches on
+  // (showing the existing review instead of failing silently).
+  'ALREADY_REVIEWED',
+  // T24 — the stay is not in a reviewable state. Only COMPLETED stays can be reviewed;
+  // anything else (PENDING, CONFIRMED, CANCELLED) is a 400, not a silent no-op.
+  'INVALID_REVIEW_STATE',
+  // T26 — payments.
+  // `INVALID_PAYMENT_STATE`: only a PENDING booking can take an intent. Anything else
+  // (CONFIRMED, COMPLETED, CANCELLED) is a 400 — the money for those states is settled
+  // or gone, and an intent now would charge for nothing.
+  'INVALID_PAYMENT_STATE',
+  // `PAYMENT_NOT_FOUND`: no intent has been created for the booking yet.
+  'PAYMENT_NOT_FOUND',
+  // `STRIPE_NOT_CONFIGURED`: the route ran without `STRIPE_SECRET_KEY` (503). Keys are
+  // optional at boot (T15/T21 precedent), so the failure names the missing key instead
+  // of crashing on a null client.
+  'STRIPE_NOT_CONFIGURED',
+  // `PAYMENT_FAILED`: the provider answered something the contract cannot use.
+  'PAYMENT_FAILED',
+  // T27 — `INVALID_SIGNATURE`: the webhook signature did not verify. 400, and the
+  // message says nothing about why: detail here is an oracle for forging.
+  'INVALID_SIGNATURE',
+  // T25 — admin moderation and suspension.
+  // `ADMIN_REQUIRED`: every `/api/admin/*` route, so the client distinguishes "sign in"
+  // (401) from "signed in as the wrong role" (this) instead of rendering one login wall.
+  'ADMIN_REQUIRED',
+  // `ACCOUNT_SUSPENDED`: login and every JWT-authenticated route for a suspended
+  // account. A distinct code — not INVALID_CREDENTIALS — because the fix is "contact
+  // support", not "retry the password", and the client must not offer a retry loop.
+  'ACCOUNT_SUSPENDED',
+  // `ADMIN_SELF_SUSPEND`: an admin suspending their own account, refused as a 400.
+  'ADMIN_SELF_SUSPEND',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -82,6 +120,14 @@ export class ApiError extends HttpException {
 
 export function badRequest(message: string, details?: unknown): ApiError {
   return new ApiError(HttpStatus.BAD_REQUEST, 'BAD_REQUEST', message, details);
+}
+
+export function forbidden(
+  code: ErrorCode,
+  message: string,
+  details?: unknown,
+): ApiError {
+  return new ApiError(HttpStatus.FORBIDDEN, code, message, details);
 }
 
 export function notFound(

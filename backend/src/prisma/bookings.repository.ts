@@ -130,4 +130,15 @@ export interface BookingRepository {
     from: BookingStatus,
     to: BookingStatus,
   ): Promise<BookingRecord | null>;
+  /**
+   * The webhook's flip: same conditional write as `updateStatus` but with no owner in
+   * the `where`, because the caller is Stripe, not a guest. `null` means the row was
+   * already past `from` — which is the idempotency the webhook depends on: a retried
+   * event finds nothing to flip and answers 200 without writing.
+   */
+  transitionStatus(
+    bookingId: string,
+    from: BookingStatus,
+    to: BookingStatus,
+  ): Promise<BookingRecord | null>;
 }

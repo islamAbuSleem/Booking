@@ -9,9 +9,10 @@
  */
 import { AMENITY_BY_ID, getHotelDetail } from '~/utils/mock'
 import type { MockRatingBreakdown, MockReview } from '~/utils/mock/types'
-import { fetchHotelDetail, isApiError, isApiFailure } from '~/utils/api'
+import { fetchHotelDetail, fetchHotelReviews, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiHotelDetail } from '~/utils/api'
-import { mockHotelToDetail } from '~/utils/hotelAdapters'
+import { apiReviewToView, mockHotelToDetail, mockReviewToView } from '~/utils/hotelAdapters'
+import type { ReviewView } from '~/components/ReviewCard.vue'
 import { usd } from '~/utils/format'
 
 const route = useRoute()
@@ -22,9 +23,11 @@ const slug = computed(() => String(route.params.id ?? ''))
 
 interface HotelDetailPayload {
   hotel: ApiHotelDetail | null
+  /** False when the hotel below came from the fixtures — the reviews fetch reads this. */
+  live: boolean
   /** Mock-only: category scores for the bar chart. The API summary has none. */
   breakdown: MockRatingBreakdown | null
-  /** Mock-only: no review list endpoint exists in the T16 contract. */
+  /** Mock-only reviews, for the no-backend fallback. Never mixed with live rows. */
   reviews: MockReview[]
 }
 
@@ -39,22 +42,68 @@ const { data: payload, error } = await useAsyncData<HotelDetailPayload>(
     const id = String(route.params.id ?? '')
     try {
       const hotel = await fetchHotelDetail(id)
-      return { hotel, breakdown: null, reviews: [] }
+      return { hotel, live: true, breakdown: null, reviews: [] }
     }
     catch (fetchError: unknown) {
       if (isApiError(fetchError) && fetchError.code === 'HOTEL_NOT_FOUND') {
-        return { hotel: null, breakdown: null, reviews: [] }
+        return { hotel: null, live: false, breakdown: null, reviews: [] }
       }
       if (isApiFailure(fetchError)) throw fetchError
       const mock = getHotelDetail(id)
-      if (!mock) return { hotel: null, breakdown: null, reviews: [] }
-      return { hotel: mockHotelToDetail(mock), breakdown: mock.rating, reviews: mock.reviews }
+      if (!mock) return { hotel: null, live: false, breakdown: null, reviews: [] }
+      return { hotel: mockHotelToDetail(mock), live: false, breakdown: mock.rating, reviews: mock.reviews }
     }
   },
 )
 
 const hotel = computed(() => payload.value?.hotel ?? null)
 const breakdown = computed(() => payload.value?.breakdown ?? null)
+const isLiveHotel = computed(() => payload.value?.live === true)
+
+interface HotelReviewsPayload {
+  reviews: ReviewView[]
+  /** The list failed and there is nothing honest to show — the section renders a retry. */
+  failed: boolean
+}
+
+/**
+ * T24: the visible reviews. Same uuid-or-slug the detail route took, so this runs
+ * beside the detail fetch instead of behind it. Fixture reviews render only under a
+ * fixture hotel — a live hotel with an unreachable list shows a retry, never someone
+ * else's words.
+ */
+const {
+  data: reviewsPayload,
+  status: reviewsStatus,
+  refresh: refreshReviews,
+} = await useAsyncData<HotelReviewsPayload>(
+  () => `hotel:${String(route.params.id ?? '')}:reviews`,
+  async (): Promise<HotelReviewsPayload> => {
+    const id = String(route.params.id ?? '')
+    const current = hotel.value
+    if (!current) return { reviews: [], failed: false }
+    if (!isLiveHotel.value) {
+      return {
+        reviews: [...(payload.value?.reviews ?? [])]
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .map(mockReviewToView),
+        failed: false,
+      }
+    }
+    try {
+      const page = await fetchHotelReviews(id, 1, 3)
+      return { reviews: page.items.map(apiReviewToView), failed: false }
+    }
+    catch {
+      return { reviews: [], failed: true }
+    }
+  },
+)
+
+/** Newest first — the API already orders this way; the sort keeps the mock path honest. */
+const reviews = computed(() => reviewsPayload.value?.reviews ?? [])
+const reviewsFailed = computed(() => reviewsPayload.value?.failed === true)
+const reviewsLoading = computed(() => reviewsStatus.value === 'pending')
 
 /** A missing slug is a 404, not an exception — render the not-found state in place. */
 if (!hotel.value) {
@@ -79,11 +128,6 @@ const amenities = computed(() =>
   (hotel.value?.amenityIds ?? [])
     .map(id => AMENITY_BY_ID.get(id)?.name)
     .filter((name): name is string => Boolean(name)),
-)
-
-/** Newest first, per the ticket. `localeCompare` on the ISO string is a date order. */
-const reviews = computed(() =>
-  [...(payload.value?.reviews ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
 )
 
 const lightboxOpen = ref(false)
@@ -278,12 +322,37 @@ useHead({
         </div>
 
         <div class="lg:col-span-8">
+          <div v-if="reviewsLoading">
+            <p
+              class="sr-only"
+              role="status"
+            >
+              {{ $t('common.loading') }}
+            </p>
+            <BaseSkeleton :rows="3" />
+          </div>
+
+          <BaseAlert
+            v-else-if="reviewsFailed"
+            tone="danger"
+            :title="$t('detail.reviewsLoadError')"
+          >
+            <p>{{ $t('detail.reviewsLoadHint') }}</p>
+            <button
+              type="button"
+              class="border-danger text-danger mt-2 inline-flex h-11 items-center rounded-sm border px-4 text-sm"
+              @click="refreshReviews()"
+            >
+              {{ $t('common.retry') }}
+            </button>
+          </BaseAlert>
+
           <div
-            v-if="reviews.length"
+            v-else-if="reviews.length"
             class="flex flex-col gap-6"
           >
             <ReviewCard
-              v-for="review in reviews.slice(0, 3)"
+              v-for="review in reviews"
               :key="review.id"
               :review="review"
             />

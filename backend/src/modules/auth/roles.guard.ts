@@ -6,8 +6,8 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from '../../common/decorators/roles.decorator.js';
-import { ApiError } from '../../common/errors/api-error.js';
+import { ROLES_CODE_KEY, ROLES_KEY } from '../../common/decorators/roles.decorator.js';
+import { ApiError, type ErrorCode } from '../../common/errors/api-error.js';
 import type { PublicUser } from '../users/dto/user.dto.js';
 import type { UserRole } from '../users/users.repository.js';
 
@@ -40,10 +40,14 @@ export class RolesGuard implements CanActivate {
       );
     }
     if (!required.includes(user.role)) {
+      const code = this.reflector.getAllAndOverride<ErrorCode>(ROLES_CODE_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? 'FORBIDDEN';
       throw new ApiError(
         HttpStatus.FORBIDDEN,
-        'FORBIDDEN',
-        'Insufficient role',
+        code,
+        code === 'ADMIN_REQUIRED' ? 'Admin access required' : 'Insufficient role',
       );
     }
     return true;
