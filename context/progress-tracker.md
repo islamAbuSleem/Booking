@@ -78,7 +78,7 @@
 - [x] T27 Stripe webhook
 - [x] T28 Checkout UI
 - [x] T29 Rate limiting
-- [ ] T30 i18n scaffolding
+- [x] T30 i18n scaffolding
 
 ### Phase 4 — Polish
 - [ ] T31 SEO
@@ -592,6 +592,13 @@
   maps 429 → `RATE_LIMITED`); the guard sets the `Retry-After` header itself.
   Webhook and health skip throttling — provider retries and monitor polls must never
   429. Pinned by firing six rapid registrations: five 201s, then the envelope.
+- **D74 — T30 extracted two pagination strings; everything else already went through
+  `$t`.** A template-wide audit (text nodes, static/bound user-facing attributes,
+  mustache literals) found only `$t()` calls, data-driven alt fallbacks, and one code
+  comment. Numbers now all flow through Intl: `formatRating`/`formatCoordinate` replace
+  every `toFixed`, and count interpolations ride `wholeNumber()` (plus `BaseInput`
+  accepting `time`, and `common.pagination`/`common.pageNumber` keys). No message text
+  changed — grouping is the only visible difference, and only past 999.
 
 ## Notes
 

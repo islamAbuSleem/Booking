@@ -11,7 +11,7 @@
  * location and a date-only string. Both map into this view (see `hotelAdapters.ts`)
  * so the card never branches on the source.
  */
-import { formatStayDate } from '~/utils/format'
+import { formatRating, formatStayDate } from '~/utils/format'
 
 export interface ReviewView {
   id: string
@@ -62,7 +62,7 @@ const initials = computed(() =>
       </div>
 
       <p class="tabular ml-auto shrink-0 text-sm font-semibold">
-        {{ review.rating.toFixed(1) }}
+        {{ formatRating(review.rating) }}
       </p>
     </div>
 

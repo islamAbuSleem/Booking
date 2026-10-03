@@ -32,7 +32,7 @@ const go = (page: number): void => {
   <nav
     v-if="totalPages > 1"
     class="flex items-center gap-1"
-    :aria-label="'Pagination'"
+    :aria-label="$t('common.pagination')"
   >
     <button
       type="button"
@@ -62,7 +62,7 @@ const go = (page: number): void => {
             : 'border-rule text-fg-muted hover:border-fg'
         "
         :aria-current="entry === page ? 'page' : undefined"
-        :aria-label="`Page ${entry}`"
+        :aria-label="$t('common.pageNumber', { entry })"
         @click="go(entry)"
       >
         {{ entry }}

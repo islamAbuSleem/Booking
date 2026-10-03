@@ -401,7 +401,7 @@ useSeoMeta({
             class="text-fg-muted mt-4 text-sm"
             aria-live="polite"
           >
-            {{ $t('host.photosSummary', { done: uploadedCount, total: uploads.length }) }}
+            {{ $t('host.photosSummary', { done: wholeNumber(uploadedCount), total: wholeNumber(uploads.length) }) }}
           </p>
           <ul
             v-if="uploads.length"
