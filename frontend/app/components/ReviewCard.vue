@@ -5,11 +5,28 @@
  *
  * The rating is the raw score. No stars: a star row as the only rating display is a
  * listed anti-pattern, and the number is what the guest actually meant.
+ *
+ * `ReviewView` is the card's contract, not the mock shape: the live API review has no
+ * author location and its `createdAt` is an instant, while the fixture carries a
+ * location and a date-only string. Both map into this view (see `hotelAdapters.ts`)
+ * so the card never branches on the source.
  */
-import type { MockReview } from '~/utils/mock/types'
 import { formatStayDate } from '~/utils/format'
 
-const props = defineProps<{ review: MockReview }>()
+export interface ReviewView {
+  id: string
+  authorName: string
+  /** Null for API reviews — the contract carries no location, and none is invented. */
+  authorLocation: string | null
+  /** 1–5 live, 1–10 in the fixtures. Rendered raw either way. */
+  rating: number
+  title: string
+  body: string
+  /** Date-only `YYYY-MM-DD`, so the timezone-safe formatter holds. */
+  stayedOn: string
+}
+
+const props = defineProps<{ review: ReviewView }>()
 
 const initials = computed(() =>
   props.review.authorName
@@ -36,7 +53,10 @@ const initials = computed(() =>
         <p class="truncate text-sm font-medium">
           {{ review.authorName }}
         </p>
-        <p class="text-fg-subtle text-label uppercase">
+        <p
+          v-if="review.authorLocation"
+          class="text-fg-subtle text-label uppercase"
+        >
           {{ review.authorLocation }}
         </p>
       </div>
@@ -55,7 +75,7 @@ const initials = computed(() =>
     </p>
 
     <p class="text-fg-subtle tabular text-sm">
-      {{ formatStayDate(review.createdAt) }}
+      {{ formatStayDate(review.stayedOn) }}
     </p>
   </BaseCard>
 </template>

@@ -12,6 +12,9 @@ export const USERS_REPOSITORY = Symbol('USERS_REPOSITORY');
 /** Mirrors the `users.role` enum without importing a Prisma type into the contract. */
 export type UserRole = 'GUEST' | 'HOST' | 'ADMIN';
 
+/** Mirrors `users.status`. Suspension keeps the row and its history; it only stops auth. */
+export type UserStatus = 'ACTIVE' | 'SUSPENDED';
+
 export interface UserRecord {
   id: string;
   email: string;
@@ -20,6 +23,7 @@ export interface UserRecord {
   /** Null for OAuth-only accounts (T15). */
   passwordHash: string | null;
   role: UserRole;
+  status: UserStatus;
   oauthProvider: string | null;
   oauthAccountId: string | null;
   createdAt: Date;
@@ -40,6 +44,7 @@ export interface UpdateUserData {
   avatarUrl?: string | null;
   passwordHash?: string | null;
   role?: UserRole;
+  status?: UserStatus;
   oauthProvider?: string | null;
   oauthAccountId?: string | null;
 }

@@ -6,12 +6,17 @@
  *
  * Nights are the half-open range (checkout excluded) and every figure in the order
  * summary is priced by `POST /api/bookings/quote` — this page computes no total, because
- * the server decides availability and the rate before it hands back cents (D3). No card
- * fields yet — the Stripe Elements step is T28; this ticket ends at confirm.
+ * the server decides availability and the rate before it hands back cents (D3).
+ *
+ * T28: the confirm step is a real Stripe Elements form. Continue creates the PENDING
+ * booking and its intent, the card form confirms the intent's `clientSecret`, and the
+ * success banner renders only from the server's booking record once it reads
+ * CONFIRMED — never from the Stripe callback. No mock booking exists: without a
+ * backend there is nothing to confirm, so a transport failure is an error state.
  */
 import { getHotelDetail, nightsBetween } from '~/utils/mock'
-import { fetchHotelDetail, fetchQuote, isApiError, isApiFailure } from '~/utils/api'
-import type { ApiHotelDetail, ApiHotelRoom, ApiQuoteData, QuoteRequest } from '~/utils/api'
+import { createBooking, createPaymentIntent, fetchBooking, fetchHotelDetail, fetchQuote, isApiError, isApiFailure } from '~/utils/api'
+import type { ApiBooking, ApiHotelDetail, ApiHotelRoom, ApiIntentData, ApiQuoteData, QuoteRequest } from '~/utils/api'
 import { mockHotelToDetail, mockQuoteToApi } from '~/utils/hotelAdapters'
 import { formatStayDate, payableCents, wholeNumber } from '~/utils/format'
 import { localToday } from '~/utils/date'
@@ -19,6 +24,7 @@ import { guestDetailsSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
 
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 
 const slug = computed(() => String(route.params.id ?? ''))
@@ -61,12 +67,31 @@ const guestPhone = ref('')
 
 const touched = ref({ dates: false, room: false, name: false, email: false, phone: false })
 const fieldErrors = ref<FieldErrors>({})
-const confirming = ref(false)
-const confirmedRef = ref('')
-const confirmTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
+/**
+ * The payment state machine. `idle` owns the details form; `card` owns the Stripe
+ * element; every terminal state keeps the form filled, because a failure never
+ * discards input. Poll timers respect unmount — a late resolve after navigation must
+ * not write state into a dead page.
+ */
+type PaymentPhase
+  = | { kind: 'idle' }
+    | { kind: 'creating' }
+    | { kind: 'card', booking: ApiBooking, intent: ApiIntentData }
+    | { kind: 'paying', booking: ApiBooking, intent: ApiIntentData }
+    | { kind: 'polling', booking: ApiBooking }
+    | { kind: 'done', booking: ApiBooking }
+    | { kind: 'failed', message: string, booking: ApiBooking | null, intent: ApiIntentData | null }
+    | { kind: 'timeout', booking: ApiBooking }
+
+const payment = ref<PaymentPhase>({ kind: 'idle' })
+const cardComplete = ref(false)
+const cardFieldError = ref('')
+
+let pollCancelled = false
 
 onUnmounted(() => {
-  if (confirmTimer.value) clearTimeout(confirmTimer.value)
+  pollCancelled = true
 })
 
 const rooms = computed(() => hotel.value?.rooms ?? [])
@@ -191,28 +216,197 @@ function touch(field: keyof typeof touched.value): void {
   touched.value[field] = true
 }
 
-function confirm(): void {
-  if (!hotel.value || confirming.value || confirmedRef.value) return
-  touched.value = { dates: true, room: true, name: true, email: true, phone: true }
+/** The publishable key gates the card step: without it there is nothing to mount. */
+const hasStripeKey = computed(() => {
+  const key = useRuntimeConfig().public.stripePublishableKey
+  return typeof key === 'string' && key.length > 0
+})
 
+/**
+ * An intent prices one stay. Any change to the stay voids it: confirming a new card
+ * against yesterday's amount would charge the wrong total, so the page falls back to
+ * the details step rather than carrying a stale `clientSecret` forward.
+ */
+watch([roomId, checkIn, checkOut, guests], () => {
+  if (payment.value.kind !== 'idle') payment.value = { kind: 'idle' }
+  cardComplete.value = false
+  cardFieldError.value = ''
+})
+
+function validateDetails(): boolean {
+  touched.value = { dates: true, room: true, name: true, email: true, phone: true }
   const guest = guestDetailsSchema.safeParse({
     name: guestName.value,
     email: guestEmail.value,
     phone: guestPhone.value,
   })
   fieldErrors.value = { ...guest.errors }
-  if (!checkIn.value || !checkOut.value || datesError.value) return
-  if (!selectedRoom.value) return
-  if (guestsError.value) return
-  if (!guest.success) return
-  if (!quote.value) return
-
-  confirming.value = true
-  confirmTimer.value = setTimeout(() => {
-    confirming.value = false
-    confirmedRef.value = `HB-${Math.floor(1000 + Math.random() * 9000)}`
-  }, 900)
+  if (!checkIn.value || !checkOut.value || datesError.value) return false
+  if (!selectedRoom.value) return false
+  if (guestsError.value) return false
+  if (!guest.success) return false
+  if (!quote.value) return false
+  return true
 }
+
+/**
+ * Step one: persist the hold, then mint its intent. A 401 sends the visitor to sign
+ * in and back — an anonymous hold cannot exist. Anything else real is an error state;
+ * only nothing-answered is unreachable here, because the quote above already proved
+ * the backend is listening.
+ */
+async function startPayment(): Promise<void> {
+  if (payment.value.kind !== 'idle' && payment.value.kind !== 'failed') return
+  if (!hotel.value || !validateDetails() || !selectedRoom.value) return
+  payment.value = { kind: 'creating' }
+  try {
+    const booking = await createBooking({
+      roomId: selectedRoom.value.id,
+      checkIn: checkIn.value,
+      checkOut: checkOut.value,
+      guests: guests.value,
+      guestName: guestName.value.trim(),
+      guestEmail: guestEmail.value.trim(),
+      guestPhone: guestPhone.value.trim(),
+    })
+    const intent = await createPaymentIntent(booking.id)
+    if (pollCancelled) return
+    payment.value = { kind: 'card', booking, intent }
+  }
+  catch (error: unknown) {
+    if (isApiError(error) && error.code === 'UNAUTHORIZED') {
+      await router.push({ path: '/login', query: { redirect: route.fullPath } })
+      payment.value = { kind: 'idle' }
+      return
+    }
+    payment.value = {
+      kind: 'failed',
+      message: isApiError(error) ? error.message : t('common.unexpectedError'),
+      booking: null,
+      intent: null,
+    }
+  }
+}
+
+function onCardChange(complete: boolean, error: string): void {
+  cardComplete.value = complete
+  cardFieldError.value = error
+}
+
+const cardForm = ref<{ pay: () => Promise<{ ok: true } | { ok: false, message: string }> } | null>(null)
+
+/**
+ * Step two: confirm the intent with the mounted card, then poll the booking record.
+ * The banner renders only from a server-read CONFIRMED — the Stripe callback proves
+ * the charge, but only the API knows the booking flipped.
+ */
+async function payNow(): Promise<void> {
+  const state = payment.value
+  // Both payable states carry the pair — required on `card`, nullable on `failed`.
+  if (state.kind !== 'card' && state.kind !== 'failed') return
+  const { booking, intent } = state
+  if (!booking || !intent) return
+  payment.value = { kind: 'paying', booking, intent }
+  const result = await cardForm.value?.pay()
+  if (pollCancelled) return
+  if (!result) {
+    payment.value = { kind: 'failed', message: t('booking.cardNotReady'), booking, intent }
+    return
+  }
+  if (!result.ok) {
+    payment.value = {
+      kind: 'failed',
+      message: result.message === 'unavailable'
+        ? t('booking.cardNotReady')
+        : result.message === 'declined'
+          ? t('booking.cardDeclined')
+          : result.message,
+      booking,
+      intent,
+    }
+    return
+  }
+  payment.value = { kind: 'polling', booking }
+  const confirmed = await pollConfirmation(booking.id)
+  if (pollCancelled) return
+  payment.value = confirmed
+    ? { kind: 'done', booking: confirmed }
+    : { kind: 'timeout', booking }
+}
+
+/**
+ * Brief polling for the webhook's flip, then a manual refresh: the charge succeeded,
+ * but confirmation arrives out-of-band and may lag. Transport blips while polling are
+ * swallowed — a dead backend here would strand a paid booking behind an error, and
+ * the next poll (or the guest's own retry) is the honest recovery.
+ */
+const POLL_ROUNDS = 5
+const POLL_INTERVAL_MS = 2000
+
+async function pollConfirmation(bookingId: string): Promise<ApiBooking | null> {
+  for (let round = 0; round < POLL_ROUNDS; round += 1) {
+    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS))
+    if (pollCancelled) return null
+    try {
+      const record = await fetchBooking(bookingId)
+      if (record.status === 'CONFIRMED') return record
+    }
+    catch {
+      // Keep polling: see above.
+    }
+  }
+  return null
+}
+
+async function checkAgain(): Promise<void> {
+  const state = payment.value
+  if (state.kind !== 'timeout') return
+  payment.value = { kind: 'polling', booking: state.booking }
+  const confirmed = await pollConfirmation(state.booking.id)
+  if (pollCancelled) return
+  payment.value = confirmed
+    ? { kind: 'done', booking: confirmed }
+    : { kind: 'timeout', booking: state.booking }
+}
+
+function retryPay(): void {
+  const state = payment.value
+  if (state.kind !== 'failed' || !state.booking || !state.intent) return
+  // Same intent, same amount: the idempotency key makes the retry the same Stripe
+  // call, not a second charge. The card element stays mounted with its number.
+  payment.value = { kind: 'card', booking: state.booking, intent: state.intent }
+}
+
+function onSubmit(): void {
+  const state = payment.value
+  if (state.kind === 'card') {
+    void payNow()
+    return
+  }
+  if (state.kind === 'failed') {
+    // An intent already exists: retry the payment, never mint a second booking.
+    if (state.booking && state.intent) void payNow()
+    else void startPayment()
+    return
+  }
+  if (state.kind === 'idle') void startPayment()
+}
+
+const activeIntent = computed(() => {
+  const state = payment.value
+  if (state.kind === 'card' || state.kind === 'paying') return state.intent
+  if (state.kind === 'failed') return state.intent
+  return null
+})
+
+/** The submit button lives only before any terminal state — done and timeout have their own actions. */
+const showSubmit = computed(() => payment.value.kind !== 'done' && payment.value.kind !== 'timeout')
+
+const payLabel = computed(() => {
+  const intent = activeIntent.value
+  if (!intent) return t('booking.payNow')
+  return t('booking.payAmount', { amount: payableCents(intent.amountCents, intent.currency) })
+})
 
 useSeoMeta({
   title: () => (hotel.value ? `${t('booking.title')} · ${hotel.value.name} · ${t('common.brand')}` : t('detail.notFoundTitle')),
@@ -252,15 +446,15 @@ useSeoMeta({
         {{ $t('booking.subtitle', { name: hotel.name }) }}
       </p>
 
-      <!-- Confirmation replaces the form. The reference is named, the input kept. -->
+      <!-- Confirmation replaces the form. The reference is the server's, never Stripe's. -->
       <BaseAlert
-        v-if="confirmedRef"
+        v-if="payment.kind === 'done'"
         tone="success"
         :title="$t('booking.confirmedTitle')"
         class="mt-8 max-w-[720px]"
       >
         <p>
-          {{ $t('booking.confirmedBody', { reference: confirmedRef, name: hotel.name }) }}
+          {{ $t('booking.confirmedBody', { reference: payment.booking.reference, name: hotel.name }) }}
         </p>
         <p class="mt-3 flex flex-wrap gap-3">
           <NuxtLink
@@ -268,6 +462,12 @@ useSeoMeta({
             class="text-link underline-offset-4 hover:underline"
           >
             {{ $t('booking.viewTrips') }}
+          </NuxtLink>
+          <NuxtLink
+            :to="`/bookings/${payment.booking.id}`"
+            class="text-link underline-offset-4 hover:underline"
+          >
+            {{ $t('booking.viewBooking') }}
           </NuxtLink>
           <NuxtLink
             :to="`/hotels/${hotel.slug}`"
@@ -286,7 +486,7 @@ useSeoMeta({
         <form
           class="flex flex-col gap-10 lg:col-span-7"
           novalidate
-          @submit.prevent="confirm"
+          @submit.prevent="onSubmit"
         >
           <section aria-labelledby="book-stay">
             <h2
@@ -432,16 +632,115 @@ useSeoMeta({
             </div>
           </section>
 
+          <!-- Card step. Mounts only once an intent exists to confirm against. -->
+          <section
+            v-if="payment.kind === 'card' || payment.kind === 'paying' || payment.kind === 'failed' || payment.kind === 'polling'"
+            aria-labelledby="book-card"
+          >
+            <h2
+              id="book-card"
+              class="text-fg-muted text-label uppercase"
+            >
+              {{ $t('booking.cardHeading') }}
+            </h2>
+            <div class="border-rule mt-3 border-t pt-6">
+              <p class="text-fg-muted max-w-[68ch] text-sm">
+                {{ $t('booking.cardHint') }}
+              </p>
+              <div class="mt-4 max-w-[480px]">
+                <StripeCardForm
+                  v-if="activeIntent"
+                  ref="cardForm"
+                  :client-secret="activeIntent.clientSecret"
+                  @change="onCardChange"
+                />
+                <BaseAlert
+                  v-else
+                  tone="info"
+                  :title="$t('booking.stripeMissingTitle')"
+                  class="mt-2"
+                >
+                  {{ $t('booking.stripeMissingBody') }}
+                </BaseAlert>
+              </div>
+              <p
+                v-if="cardFieldError"
+                role="alert"
+                class="text-danger mt-2 text-sm"
+              >
+                {{ cardFieldError }}
+              </p>
+            </div>
+          </section>
+
           <div>
+            <BaseAlert
+              v-if="payment.kind === 'failed'"
+              tone="danger"
+              :title="$t('booking.paymentFailedTitle')"
+              class="mb-4"
+            >
+              <p>{{ payment.message }}</p>
+              <button
+                v-if="payment.booking && payment.intent"
+                type="button"
+                class="border-danger text-danger mt-3 inline-flex h-11 items-center rounded-sm border px-4 text-sm"
+                @click="retryPay()"
+              >
+                {{ $t('booking.paymentRetry') }}
+              </button>
+            </BaseAlert>
+
+            <BaseAlert
+              v-else-if="payment.kind === 'timeout'"
+              tone="warning"
+              :title="$t('booking.pollTimeoutTitle')"
+              class="mb-4"
+            >
+              <p>{{ $t('booking.pollTimeoutBody') }}</p>
+              <div class="mt-3 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  class="border-rule-strong text-fg hover:border-fg inline-flex h-11 items-center rounded-sm border px-4 text-sm"
+                  @click="checkAgain()"
+                >
+                  {{ $t('booking.checkAgain') }}
+                </button>
+                <NuxtLink
+                  to="/bookings"
+                  class="text-link inline-flex h-11 items-center text-sm underline-offset-4 hover:underline"
+                >
+                  {{ $t('booking.viewTrips') }}
+                </NuxtLink>
+              </div>
+            </BaseAlert>
+
+            <p
+              v-else-if="payment.kind === 'polling'"
+              role="status"
+              class="text-fg-muted mb-4 text-sm"
+            >
+              {{ $t('booking.awaitingConfirm') }}
+            </p>
+
             <BaseButton
+              v-if="showSubmit"
               type="submit"
               variant="primary"
               size="lg"
               class="w-full sm:w-auto"
-              :loading="confirming"
-              :disabled="confirming"
+              :loading="payment.kind === 'creating' || payment.kind === 'paying' || payment.kind === 'polling'"
+              :disabled="payment.kind === 'creating' || payment.kind === 'paying' || payment.kind === 'polling' || (payment.kind === 'card' && (!cardComplete || !hasStripeKey))"
             >
-              {{ confirming ? $t('booking.confirming') : $t('booking.confirm') }}
+              {{
+                payment.kind === 'creating'
+                  ? $t('booking.creatingBooking')
+                  : payment.kind === 'paying' || payment.kind === 'polling'
+                    ? $t('booking.paying')
+                    : payment.kind === 'card'
+                      ? payLabel
+                      : $t('booking.toPayment')
+              }}
             </BaseButton>
             <p
               v-if="datesError && touched.dates"

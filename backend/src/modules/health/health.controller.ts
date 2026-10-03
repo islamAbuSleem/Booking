@@ -1,5 +1,6 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import type { HealthDataDto } from '../hotels/dto/hotel.dto.js';
@@ -13,6 +14,7 @@ export class HealthController {
 
   @Get()
   @Public()
+  @SkipThrottle()
   @ApiOperation({
     summary: 'Liveness and database reachability',
     description:

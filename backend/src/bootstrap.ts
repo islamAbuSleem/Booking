@@ -6,6 +6,11 @@ import { SwaggerModule, type OpenAPIObject } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { EnvelopeInterceptor } from './common/interceptors/envelope.interceptor.js';
+import {
+  AppThrottlerGuard,
+  createThrottleStorage,
+  READ_THROTTLE,
+} from './common/throttle/app-throttler.guard.js';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard.js';
 import { allowedOrigins } from './modules/auth/oauth-origin.js';
 import { RolesGuard } from './modules/auth/roles.guard.js';
@@ -57,8 +62,18 @@ export function configureApp(app: INestApplication): OpenAPIObject {
   // `@Roles()` narrows to a role. Wired manually (like the filter and the
   // interceptor above) rather than via `APP_GUARD`, so the OpenAPI preview
   // build — which never calls `configureApp` — does not resolve them.
-  // Authentication first, authorization second: order is registration order.
+  // Authentication first, authorization second, throttling last: order is
+  // registration order, and the throttle guard needs `request.user` populated
+  // to key authenticated callers by id rather than by IP.
   const reflector = new Reflector();
+  const throttler = new AppThrottlerGuard(
+    [{ name: 'default', limit: READ_THROTTLE.limit, ttl: READ_THROTTLE.ttl }],
+    createThrottleStorage(),
+    reflector,
+  );
+  // Fire-and-forget on purpose: it only sorts the one configured throttler (no I/O),
+  // and `configureApp` stays synchronous so `main.ts` needs no restructuring.
+  void throttler.onModuleInit();
   app.useGlobalGuards(
     new JwtAuthGuard(
       reflector,
@@ -67,6 +82,7 @@ export function configureApp(app: INestApplication): OpenAPIObject {
       app.get<UsersRepository>(USERS_REPOSITORY),
     ),
     new RolesGuard(reflector),
+    throttler,
   );
 
   // The raw specification is served from a plain adapter route, not a controller, so it

@@ -13,6 +13,8 @@ import {
   type HotelSearchCriteria,
   type HotelsRepository,
 } from '../src/prisma/hotels.repository.js';
+import { HOST_REPOSITORY } from '../src/modules/host/host.repository.js';
+import { StubHostRepository } from '../src/modules/host/host.stub.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 /**
@@ -112,6 +114,8 @@ describe('Booking API (e2e)', () => {
       })
       .overrideProvider(HOTELS_REPOSITORY)
       .useValue(repository)
+      .overrideProvider(HOST_REPOSITORY)
+      .useValue(new StubHostRepository())
       .compile();
 
     app = moduleRef.createNestApplication();

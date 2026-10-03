@@ -32,8 +32,9 @@ interface JwtPayload {
  * resolved to a fresh user row (so a role change takes effect immediately)
  * and attached as `request.user` for `@CurrentUser()` and `RolesGuard`.
  *
- * Every rejection is an `ApiError` 401 `UNAUTHORIZED`, so it flows through the
- * envelope with a stable machine-readable code.
+ * Every rejection is an `ApiError` with a stable machine-readable code — 401
+ * `UNAUTHORIZED` for missing, invalid, or ownerless tokens, and 403
+ * `ACCOUNT_SUSPENDED` for a valid token on a suspended account.
  */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -99,6 +100,19 @@ export class JwtAuthGuard implements CanActivate {
         HttpStatus.UNAUTHORIZED,
         'UNAUTHORIZED',
         'Invalid or expired token',
+      );
+    }
+
+    // Suspension takes effect on the next request, not at token expiry: the guard
+    // resolves a fresh row on every call, so a suspended account's live JWT dies here.
+    // 403, not 401 — the token is valid, the account is not, and the client must offer
+    // "contact support" rather than another login attempt.
+    if (user.status === 'SUSPENDED') {
+      this.logger.warn(`[auth] rejected suspended account ${user.id}`);
+      throw new ApiError(
+        HttpStatus.FORBIDDEN,
+        'ACCOUNT_SUSPENDED',
+        'This account has been suspended',
       );
     }
 
