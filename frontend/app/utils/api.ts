@@ -32,6 +32,31 @@ export type ApiBooking = components['schemas']['Booking']
 export type ApiBookingListData = components['schemas']['BookingListData']
 export type ApiUploadSign = components['schemas']['UploadSign']
 export type ApiAttachUpload = components['schemas']['AttachUpload']
+export type ApiHostHotelListItem = components['schemas']['HostHotelListItem']
+export type ApiHostHotelListData = components['schemas']['HostHotelListData']
+export type ApiHostHotelDetail = components['schemas']['HostHotelDetail']
+export type ApiHostRoom = components['schemas']['RoomDetail']
+export type ApiHostBlackout = components['schemas']['BlackoutDate']
+export type ApiHostBooking = components['schemas']['HostBookingListItem']
+export type ApiHostBookingListData = components['schemas']['HostBookingListData']
+export type ApiCreateHotel = components['schemas']['CreateHotel']
+export type ApiUpdateHotel = components['schemas']['UpdateHotel']
+export type ApiCreateRoom = components['schemas']['CreateRoom']
+export type ApiUpdateRoom = components['schemas']['UpdateRoom']
+export type ApiCreateBlackout = components['schemas']['CreateBlackout']
+export type ApiReview = components['schemas']['Review']
+export type ApiReviewListData = components['schemas']['ReviewListData']
+export type ApiReviewable = components['schemas']['ReviewableData']
+export type ApiCreateReview = components['schemas']['CreateReview']
+export type ApiIntentData = components['schemas']['IntentData']
+export type ApiPayment = components['schemas']['Payment']
+export type ApiAdminHotel = components['schemas']['AdminHotel']
+export type ApiAdminUser = components['schemas']['AdminUser']
+export type ApiAdminReview = components['schemas']['AdminReview']
+export type ApiAdminStats = components['schemas']['AdminStats']
+export type ApiAdminHotelStatus = ApiAdminHotel['status']
+export type ApiAdminUserStatus = ApiAdminUser['status']
+export type ApiAdminReviewStatus = ApiAdminReview['status']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -132,14 +157,17 @@ interface ApiRequestOptions {
    * `POST` for the writes that carry a body — the quote (which changes nothing, the
    * server prices a stay and answers 200), the favourites insert, and the upload
    * sign/attach. `DELETE` is a path-only call that answers 204 with no body at all.
+   * `PATCH` for the updates that carry a partial body.
    */
-  method?: 'POST' | 'DELETE'
+  method?: 'POST' | 'DELETE' | 'PATCH'
   /**
-   * `boolean` is here for `AttachUpload.isCover`. Optional fields stay `undefined`
-   * rather than being dropped by the caller: `$fetch` omits them from the JSON body, so
-   * the API applies its own default, which is what its Zod schema describes.
+   * Flat key/value bodies stay a `Record` so `$fetch` omits `undefined` optionals and
+   * the API applies its own defaults. Bodies with nested arrays (room prices, room
+   * images) cannot be expressed that way, so they travel as `json` instead — one or
+   * the other, never both.
    */
   body?: Record<string, string | number | boolean | undefined>
+  json?: unknown
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -160,7 +188,7 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
       headers,
       method: options.method,
       query: options.query,
-      body: options.body,
+      body: options.json !== undefined ? options.json : options.body,
     })
   }
   catch (error: unknown) {
@@ -289,6 +317,167 @@ export async function fetchBooking(id: string): Promise<ApiBooking> {
  */
 export async function cancelBooking(id: string): Promise<ApiBooking> {
   return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+}
+
+/**
+ * T22. The host's own listings. Scoped server-side to the caller — a 403
+ * `NOT_HOTEL_OWNER` is the answer for someone else's id, and the list never contains
+ * it in the first place. Anonymous callers 401, which pages treat as the mock-fallback
+ * signal exactly like the bookings pages do.
+ */
+export async function fetchMyHotels(): Promise<ApiHostHotelListData> {
+  return apiFetch<ApiHostHotelListData>('/api/host/hotels')
+}
+
+/** Accepts a uuid or a slug, like the public detail route. */
+export async function fetchMyHotel(id: string): Promise<ApiHostHotelDetail> {
+  return apiFetch<ApiHostHotelDetail>(`/api/host/hotels/${encodeURIComponent(id)}`)
+}
+
+/** Creates the listing `PENDING`. The slug comes back on the detail for the edit link. */
+export async function createHotel(body: ApiCreateHotel): Promise<ApiHostHotelDetail> {
+  return apiFetch<ApiHostHotelDetail>('/api/host/hotels', { method: 'POST', json: body })
+}
+
+/** A host can suspend their own listing here, but never publish it (403 `FORBIDDEN`). */
+export async function updateHotel(id: string, body: ApiUpdateHotel): Promise<ApiHostHotelDetail> {
+  return apiFetch<ApiHostHotelDetail>(`/api/host/hotels/${encodeURIComponent(id)}`, { method: 'PATCH', json: body })
+}
+
+/** 204, no body. Rooms, images and blackouts cascade server-side. */
+export async function deleteHotel(id: string): Promise<void> {
+  await apiFetch<undefined>(`/api/host/hotels/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function createRoom(hotelId: string, body: ApiCreateRoom): Promise<ApiHostRoom> {
+  return apiFetch<ApiHostRoom>(`/api/host/hotels/${encodeURIComponent(hotelId)}/rooms`, { method: 'POST', json: body })
+}
+
+export async function updateRoom(roomId: string, body: ApiUpdateRoom): Promise<ApiHostRoom> {
+  return apiFetch<ApiHostRoom>(`/api/host/hotels/rooms/${encodeURIComponent(roomId)}`, { method: 'PATCH', json: body })
+}
+
+/** 204, no body. Only when no confirmed booking needs the room. */
+export async function deleteRoom(roomId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/host/hotels/rooms/${encodeURIComponent(roomId)}`, { method: 'DELETE' })
+}
+
+/**
+ * `roomId: null` closes the whole hotel for the range, otherwise just that room.
+ * Dates are `YYYY-MM-DD`, inclusive on both ends.
+ */
+export async function createBlackout(hotelId: string, body: ApiCreateBlackout): Promise<ApiHostBlackout> {
+  return apiFetch<ApiHostBlackout>(`/api/host/hotels/${encodeURIComponent(hotelId)}/blackouts`, { method: 'POST', json: body })
+}
+
+/** 204, no body. */
+export async function deleteBlackout(blackoutId: string): Promise<void> {
+  await apiFetch<undefined>(`/api/host/hotels/blackouts/${encodeURIComponent(blackoutId)}`, { method: 'DELETE' })
+}
+
+/** Every booking on the caller's rooms, newest first — the "incoming" table. */
+export async function fetchHostBookings(): Promise<ApiHostBookingListData> {
+  return apiFetch<ApiHostBookingListData>('/api/host/hotels/bookings')
+}
+
+/**
+ * T24. A hotel's visible reviews, newest first. Takes the same uuid-or-slug the detail
+ * route does, so the page never resolves the slug first and waterfalls.
+ */
+export async function fetchHotelReviews(hotelIdOrSlug: string, page = 1, pageSize = 10): Promise<ApiReviewListData> {
+  return apiFetch<ApiReviewListData>(`/api/hotels/${encodeURIComponent(hotelIdOrSlug)}/reviews`, {
+    query: { page, pageSize },
+  })
+}
+
+/** T24. One review per completed stay — a second write for the same booking 409s. */
+export async function createReview(hotelId: string, body: ApiCreateReview): Promise<ApiReview> {
+  return apiFetch<ApiReview>(`/api/hotels/${encodeURIComponent(hotelId)}/reviews`, { method: 'POST', json: body })
+}
+
+/**
+ * T24. Whether the caller may review this booking right now. A negative answer is data
+ * (`canReview: false` + reason), not an error — the form branches on it.
+ */
+export async function fetchReviewable(bookingId: string): Promise<ApiReviewable> {
+  return apiFetch<ApiReviewable>(`/api/bookings/${encodeURIComponent(bookingId)}/reviewable`)
+}
+
+/**
+ * T20 + T28. Creates the PENDING booking — the hold that T26/T27 confirm. The money
+ * snapshot is server-computed from the quote inputs; contact fields are validated but
+ * not persisted. A signed-out caller 401s (the page sends them to login); nothing
+ * answered (transport failure) is the only case with no booking at all.
+ */
+export interface CreateBookingRequest {
+  roomId: string
+  checkIn: string
+  checkOut: string
+  guests: number
+  guestName: string
+  guestEmail: string
+  guestPhone: string
+}
+
+export async function createBooking(request: CreateBookingRequest): Promise<ApiBooking> {
+  return apiFetch<ApiBooking>('/api/bookings', { method: 'POST', body: { ...request } })
+}
+
+/**
+ * T26 + T28. Mints (or replays, idempotently) the PaymentIntent for a PENDING booking.
+ * The amount answers in the payload — the page never prices anything itself.
+ */
+export async function createPaymentIntent(bookingId: string): Promise<ApiIntentData> {
+  return apiFetch<ApiIntentData>('/api/payments/intent', { method: 'POST', body: { bookingId } })
+}
+
+/** T26 + T28. The payment row, if an intent exists. 404 before the first intent. */
+export async function fetchPayment(bookingId: string): Promise<ApiPayment> {
+  return apiFetch<ApiPayment>(`/api/payments/${encodeURIComponent(bookingId)}`)
+}
+
+/**
+ * T25. The moderation console reads. Every one is admin-only: a host gets 403
+ * `ADMIN_REQUIRED`, which pages treat as a real error (never fixtures — fixtures must
+ * not stand in for access control).
+ */
+export async function fetchAdminStats(): Promise<ApiAdminStats> {
+  return apiFetch<ApiAdminStats>('/api/admin/stats')
+}
+
+export async function fetchAdminListings(status?: string): Promise<ApiAdminHotel[]> {
+  return apiFetch<{ items: ApiAdminHotel[] }>('/api/admin/listings', {
+    query: status && status !== 'ALL' ? { status } : {},
+  }).then(page => page.items)
+}
+
+export async function setAdminListingStatus(id: string, status: ApiAdminHotelStatus): Promise<ApiAdminHotel> {
+  return apiFetch<ApiAdminHotel>(`/api/admin/listings/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    json: { status },
+  })
+}
+
+export async function fetchAdminUsers(): Promise<ApiAdminUser[]> {
+  return apiFetch<{ items: ApiAdminUser[] }>('/api/admin/users').then(page => page.items)
+}
+
+export async function setAdminUserStatus(id: string, status: ApiAdminUserStatus): Promise<ApiAdminUser> {
+  return apiFetch<ApiAdminUser>(`/api/admin/users/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    json: { status },
+  })
+}
+
+export async function fetchAdminReviews(): Promise<ApiAdminReview[]> {
+  return apiFetch<{ items: ApiAdminReview[] }>('/api/admin/reviews').then(page => page.items)
+}
+
+export async function setAdminReviewStatus(id: string, status: ApiAdminReviewStatus): Promise<ApiAdminReview> {
+  return apiFetch<ApiAdminReview>(`/api/admin/reviews/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    json: { status },
+  })
 }
 
 /**

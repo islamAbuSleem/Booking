@@ -35,6 +35,14 @@ enum UserRole {
   ADMIN
 }
 
+/// T25 — account state. Suspension is a persisted state, not a deleted row: the
+/// account keeps its bookings and reviews, but login and every JWT-authenticated
+/// route stop working for it until an admin reactivates it.
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum HotelStatus {
   PENDING
   PUBLISHED
@@ -77,6 +85,8 @@ model User {
   passwordHash String? @map("password_hash")
 
   role UserRole @default(GUEST)
+
+  status UserStatus @default(ACTIVE)
 
   oauthProvider  String? @map("oauth_provider")
   oauthAccountId String? @map("oauth_account_id")

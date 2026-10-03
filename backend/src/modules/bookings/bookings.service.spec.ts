@@ -184,6 +184,18 @@ class FakeBookingsRepository implements BookingRepository {
     this.w.bookings.set(bookingId, updated);
     return updated;
   }
+
+  async transitionStatus(
+    bookingId: string,
+    from: BookingStatus,
+    to: BookingStatus,
+  ): Promise<BookingRecord | null> {
+    const record = this.w.bookings.get(bookingId);
+    if (!record || record.status !== from) return null;
+    const updated = { ...record, status: to };
+    this.w.bookings.set(bookingId, updated);
+    return updated;
+  }
 }
 
 /**

@@ -8,6 +8,8 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { configureApp } from '../src/bootstrap.js';
 import { USERS_REPOSITORY } from '../src/modules/users/users.repository.js';
+import { HOST_REPOSITORY } from '../src/modules/host/host.repository.js';
+import { StubHostRepository } from '../src/modules/host/host.stub.js';
 import type {
   UserRecord,
   UsersRepository,
@@ -114,6 +116,7 @@ describe('Auth API (e2e)', () => {
       avatarUrl: null,
       passwordHash: seeded,
       role: 'GUEST',
+      status: 'ACTIVE',
       oauthProvider: null,
       oauthAccountId: null,
       createdAt: new Date(),
@@ -129,6 +132,8 @@ describe('Auth API (e2e)', () => {
       })
       .overrideProvider(USERS_REPOSITORY)
       .useValue(users)
+      .overrideProvider(HOST_REPOSITORY)
+      .useValue(new StubHostRepository())
       .overrideGuard(AuthGuard('google'))
       .useValue(new MockOAuthGuard())
       .overrideGuard(AuthGuard('github'))

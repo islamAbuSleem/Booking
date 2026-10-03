@@ -5,6 +5,7 @@
  * design references — see the corrected prompt in context/stitch-prompts.md.
  */
 import { localToday } from '~/utils/date'
+import { wholeNumber } from '~/utils/format'
 
 const router = useRouter()
 const route = useRoute()
@@ -89,7 +90,7 @@ const submit = async (): Promise<void> => {
         </span>
         <div class="border-rule-strong bg-surface flex h-12 items-center justify-between rounded-sm border px-3">
           <span class="tabular text-sm">
-            {{ $t('search.guestsMany', { count: guests }) }}
+            {{ $t('search.guestsMany', { count: wholeNumber(guests) }) }}
           </span>
           <span class="flex items-center gap-2">
             <button

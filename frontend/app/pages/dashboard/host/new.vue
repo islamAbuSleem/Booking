@@ -4,10 +4,16 @@
  * room types. Each step validates before advancing. The photo step uploads for real
  * (T21): each file is signed by the API and posted straight to Cloudinary, with
  * per-file progress and a retry that re-signs. The Cloudinary results are staged on
- * the upload entries — `attach` needs a `hotelId`, and the listing does not exist
- * until T22 creates it.
+ * the upload entries until T22 creates the listing below.
+ *
+ * T22: finishing creates the hotel (`PENDING`), attaches the staged photos, and
+ * creates the room drafts — in that order, because every step needs the id the
+ * previous one returned. A failure stops the chain with the form intact: the visitor
+ * fixes nothing by retyping, and a half-built listing is resumed from the edit page.
  */
 import { AMENITIES } from '~/utils/mock'
+import { attachUpload, createHotel, createRoom, isApiError } from '~/utils/api'
+import type { ApiCreateRoom } from '~/utils/api'
 import { usd, wholeNumber } from '~/utils/format'
 
 definePageMeta({ layout: 'dashboard', middleware: 'auth' })
@@ -20,7 +26,10 @@ type Step = (typeof STEPS)[number]
 interface RoomDraft {
   key: number
   name: string
+  description: string
+  bedType: string
   maxGuests: number
+  totalInventory: number
   priceDollars: number
 }
 
@@ -37,17 +46,31 @@ const stepLabels = computed<Record<Step, string>>(() => ({
 const name = ref('')
 const city = ref('')
 const description = ref('')
+const addressLine = ref('')
+const country = ref('')
+/** `BaseSelect` is string-modelled, so the rating rides as text and converts on submit. */
+const starRating = ref('3')
+const checkInTime = ref('15:00')
+const checkOutTime = ref('11:00')
 const amenityIds = ref<string[]>([])
 const rooms = ref<RoomDraft[]>([])
 const roomKey = ref(0)
 const stepError = ref('')
+const submitError = ref('')
+const submitting = ref(false)
 const finished = ref(false)
+const createdId = ref('')
+
+const starOptions = computed(() => [1, 2, 3, 4, 5].map(stars => ({ value: String(stars), label: String(stars) })))
 
 /** Owns the uploads and every object URL they make; the page only selects and forwards. */
 const { uploads, addFiles, retry, remove } = usePhotoUploads()
 
 /** Announced on change, so it must be a number the page computed, not one read per render. */
 const uploadedCount = computed(() => uploads.value.filter(photo => photo.status === 'done').length)
+
+/** The staged Cloudinary results, in tile order. The first done photo becomes the cover. */
+const stagedPhotos = computed(() => uploads.value.filter(photo => photo.status === 'done' && photo.uploaded !== null))
 
 function toggleAmenity(id: string): void {
   amenityIds.value = amenityIds.value.includes(id)
@@ -65,7 +88,7 @@ function onFiles(event: Event): void {
 
 function addRoom(): void {
   roomKey.value += 1
-  rooms.value.push({ key: roomKey.value, name: '', maxGuests: 2, priceDollars: 0 })
+  rooms.value.push({ key: roomKey.value, name: '', description: '', bedType: '', maxGuests: 2, totalInventory: 1, priceDollars: 0 })
 }
 
 function removeRoom(key: number): void {
@@ -74,7 +97,10 @@ function removeRoom(key: number): void {
 
 function roomError(room: RoomDraft): string {
   if (!room.name.trim()) return t('host.roomNameRequired')
+  if (!room.description.trim()) return t('host.roomDescriptionRequired')
+  if (!room.bedType.trim()) return t('host.roomBedTypeRequired')
   if (!(room.maxGuests >= 1)) return t('host.roomGuestsRequired')
+  if (!(room.totalInventory >= 1)) return t('host.roomInventoryRequired')
   if (!(room.priceDollars > 0)) return t('host.roomPriceRequired')
   return ''
 }
@@ -85,6 +111,9 @@ function validateStep(current: Step): boolean {
     if (name.value.trim().length < 2) return false
     if (city.value.trim().length < 2) return false
     if (description.value.trim().length < 20) return false
+    if (addressLine.value.trim().length < 3) return false
+    if (country.value.trim().length < 2) return false
+    if (!checkInTime.value || !checkOutTime.value) return false
     return true
   }
   if (current === 'rooms') {
@@ -117,7 +146,77 @@ function finish(): void {
     stepError.value = t('host.roomsInvalid')
     return
   }
-  finished.value = true
+  void submit()
+}
+
+/**
+ * Creates the listing and everything under it. The hotel first — photos and rooms
+ * need its id — then the attaches and the rooms concurrently, since no room depends
+ * on another. A failure leaves the form exactly as it was: retyping a description to
+ * retry a network call is the failure mode the UX rules forbid, and a listing that
+ * was created but not finished is resumed from its edit page, not rebuilt.
+ */
+async function submit(): Promise<void> {
+  if (submitting.value) return
+  submitting.value = true
+  submitError.value = ''
+  try {
+    const hotel = await createHotel({
+      name: name.value.trim(),
+      description: description.value.trim(),
+      addressLine: addressLine.value.trim(),
+      city: city.value.trim(),
+      country: country.value.trim(),
+      // No location picker yet (maps are a placeholder per D28), so the listing is
+      // created at 0,0 rather than at an invented address. A real coordinate belongs
+      // to the map seam, not to this form.
+      lat: 0,
+      lng: 0,
+      starRating: Number(starRating.value),
+      checkInTime: checkInTime.value,
+      checkOutTime: checkOutTime.value,
+      amenityIds: [...amenityIds.value],
+    })
+
+    const staged = stagedPhotos.value
+    await Promise.all([
+      ...staged.map((photo, index) => {
+        const uploaded = photo.uploaded
+        if (!uploaded) return Promise.resolve()
+        // Attach order is creation order: the first done photo carries the cover flag.
+        return attachUpload({
+          hotelId: hotel.id,
+          url: uploaded.url,
+          publicId: uploaded.publicId,
+          isCover: index === 0,
+        })
+      }),
+      ...rooms.value.map((room, index) => {
+        const body: ApiCreateRoom = {
+          name: room.name.trim(),
+          description: room.description.trim(),
+          bedType: room.bedType.trim(),
+          maxGuests: room.maxGuests,
+          totalInventory: room.totalInventory,
+          sortOrder: index,
+          prices: [{ currency: 'USD', priceCents: Math.round(room.priceDollars * 100) }],
+          images: [],
+        }
+        return createRoom(hotel.id, body)
+      }),
+    ])
+
+    createdId.value = hotel.id
+    finished.value = true
+  }
+  catch (error: unknown) {
+    // The message is the API's (validation names the field); the code decides support
+    // triage, so it is logged rather than shown.
+    submitError.value = isApiError(error) ? error.message : t('common.unexpectedError')
+  }
+  finally {
+    submitting.value = false
+  }
 }
 
 useSeoMeta({
@@ -167,6 +266,13 @@ useSeoMeta({
         >
           {{ $t('host.backToProperties') }}
         </NuxtLink>
+        <span aria-hidden="true"> · </span>
+        <NuxtLink
+          :to="`/dashboard/host/${createdId}/edit`"
+          class="text-link underline-offset-4 hover:underline"
+        >
+          {{ $t('host.editTitle') }}
+        </NuxtLink>
       </p>
     </BaseAlert>
 
@@ -202,6 +308,40 @@ useSeoMeta({
             type="text"
             :label="$t('host.fieldCity')"
           />
+          <BaseInput
+            id="wizard-address"
+            v-model="addressLine"
+            type="text"
+            :label="$t('host.fieldAddress')"
+          />
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <BaseInput
+              id="wizard-country"
+              v-model="country"
+              type="text"
+              :label="$t('host.fieldCountry')"
+            />
+            <BaseSelect
+              id="wizard-stars"
+              v-model="starRating"
+              :label="$t('host.fieldStarRating')"
+              :options="starOptions"
+            />
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <BaseInput
+              id="wizard-checkin"
+              v-model="checkInTime"
+              type="time"
+              :label="$t('host.fieldCheckIn')"
+            />
+            <BaseInput
+              id="wizard-checkout"
+              v-model="checkOutTime"
+              type="time"
+              :label="$t('host.fieldCheckOut')"
+            />
+          </div>
           <div class="flex flex-col gap-2">
             <label
               for="wizard-description"
@@ -261,7 +401,7 @@ useSeoMeta({
             class="text-fg-muted mt-4 text-sm"
             aria-live="polite"
           >
-            {{ $t('host.photosSummary', { done: uploadedCount, total: uploads.length }) }}
+            {{ $t('host.photosSummary', { done: wholeNumber(uploadedCount), total: wholeNumber(uploads.length) }) }}
           </p>
           <ul
             v-if="uploads.length"
@@ -314,6 +454,30 @@ useSeoMeta({
                   :label="$t('host.roomPrice')"
                 />
               </div>
+              <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-5">
+                <div class="sm:col-span-2">
+                  <BaseInput
+                    :id="`wizard-room-description-${room.key}`"
+                    v-model="room.description"
+                    type="text"
+                    :label="$t('host.roomDescription')"
+                  />
+                </div>
+                <div class="sm:col-span-2">
+                  <BaseInput
+                    :id="`wizard-room-bed-${room.key}`"
+                    v-model="room.bedType"
+                    type="text"
+                    :label="$t('host.roomBedType')"
+                  />
+                </div>
+                <BaseInput
+                  :id="`wizard-room-inventory-${room.key}`"
+                  v-model="room.totalInventory"
+                  type="number"
+                  :label="$t('host.roomInventory')"
+                />
+              </div>
               <div class="mt-3 flex items-center justify-between gap-3">
                 <p
                   v-if="roomError(room)"
@@ -355,11 +519,20 @@ useSeoMeta({
           {{ stepError }}
         </p>
 
+        <BaseAlert
+          v-if="submitError"
+          tone="danger"
+          class="mt-4"
+        >
+          {{ submitError }}
+        </BaseAlert>
+
         <div class="mt-6 flex flex-wrap gap-3">
           <BaseButton
             v-if="stepIndex > 0"
             variant="secondary"
             size="md"
+            :disabled="submitting"
             @click="back"
           >
             {{ $t('common.back') }}
@@ -368,6 +541,7 @@ useSeoMeta({
             v-if="step !== 'rooms'"
             variant="primary"
             size="md"
+            :disabled="submitting"
             @click="next"
           >
             {{ $t('common.next') }}
@@ -376,9 +550,11 @@ useSeoMeta({
             v-else
             variant="primary"
             size="md"
+            :loading="submitting"
+            :disabled="submitting"
             @click="finish"
           >
-            {{ $t('host.finishListing') }}
+            {{ submitting ? $t('host.creatingListing') : $t('host.finishListing') }}
           </BaseButton>
         </div>
       </div>

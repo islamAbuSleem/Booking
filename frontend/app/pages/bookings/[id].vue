@@ -9,7 +9,7 @@
  * Cancel goes through the real endpoint and degrades to the local store the
  * same way the read does.
  */
-import { cancelBooking, fetchBooking, isApiError, isApiFailure } from '~/utils/api'
+import { cancelBooking, createReview, fetchBooking, fetchReviewable, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiBooking } from '~/utils/api'
 import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
 import { useBookings } from '~/composables/useBookings'
@@ -29,6 +29,8 @@ interface BookingDetailPayload {
    * The fixture world keeps the line, the live one drops it.
    */
   guestName: string | null
+  /** False in fixture fallback — the review form below only renders for live bookings. */
+  live: boolean
 }
 
 /**
@@ -46,13 +48,13 @@ const {
     const bookingId = String(route.params.id ?? '')
     try {
       const booking = await fetchBooking(bookingId)
-      return { booking, guestName: null }
+      return { booking, guestName: null, live: true }
     }
     catch (fetchError: unknown) {
       // 404 and 403 are answers, not failures: neither is papered over with a
       // fixture, and both read as "you cannot see this trip".
       if (isApiError(fetchError) && (fetchError.code === 'BOOKING_NOT_FOUND' || fetchError.code === 'NOT_BOOKING_OWNER')) {
-        return { booking: null, guestName: null }
+        return { booking: null, guestName: null, live: false }
       }
       // 401 `UNAUTHORIZED` means no session at all, and with auth unwired that
       // is the everyday case — so it degrades to the fixtures, as a transport
@@ -61,8 +63,8 @@ const {
         throw fetchError
       }
       const mock = bookingById(bookingId)
-      if (!mock) return { booking: null, guestName: null }
-      return { booking: mockBookingToApi(mock), guestName: mock.guestName }
+      if (!mock) return { booking: null, guestName: null, live: false }
+      return { booking: mockBookingToApi(mock), guestName: mock.guestName, live: false }
     }
   },
 )
@@ -73,6 +75,77 @@ const guestName = computed(() => payload.value?.guestName ?? null)
 /** A missing id or a 404/403 answer is a not-found, not an exception — say so in the status line. */
 if (!booking.value && status.value !== 'error') {
   setResponseStatus(404, 'Booking not found')
+}
+
+/**
+ * T24: the review gate. Asked only for a live COMPLETED booking — anything else cannot
+ * be reviewable, so asking would be a wasted round trip. A negative answer is data, not
+ * an error: the template branches on the reason. Gone, foreign, or unreachable since
+ * the booking loaded all hide the form alike.
+ */
+const {
+  data: reviewable,
+  refresh: refreshReviewable,
+} = await useAsyncData(
+  () => `booking:${id.value}:reviewable`,
+  async () => {
+    const record = booking.value
+    if (!payload.value?.live || !record || record.status !== 'COMPLETED') return null
+    try {
+      return await fetchReviewable(record.id)
+    }
+    catch {
+      return null
+    }
+  },
+)
+
+const canReview = computed(() => reviewable.value?.canReview === true)
+const reviewReason = computed(() => reviewable.value?.reason ?? null)
+
+const rating = ref('5')
+const reviewTitle = ref('')
+const reviewBody = ref('')
+const reviewBusy = ref(false)
+const reviewError = ref('')
+const reviewDone = ref(false)
+
+const ratingOptions = computed(() => [5, 4, 3, 2, 1].map(score => ({ value: String(score), label: String(score) })))
+
+/**
+ * Writes the review, then stands down: the success banner replaces the form, so a
+ * double submit cannot 409 against itself. Losing a race (or the stay changing under
+ * the form) re-asks the gate instead of retrying a closed door — the reason note
+ * below replaces the form, and the visitor's words stay in place either way.
+ */
+async function submitReview(): Promise<void> {
+  const record = booking.value
+  reviewError.value = ''
+  if (!record || reviewBusy.value) return
+  if (!reviewTitle.value.trim() || !reviewBody.value.trim()) {
+    reviewError.value = t('reviews.fieldsRequired')
+    return
+  }
+  reviewBusy.value = true
+  try {
+    await createReview(record.hotel.id, {
+      bookingId: record.id,
+      rating: Number(rating.value),
+      title: reviewTitle.value.trim(),
+      body: reviewBody.value.trim(),
+    })
+    reviewDone.value = true
+  }
+  catch (error: unknown) {
+    if (isApiError(error) && (error.code === 'ALREADY_REVIEWED' || error.code === 'INVALID_REVIEW_STATE')) {
+      await refreshReviewable()
+      return
+    }
+    reviewError.value = isApiError(error) ? error.message : t('common.unexpectedError')
+  }
+  finally {
+    reviewBusy.value = false
+  }
 }
 
 /** Skeletons only on the cold request — a cached payload renders straight away. */
@@ -345,6 +418,97 @@ useSeoMeta({
               {{ $t('bookings.cancelBooking') }}
             </BaseButton>
           </div>
+
+          <!-- T24: the review form, once per completed stay. Fixtures are read-only. -->
+          <section
+            v-if="booking.status === 'COMPLETED'"
+            aria-labelledby="booking-review"
+            class="border-rule bg-surface rounded-none border p-6"
+          >
+            <h2
+              id="booking-review"
+              class="text-fg-muted text-label uppercase"
+            >
+              {{ $t('reviews.formTitle') }}
+            </h2>
+
+            <BaseAlert
+              v-if="reviewDone"
+              tone="success"
+              :title="$t('reviews.successTitle')"
+              class="mt-4"
+            >
+              {{ $t('reviews.successBody') }}
+            </BaseAlert>
+
+            <form
+              v-else-if="canReview"
+              class="mt-4 flex flex-col gap-4"
+              novalidate
+              @submit.prevent="submitReview"
+            >
+              <p class="text-fg-muted text-sm">
+                {{ $t('reviews.formHint') }}
+              </p>
+              <div class="max-w-[200px]">
+                <BaseSelect
+                  id="review-rating"
+                  v-model="rating"
+                  :label="$t('reviews.ratingLabel')"
+                  :options="ratingOptions"
+                />
+              </div>
+              <BaseInput
+                id="review-title"
+                v-model="reviewTitle"
+                type="text"
+                :label="$t('reviews.titleLabel')"
+              />
+              <div class="flex flex-col gap-2">
+                <label
+                  for="review-body"
+                  class="text-fg-muted text-label uppercase"
+                >{{ $t('reviews.bodyLabel') }}</label>
+                <textarea
+                  id="review-body"
+                  v-model="reviewBody"
+                  rows="5"
+                  class="text-fg placeholder:text-fg-subtle border-rule-strong bg-surface w-full rounded-sm border px-3 py-3 text-sm focus:border-fg focus:outline-none"
+                />
+              </div>
+              <p
+                v-if="reviewError"
+                role="alert"
+                class="text-danger text-sm"
+              >
+                {{ reviewError }}
+              </p>
+              <div>
+                <BaseButton
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  :loading="reviewBusy"
+                  :disabled="reviewBusy"
+                >
+                  {{ reviewBusy ? $t('reviews.submittingReview') : $t('reviews.submitReview') }}
+                </BaseButton>
+              </div>
+            </form>
+
+            <p
+              v-else-if="reviewReason === 'ALREADY_REVIEWED'"
+              class="text-fg-muted mt-4 text-sm"
+            >
+              {{ $t('reviews.alreadyReviewed') }}
+            </p>
+            <p
+              v-else-if="reviewReason === 'NOT_COMPLETED'"
+              class="text-fg-muted mt-4 text-sm"
+            >
+              {{ $t('reviews.notCompletedNote') }}
+            </p>
+          </section>
         </div>
 
         <!-- Price breakdown: 5 columns, sticky. -->
