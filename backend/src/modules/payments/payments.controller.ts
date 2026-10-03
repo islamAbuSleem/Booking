@@ -18,9 +18,11 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { MUTATION_THROTTLE } from '../../common/throttle/app-throttler.guard.js';
 import type { Request } from 'express';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import {
@@ -51,6 +53,7 @@ export class PaymentsController {
   ) {}
 
   @Post('intent')
+  @Throttle({ default: MUTATION_THROTTLE })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create the Stripe PaymentIntent for a pending booking',
@@ -131,6 +134,7 @@ export class PaymentsController {
 
   @Post('webhook')
   @Public()
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Stripe webhook: confirm or release a booking',

@@ -77,7 +77,7 @@
 - [x] T26 Stripe payment intent
 - [x] T27 Stripe webhook
 - [x] T28 Checkout UI
-- [ ] T29 Rate limiting
+- [x] T29 Rate limiting
 - [ ] T30 i18n scaffolding
 
 ### Phase 4 — Polish
@@ -583,6 +583,15 @@
   state. PENDING already displayed as "Awaiting payment" (`STATUS_LABEL_KEY`), so no
   badge change was needed. `NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` gates the card step;
   secret keys never leave the API.
+- **D73 — one throttler, three parameterizations, tracker in the guard.** A single
+  `default` throttler is overridden per route (`@Throttle({ default: … })`), because
+  configuring three global throttlers would charge every request against all three
+  budgets and lock users out of login after five page views. `AppThrottlerGuard`
+  keys authenticated callers by user id and everyone else by IP, and runs after the
+  JWT guard so the id is populated. The 429 envelope was already correct (the filter
+  maps 429 → `RATE_LIMITED`); the guard sets the `Retry-After` header itself.
+  Webhook and health skip throttling — provider retries and monitor polls must never
+  429. Pinned by firing six rapid registrations: five 201s, then the envelope.
 
 ## Notes
 

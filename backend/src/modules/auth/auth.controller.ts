@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiNoContentResponse,
   ApiOkResponse,
@@ -24,6 +25,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { SkipEnvelope } from '../../common/envelope.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { AUTH_THROTTLE } from '../../common/throttle/app-throttler.guard.js';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import type { PublicUser } from '../users/dto/user.dto.js';
 import { AuthService, type Session } from './auth.service.js';
@@ -60,6 +62,7 @@ export class AuthController {
 
   @Post('register')
   @Public()
+  @Throttle({ default: AUTH_THROTTLE })
   @ApiOperation({
     summary: 'Register with email and password',
     description:
@@ -87,6 +90,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  @Throttle({ default: AUTH_THROTTLE })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Log in with email and password',
