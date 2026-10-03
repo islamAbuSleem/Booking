@@ -68,15 +68,15 @@
 - [x] T19 Favorites
 - [x] T20 Bookings API
 - [x] T21 Cloudinary upload
-- [ ] T22 Host listing management API
-- [ ] T23 Wire auth into the frontend
-- [ ] T24 Reviews
-- [ ] T25 Admin moderation
+- [x] T22 Host listing management API
+- [x] T23 Wire auth into the frontend
+- [x] T24 Reviews
+- [x] T25 Admin moderation
 
 ### Phase 3 — Advanced
-- [ ] T26 Stripe payment intent
-- [ ] T27 Stripe webhook
-- [ ] T28 Checkout UI
+- [x] T26 Stripe payment intent
+- [x] T27 Stripe webhook
+- [x] T28 Checkout UI
 - [ ] T29 Rate limiting
 - [ ] T30 i18n scaffolding
 
@@ -488,6 +488,101 @@
   image to any `hotelId` if the `publicId` prefix matches their own folder — T22's host-ownership
   query-filter rule is what closes this. If T22 lands without that check, a host could attach
   images to another host's hotel.
+- **D60 — T22 ownership failures are 403 `NOT_HOTEL_OWNER`, never a bare `Error` and never
+  the P2025 404.** The first draft threw `new Error('NOT_HOTEL_OWNER')`, which the exception
+  filter renders as a 500, and the room/blackout writes went straight to Prisma, where a
+  foreign id would have answered P2025/404 — letting host B probe host A's ids by status
+  code. The service now pre-checks (`findRoomHost`/`findBlackoutHost`) and throws
+  `forbidden('NOT_HOTEL_OWNER')`. Unknown ids answer 403 alike: missing and foreign are
+  indistinguishable on purpose. Pinned by `test/host.e2e-spec.ts` (8 tests).
+- **D61 — T22 is backend-complete but the ticket is not done: T10 still reads mocks.**
+  The ticket's UI line ("T10 wires to real data") is outstanding — `dashboard/host/*`
+  still renders fixtures. It was sequenced after T23 on purpose (the wiring needs a real
+  session), not skipped. The checkbox stays open until the dashboard reads the API.
+- **D62 — `useAuth` state lives in `useState`, not a per-call `ref`.** The header, the
+  route middleware, and pages each call `useAuth()` independently; a plain `ref` would give
+  each caller its own session copy and the header would never reflect a login performed
+  elsewhere. `useState` is also serialised into the SSR payload, and `app/plugins/auth.ts`
+  hydrates it before first render so there is no signed-out flash. The mock `useSession`
+  is deleted — a grep for it returns only the comment in `useAuth` that names its
+  replacement.
+- **D63 — T22 wiring is API-first with a fixture fallback, behind a view-model seam.**
+  `dashboard/host/*` reads the host endpoints via `useAsyncData` and maps both the live
+  payloads and the fixtures into the same view models, so the template never branches on
+  the source. Four honest limits, all owned by the API rather than papered over in the
+  form: (1) the host list carries no review aggregates, so ratings render "—" until T24/T41;
+  (2) room prices have no write endpoint until multi-currency (T39), so the edit page shows
+  the price as a locked line; (3) hotel-scoped blackouts are not returned by the detail
+  payload, so only room-scoped ones seed the edit list; (4) the wizard creates listings at
+  lat/lng 0,0 — no location picker exists (maps are a placeholder per D28) and an invented
+  coordinate would be worse than a zero one. The wizard collects the fields the create
+  schema actually requires (address, country, stars, check-in/out, room description/bed/inventory)
+  and `amenityIds` was added to create/update because the ticket promises amenities CRUD.
+  Publishing is refused unconditionally on the host route (`FORBIDDEN` even for admins) —
+  it is T25 moderation's job, so the route has one rule for every caller.
+- **D64 — `BaseInput` accepts `time`, and the wizard's star rating rides as text.**
+  `BaseSelect` is string-modelled, so the 1–5 rating is selected as `'3'` and converted
+  with `Number()` at the submit edge rather than widening the shared component's model.
+- **D65 — T24 checks five rules cheapest-first, each with its own answer.** Missing
+  booking → 404 `BOOKING_NOT_FOUND`; foreign booking → 403 `NOT_BOOKING_OWNER` (the T20
+  code); booking from another hotel → 404 (posted *under* a hotel, so "not found here");
+  non-COMPLETED stay → 400 `INVALID_REVIEW_STATE`; second review → 409
+  `ALREADY_REVIEWED` on the unique `bookingId`. The aggregate is derived at read time
+  from the same VISIBLE rows — "recalculate on write" is a no-op by construction, and
+  there is no column to drift. `GET reviewable` returns data, not errors, for the two
+  negative states.
+- **D66 — the reviews list resolves uuid-or-slug so it never waterfalls behind the
+  detail fetch.** Both run concurrently on the raw route param. The card renders a
+  `ReviewView`, not the mock shape: the API carries no author location (dropped, never
+  invented) and its `createdAt` instant is truncated to the day, because
+  `formatStayDate` pins UTC midnight and a full instant would shift it. Fixture reviews
+  render only under a fixture hotel. The booking-detail form renders only for a live
+  COMPLETED booking with `canReview: true`; fixtures are read-only.
+- **D67 — suspension is persisted state, enforced at three points.** `UserStatus`
+  (`ACTIVE`/`SUSPENDED`, default `ACTIVE`) ships as an offline-written additive
+  migration — no live DB exists here, so the SQL in `prisma/migrations/` is what
+  `migrate deploy` applies on Neon, and the directory gains the `migration_lock.toml`
+  T12 never committed. Enforcement: login and all three OAuth session paths answer 403
+  `ACCOUNT_SUSPENDED` after credentials verify, and `JwtAuthGuard` rejects a live JWT
+  on the next request, so suspension bites immediately rather than at token expiry.
+- **D68 — the admin 403 names its code via `@RolesCode`, and the audit trail is the
+  API log.** `RolesGuard` defaults to `FORBIDDEN` as before; the admin controller sets
+  `ADMIN_REQUIRED` so the client tells "sign in" from "wrong role". Every moderation
+  action — reads included — logs `[admin] <actor> …`, and self-suspension is refused
+  pre-delegation (400 `ADMIN_SELF_SUSPEND`) while self-reactivation stays allowed.
+- **D69 — the console filters listings server-side and moderates the whole review
+  corpus.** There is no report system, so the flagged queue exists only in fixture
+  mode; live rows show hide/unhide by status. A real 403 never degrades to fixtures,
+  and mock mutations re-fetch so the local overrides stay the single source they
+  always were.
+- **D70 — T26 never trusts a client-sent amount because the request has no amount
+  field at all.** The intent body is `{ bookingId }` only; the total comes from the
+  booking snapshot the server wrote. Idempotency is two-layered: a deterministic
+  `payments-intent:<reference>` key for Stripe (human-matchable in support) plus a
+  one-row-per-booking upsert locally. `stripe@22.6.2` is pinned exact, and keys stay
+  optional at boot — the client builds lazily and answers 503 `STRIPE_NOT_CONFIGURED`
+  only when a payment actually runs without credentials.
+- **D71 — the webhook verifies against raw bytes and dispatches idempotently.**
+  `rawBody: true` was scaffolded in T1 for exactly this; the handler reads
+  `req.rawBody` (never `@Body({ bodyParser: false })`, which does not exist, and never
+  `app.use(express.json())`, which nulls it). `constructEvent` is local HMAC, so tests
+  sign fixtures with the real algorithm instead of mocking the verifier — and the one
+  fake that does verify mirrors the real client's error contract, after a raw SDK
+  error leaked through as a 500 once. Each arm flips conditionally (`PENDING` → the new
+  state, else no write), a late failure for a CONFIRMED stay changes nothing, unknown
+  events 200-and-ignore, and the payment row is found by intent id rather than trusted
+  metadata. E2E suites that boot the app must pass `{ rawBody: true }` to
+  `createNestApplication` or every signature fails — main.ts does, tests did not.
+- **D72 — T28 confirms the intent but believes only the server.** The page chain is
+  create-booking → create-intent → Elements `confirmCardPayment` → poll the booking
+  record; the banner renders solely from a server-read CONFIRMED. Any stay edit voids
+  the intent (a stale `clientSecret` must never charge yesterday's amount), a failed
+  submit retries the same intent rather than minting a second booking, and 401 sends
+  the visitor to login with a return address. The mock `HB-xxxx` confirmation is gone:
+  without a backend there is nothing to confirm, so transport failure is an error
+  state. PENDING already displayed as "Awaiting payment" (`STATUS_LABEL_KEY`), so no
+  badge change was needed. `NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` gates the card step;
+  secret keys never leave the API.
 
 ## Notes
 

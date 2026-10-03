@@ -6,6 +6,7 @@
  */
 const route = useRoute()
 const { t } = useI18n()
+const { current: user, logout } = useAuth()
 
 const isAdmin = computed(() => route.path.startsWith('/dashboard/admin'))
 
@@ -17,6 +18,12 @@ const nav = computed(() =>
         { to: '/dashboard/host/new', label: t('dashboard.navNew') },
       ],
 )
+
+/** Signs out and lands on `/` — a dashboard with no exit traps the session. */
+async function onLogout(): Promise<void> {
+  await logout()
+  await navigateTo('/')
+}
 </script>
 
 <template>
@@ -49,6 +56,22 @@ const nav = computed(() =>
           {{ item.label }}
         </NuxtLink>
       </nav>
+
+      <div class="border-rule border-t p-3">
+        <p
+          v-if="user"
+          class="text-fg-subtle truncate px-3 pb-2 text-sm"
+        >
+          {{ user.name }}
+        </p>
+        <button
+          type="button"
+          class="border-rule hover:border-accent w-full rounded-sm border px-3 py-2 text-left text-sm opacity-60 transition-colors duration-150 hover:opacity-100"
+          @click="onLogout"
+        >
+          {{ $t('nav.signOut') }}
+        </button>
+      </div>
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">

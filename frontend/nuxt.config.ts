@@ -11,6 +11,13 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: 'http://localhost:3000',
+      /**
+       * T28 — Stripe publishable key (test mode: `pk_test_…`). Public by design: it
+       * identifies the account to Stripe.js and cannot charge anything alone. Empty
+       * disables the card form with a configuration notice instead of failing obscurely
+       * at confirm time. Secret keys never leave the API.
+       */
+      stripePublishableKey: '',
     },
   },
 
