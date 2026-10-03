@@ -48,6 +48,8 @@ export type ApiReview = components['schemas']['Review']
 export type ApiReviewListData = components['schemas']['ReviewListData']
 export type ApiReviewable = components['schemas']['ReviewableData']
 export type ApiCreateReview = components['schemas']['CreateReview']
+export type ApiIntentData = components['schemas']['IntentData']
+export type ApiPayment = components['schemas']['Payment']
 export type ApiAdminHotel = components['schemas']['AdminHotel']
 export type ApiAdminUser = components['schemas']['AdminUser']
 export type ApiAdminReview = components['schemas']['AdminReview']
@@ -399,6 +401,39 @@ export async function createReview(hotelId: string, body: ApiCreateReview): Prom
  */
 export async function fetchReviewable(bookingId: string): Promise<ApiReviewable> {
   return apiFetch<ApiReviewable>(`/api/bookings/${encodeURIComponent(bookingId)}/reviewable`)
+}
+
+/**
+ * T20 + T28. Creates the PENDING booking — the hold that T26/T27 confirm. The money
+ * snapshot is server-computed from the quote inputs; contact fields are validated but
+ * not persisted. A signed-out caller 401s (the page sends them to login); nothing
+ * answered (transport failure) is the only case with no booking at all.
+ */
+export interface CreateBookingRequest {
+  roomId: string
+  checkIn: string
+  checkOut: string
+  guests: number
+  guestName: string
+  guestEmail: string
+  guestPhone: string
+}
+
+export async function createBooking(request: CreateBookingRequest): Promise<ApiBooking> {
+  return apiFetch<ApiBooking>('/api/bookings', { method: 'POST', body: { ...request } })
+}
+
+/**
+ * T26 + T28. Mints (or replays, idempotently) the PaymentIntent for a PENDING booking.
+ * The amount answers in the payload — the page never prices anything itself.
+ */
+export async function createPaymentIntent(bookingId: string): Promise<ApiIntentData> {
+  return apiFetch<ApiIntentData>('/api/payments/intent', { method: 'POST', body: { bookingId } })
+}
+
+/** T26 + T28. The payment row, if an intent exists. 404 before the first intent. */
+export async function fetchPayment(bookingId: string): Promise<ApiPayment> {
+  return apiFetch<ApiPayment>(`/api/payments/${encodeURIComponent(bookingId)}`)
 }
 
 /**
