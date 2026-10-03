@@ -11,6 +11,7 @@
  * count, and the scale is stated in text.
  */
 import type { MockRatingBreakdown } from '~/utils/mock/types'
+import { formatRating, wholeNumber } from '~/utils/format'
 
 const props = defineProps<{ breakdown: MockRatingBreakdown }>()
 
@@ -41,15 +42,15 @@ function widthFor(score: number): string {
 <template>
   <div class="border-rule bg-surface rounded-none border p-5">
     <p class="text-fg-muted text-label uppercase">
-      {{ $t('detail.ratingScale', { min: minScore, max: maxScore }) }}
+      {{ $t('detail.ratingScale', { min: formatRating(minScore), max: formatRating(maxScore) }) }}
     </p>
 
     <div class="mt-4 flex items-baseline gap-3">
-      <span class="tabular font-display text-display-l">{{ breakdown.average }}</span>
+      <span class="tabular font-display text-display-l">{{ formatRating(breakdown.average) }}</span>
       <span class="text-fg-muted text-sm">
         {{ breakdown.totalReviews === 1
           ? $t('detail.reviewsCountOne')
-          : $t('detail.reviewsCount', { count: breakdown.totalReviews }) }}
+          : $t('detail.reviewsCount', { count: wholeNumber(breakdown.totalReviews) }) }}
       </span>
     </div>
 
@@ -61,7 +62,7 @@ function widthFor(score: number): string {
       >
         <div class="flex items-baseline justify-between gap-3 text-sm">
           <span>{{ entry.label }}</span>
-          <span class="tabular text-fg-muted">{{ entry.score.toFixed(1) }}</span>
+          <span class="tabular text-fg-muted">{{ formatRating(entry.score) }}</span>
         </div>
         <!-- The bar itself is decorative: the label and the raw score above it are
              already text, so announcing them twice would be noise. -->
