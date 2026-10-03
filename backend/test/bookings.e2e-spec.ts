@@ -221,6 +221,18 @@ class InMemoryWorld implements AvailabilityRepository, BookingRepository {
     return updated;
   }
 
+  async transitionStatus(
+    bookingId: string,
+    from: BookingStatus,
+    to: BookingStatus,
+  ): Promise<BookingRecord | null> {
+    const row = this.bookings.get(bookingId);
+    if (!row || row.status !== from) return null;
+    const updated = { ...row, status: to };
+    this.bookings.set(bookingId, updated);
+    return updated;
+  }
+
   /** Test-only: the T26 confirmation, so cancel can be exercised both ways. */
   confirm(bookingId: string): void {
     const row = this.bookings.get(bookingId);

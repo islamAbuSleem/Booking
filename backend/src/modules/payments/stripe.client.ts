@@ -36,6 +36,12 @@ export interface CreatedIntent {
 
 export interface StripeClient {
   createIntent(input: CreateIntentInput): Promise<CreatedIntent>;
+  /**
+   * Verifies a webhook's signature against the raw request bytes and parses the event.
+   * Pure HMAC — no network — so tests sign fixtures with the real algorithm instead of
+   * mocking the verifier.
+   */
+  verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event>;
 }
 
 /**
@@ -90,6 +96,31 @@ export class StripePaymentClient implements StripeClient {
       clientSecret: intent.client_secret,
       status: mapStatus(intent.status),
     };
+  }
+
+  async verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event> {
+    const secret = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
+    if (!secret) {
+      throw new ApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'STRIPE_NOT_CONFIGURED',
+        'Webhooks are not configured on this deployment',
+      );
+    }
+    try {
+      // No network: `constructEvent` is HMAC verification plus JSON parsing, which is
+      // exactly why the raw bytes (not the parsed body) are its input.
+      return new Stripe(secret).webhooks.constructEvent(rawBody, signature, secret);
+    } catch {
+      // Never include the secret, the signature, or Stripe's detail: the first two
+      // are credentials and the third is an oracle for forging.
+      this.logger.warn('[payments] rejected webhook with invalid signature');
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_SIGNATURE',
+        'The webhook signature is invalid',
+      );
+    }
   }
 }
 

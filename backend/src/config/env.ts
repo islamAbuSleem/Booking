@@ -112,6 +112,12 @@ export const envSchema = z.object({
    * ever (D7). `STRIPE_WEBHOOK_SECRET` belongs to T27 and is validated there.
    */
   STRIPE_SECRET_KEY: z.string().optional(),
+  /**
+   * T27 — verifies webhook signatures. Optional at boot like the secret key; a webhook
+   * call without it is a 503, and a forged signature is a 400 that names nothing about
+   * why verification failed.
+   */
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 });
 
 /** The exact string `.env.example` used to ship, kept so it can be refused by name. */

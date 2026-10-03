@@ -2546,6 +2546,39 @@
         ]
       }
     },
+    "/api/payments/webhook": {
+      "post": {
+        "description": "Signature-verified against the RAW body (`rawBody: true` at scaffold; never `@Body({ bodyParser: false })`, which does not exist, and never `app.use(express.json())`, which nulls `rawBody`). `payment_intent.succeeded` flips the booking PENDING → CONFIRMED and upserts the payment row with the receipt URL; `payment_intent.payment_failed` releases the hold (PENDING → CANCELLED). A late failure for an already-confirmed stay changes nothing. Unknown events 200 and are ignored, so a new Stripe event type never wedges deliveries into a retry loop. Fully idempotent: Stripe retries, and a repeated event finds nothing in `from` and writes nothing.",
+        "operationId": "PaymentsController_webhook",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Accepted — verified and dispatched, or verified and ignored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The signature is missing or does not verify.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stripe webhook: confirm or release a booking",
+        "tags": [
+          "Payments"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "description": "Always 200. `status` is \"ok\" only when the database answered; `db` carries reachability on its own, so a monitor can alert on it without parsing a status string.",
@@ -5777,6 +5810,40 @@
           },
           "data": {
             "$ref": "#/components/schemas/Payment"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "WebhookData": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "received"
+        ],
+        "additionalProperties": false
+      },
+      "WebhookEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebhookData"
           }
         },
         "required": [

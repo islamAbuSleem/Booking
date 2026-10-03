@@ -1,8 +1,10 @@
-import type { INestApplication } from '@nestjs/common';
+import { HttpStatus, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import Stripe from 'stripe';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/bootstrap.js';
+import { ApiError } from '../src/common/errors/api-error.js';
 import { PasswordService } from '../src/modules/auth/password.service.js';
 import { HOST_REPOSITORY } from '../src/modules/host/host.repository.js';
 import { StubHostRepository } from '../src/modules/host/host.stub.js';
@@ -44,6 +46,8 @@ const ADA_ID = '33333333-3333-4333-8333-333333333333';
 const BO_ID = '44444444-4444-4444-8444-444444444444';
 const PENDING_ID = '55555555-5555-4555-8555-555555555555';
 const CONFIRMED_ID = '66666666-6666-4666-8666-666666666666';
+/** A second hold, reserved for the webhook tests so intent tests never touch it. */
+const WEBHOOK_ID = '77777777-7777-4777-8777-777777777777';
 const PASSWORD = 'correct-password-1';
 
 function booking(id: string, overrides: Partial<BookingRecord> = {}): BookingRecord {
@@ -72,7 +76,14 @@ function booking(id: string, overrides: Partial<BookingRecord> = {}): BookingRec
  * Stripe's idempotency, minus Stripe: the first call with a key mints the intent, a
  * repeat with the same key returns the same one, and the key log proves the service
  * sent the same key both times rather than minting a fresh one per call.
+ *
+ * Verification is the real algorithm, not a mock of it: `constructEvent` is local HMAC
+ * plus JSON parsing, so this fake holds a test secret and verifies exactly like
+ * production — only the intent-minting half is stubbed, because that half needs the
+ * network.
  */
+const WEBHOOK_SECRET = 'whsec_test_only_never_deploy';
+
 class RecordingStripe implements StripeClient {
   readonly keys: string[] = [];
   private readonly byKey = new Map<string, CreatedIntent>();
@@ -89,9 +100,21 @@ class RecordingStripe implements StripeClient {
     this.byKey.set(input.idempotencyKey, intent);
     return intent;
   }
+
+  async verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event> {
+    // Same contract as the real client: a forgery is a 400 ApiError, never a raw SDK error.
+    try {
+      return new Stripe(WEBHOOK_SECRET).webhooks.constructEvent(rawBody, signature, WEBHOOK_SECRET);
+    } catch {
+      throw new ApiError(HttpStatus.BAD_REQUEST, 'INVALID_SIGNATURE', 'The webhook signature is invalid');
+    }
+  }
 }
 
 class StubBookings implements BookingsRepository {
+  /** Every conditional flip, so a retried webhook must not append a second one. */
+  readonly flips: Array<{ bookingId: string; from: string; to: string }> = [];
+
   constructor(private readonly rows: Map<string, BookingRecord>) {}
 
   async findById(id: string): Promise<BookingRecord | null> {
@@ -106,8 +129,24 @@ class StubBookings implements BookingsRepository {
     return [];
   }
 
-  async findHotelSnapshot(): Promise<null> {
-    return null;
+  async findHotelSnapshot(): Promise<{
+    id: string;
+    slug: string;
+    name: string;
+    city: string;
+    country: string;
+    addressLine: string;
+    coverImage: string | null;
+  }> {
+    return {
+      id: '11111111-1111-4111-8111-111111111111',
+      slug: 'the-larkspur-hotel',
+      name: 'Larkspur House',
+      city: 'Lisbon',
+      country: 'Portugal',
+      addressLine: '12 Rua do Vale',
+      coverImage: null,
+    };
   }
 
   async findHotelSnapshots(): Promise<[]> {
@@ -121,6 +160,19 @@ class StubBookings implements BookingsRepository {
   async updateStatus(): Promise<null> {
     return null;
   }
+
+  async transitionStatus(
+    bookingId: string,
+    from: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
+    to: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED',
+  ): Promise<BookingRecord | null> {
+    const row = this.rows.get(bookingId);
+    if (!row || row.status !== from) return null;
+    const updated = { ...row, status: to };
+    this.rows.set(bookingId, updated);
+    this.flips.push({ bookingId, from, to });
+    return updated;
+  }
 }
 
 class StubPayments implements PaymentsRepository {
@@ -129,6 +181,13 @@ class StubPayments implements PaymentsRepository {
 
   async findByBooking(bookingId: string): Promise<PaymentRecord | null> {
     return this.rows.get(bookingId) ?? null;
+  }
+
+  async findByIntent(stripePaymentIntentId: string): Promise<PaymentRecord | null> {
+    for (const row of this.rows.values()) {
+      if (row.stripePaymentIntentId === stripePaymentIntentId) return row;
+    }
+    return null;
   }
 
   async upsert(data: UpsertPaymentData): Promise<PaymentRecord> {
@@ -197,6 +256,7 @@ describe('Payments API (e2e)', () => {
   let boCookie: string;
   let stripe: RecordingStripe;
   let payments: StubPayments;
+  let bookings: StubBookings;
 
   beforeAll(async () => {
     const passwords = new PasswordService();
@@ -204,6 +264,13 @@ describe('Payments API (e2e)', () => {
     const bo = await seededUser(passwords, BO_ID, 'bo@example.com');
     stripe = new RecordingStripe();
     payments = new StubPayments();
+    bookings = new StubBookings(
+      new Map([
+        [PENDING_ID, booking(PENDING_ID)],
+        [CONFIRMED_ID, booking(CONFIRMED_ID, { status: 'CONFIRMED' })],
+        [WEBHOOK_ID, booking(WEBHOOK_ID)],
+      ]),
+    );
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(PrismaService)
@@ -216,21 +283,14 @@ describe('Payments API (e2e)', () => {
       .overrideProvider(HOST_REPOSITORY)
       .useValue(new StubHostRepository())
       .overrideProvider(BOOKINGS_REPOSITORY)
-      .useValue(
-        new StubBookings(
-          new Map([
-            [PENDING_ID, booking(PENDING_ID)],
-            [CONFIRMED_ID, booking(CONFIRMED_ID, { status: 'CONFIRMED' })],
-          ]),
-        ),
-      )
+      .useValue(bookings)
       .overrideProvider(PAYMENTS_REPOSITORY)
       .useValue(payments)
       .overrideProvider(STRIPE_CLIENT)
       .useValue(stripe)
       .compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleRef.createNestApplication({ rawBody: true });
     configureApp(app);
     await app.init();
 
@@ -343,6 +403,133 @@ describe('Payments API (e2e)', () => {
         .get(`/api/payments/${PENDING_ID}`)
         .set('Cookie', boCookie)
         .expect(403);
+    });
+  });
+
+  describe('POST /api/payments/webhook', () => {
+    const sign = (payload: string): string =>
+      new Stripe(WEBHOOK_SECRET).webhooks.generateTestHeaderString({ payload, secret: WEBHOOK_SECRET });
+
+    const postWebhook = (payload: string, signature?: string) => {
+      const call = request(app.getHttpServer())
+        .post('/api/payments/webhook')
+        .set('Content-Type', 'application/json');
+      if (signature !== undefined) call.set('stripe-signature', signature);
+      return call.send(payload);
+    };
+
+    const succeededPayload = (intentId: string): string =>
+      JSON.stringify({
+        id: 'evt_succeeded',
+        object: 'event',
+        type: 'payment_intent.succeeded',
+        data: {
+          object: {
+            id: intentId,
+            object: 'payment_intent',
+            charges: { data: [{ receipt_url: 'https://receipt.test/1' }] },
+          },
+        },
+      });
+
+    it('confirms the booking on a valid signature and stores the receipt', async () => {
+      // The intent first, through the real route: the webhook test then exercises the
+      // full T26 → T27 chain rather than a hand-seeded row.
+      const intent = await request(app.getHttpServer())
+        .post('/api/payments/intent')
+        .set('Cookie', adaCookie)
+        .send({ bookingId: WEBHOOK_ID })
+        .expect(201);
+      const intentId = intent.body.data.paymentIntentId as string;
+
+      const payload = succeededPayload(intentId);
+      const response = await postWebhook(payload, sign(payload)).expect(200);
+
+      expect(response.body).toEqual({ success: true, data: { received: true } });
+
+      const read = await request(app.getHttpServer())
+        .get(`/api/payments/${WEBHOOK_ID}`)
+        .set('Cookie', adaCookie)
+        .expect(200);
+      expect(read.body.data).toMatchObject({ status: 'succeeded', receiptUrl: 'https://receipt.test/1' });
+
+      const trip = await request(app.getHttpServer())
+        .get(`/api/bookings/${WEBHOOK_ID}`)
+        .set('Cookie', adaCookie)
+        .expect(200);
+      expect(trip.body.data.status).toBe('CONFIRMED');
+    });
+
+    it('200s a duplicate event without a second transition', async () => {
+      // No new intent: the booking is already CONFIRMED, so an intent POST would 400.
+      // Rebuild the event from the stored row instead — redelivery carries the same
+      // bytes, and the service must find nothing in `from` and write nothing.
+      const stored = await request(app.getHttpServer())
+        .get(`/api/payments/${WEBHOOK_ID}`)
+        .set('Cookie', adaCookie)
+        .expect(200);
+      const payload = succeededPayload(stored.body.data.stripePaymentIntentId as string);
+      const flips = bookings.flips.length;
+
+      const response = await postWebhook(payload, sign(payload)).expect(200);
+
+      expect(response.body).toEqual({ success: true, data: { received: true } });
+      expect(bookings.flips).toHaveLength(flips);
+    });
+
+    it('cancels the hold on payment failure and records it', async () => {
+      const intent = await request(app.getHttpServer())
+        .post('/api/payments/intent')
+        .set('Cookie', adaCookie)
+        .send({ bookingId: PENDING_ID })
+        .expect(201);
+      const payload = JSON.stringify({
+        id: 'evt_failed',
+        object: 'event',
+        type: 'payment_intent.payment_failed',
+        data: { object: { id: intent.body.data.paymentIntentId as string, object: 'payment_intent' } },
+      });
+
+      await postWebhook(payload, sign(payload)).expect(200);
+
+      const trip = await request(app.getHttpServer())
+        .get(`/api/bookings/${PENDING_ID}`)
+        .set('Cookie', adaCookie)
+        .expect(200);
+      expect(trip.body.data.status).toBe('CANCELLED');
+
+      const read = await request(app.getHttpServer())
+        .get(`/api/payments/${PENDING_ID}`)
+        .set('Cookie', adaCookie)
+        .expect(200);
+      expect(read.body.data.status).toBe('failed');
+    });
+
+    it('400s a forged payload with INVALID_SIGNATURE', async () => {
+      const payload = succeededPayload('pi_forged');
+      const response = await postWebhook(payload, sign(`${payload}tampered`)).expect(400);
+
+      expect(response.body).toEqual({
+        success: false,
+        error: { code: 'INVALID_SIGNATURE', message: 'The webhook signature is invalid' },
+      });
+    });
+
+    it('400s a missing signature', async () => {
+      await postWebhook(succeededPayload('pi_nosig')).expect(400);
+    });
+
+    it('200s an unknown event and ignores it', async () => {
+      const payload = JSON.stringify({
+        id: 'evt_unknown',
+        object: 'event',
+        type: 'customer.created',
+        data: { object: { id: 'cus_1', object: 'customer' } },
+      });
+
+      const response = await postWebhook(payload, sign(payload)).expect(200);
+
+      expect(response.body).toEqual({ success: true, data: { received: true } });
     });
   });
 });

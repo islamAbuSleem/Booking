@@ -75,7 +75,7 @@
 
 ### Phase 3 — Advanced
 - [x] T26 Stripe payment intent
-- [ ] T27 Stripe webhook
+- [x] T27 Stripe webhook
 - [ ] T28 Checkout UI
 - [ ] T29 Rate limiting
 - [ ] T30 i18n scaffolding
@@ -562,6 +562,17 @@
   one-row-per-booking upsert locally. `stripe@22.6.2` is pinned exact, and keys stay
   optional at boot — the client builds lazily and answers 503 `STRIPE_NOT_CONFIGURED`
   only when a payment actually runs without credentials.
+- **D71 — the webhook verifies against raw bytes and dispatches idempotently.**
+  `rawBody: true` was scaffolded in T1 for exactly this; the handler reads
+  `req.rawBody` (never `@Body({ bodyParser: false })`, which does not exist, and never
+  `app.use(express.json())`, which nulls it). `constructEvent` is local HMAC, so tests
+  sign fixtures with the real algorithm instead of mocking the verifier — and the one
+  fake that does verify mirrors the real client's error contract, after a raw SDK
+  error leaked through as a 500 once. Each arm flips conditionally (`PENDING` → the new
+  state, else no write), a late failure for a CONFIRMED stay changes nothing, unknown
+  events 200-and-ignore, and the payment row is found by intent id rather than trusted
+  metadata. E2E suites that boot the app must pass `{ rawBody: true }` to
+  `createNestApplication` or every signature fails — main.ts does, tests did not.
 
 ## Notes
 

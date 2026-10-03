@@ -78,6 +78,9 @@ export const ERROR_CODES = [
   'STRIPE_NOT_CONFIGURED',
   // `PAYMENT_FAILED`: the provider answered something the contract cannot use.
   'PAYMENT_FAILED',
+  // T27 — `INVALID_SIGNATURE`: the webhook signature did not verify. 400, and the
+  // message says nothing about why: detail here is an oracle for forging.
+  'INVALID_SIGNATURE',
   // T25 — admin moderation and suspension.
   // `ADMIN_REQUIRED`: every `/api/admin/*` route, so the client distinguishes "sign in"
   // (401) from "signed in as the wrong role" (this) instead of rendering one login wall.

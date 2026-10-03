@@ -2,11 +2,14 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Inject,
   Param,
   Post,
+  Req,
+  type RawBodyRequest,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -16,7 +19,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
+import type { Request } from 'express';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import {
   intentRequestSchema,
@@ -25,6 +30,7 @@ import {
   type IntentRequest,
   type PaymentBookingParam,
   type PaymentDto,
+  type WebhookData,
 } from './dto/payment.dto.js';
 import { PaymentsService } from './payments.service.js';
 
@@ -121,5 +127,40 @@ export class PaymentsController {
     @Param(zodPipe(paymentBookingParamSchema)) params: PaymentBookingParam,
   ): Promise<PaymentDto> {
     return this.payments.getPayment(callerId, params.bookingId);
+  }
+
+  @Post('webhook')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Stripe webhook: confirm or release a booking',
+    description:
+      'Signature-verified against the RAW body (`rawBody: true` at scaffold; never ' +
+      '`@Body({ bodyParser: false })`, which does not exist, and never ' +
+      '`app.use(express.json())`, which nulls `rawBody`). `payment_intent.succeeded` ' +
+      'flips the booking PENDING → CONFIRMED and upserts the payment row with the ' +
+      'receipt URL; `payment_intent.payment_failed` releases the hold (PENDING → ' +
+      'CANCELLED). A late failure for an already-confirmed stay changes nothing. ' +
+      'Unknown events 200 and are ignored, so a new Stripe event type never wedges ' +
+      'deliveries into a retry loop. Fully idempotent: Stripe retries, and a repeated ' +
+      'event finds nothing in `from` and writes nothing.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Accepted — verified and dispatched, or verified and ignored.',
+    schema: { $ref: contractRef('WebhookEnvelope') },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'The signature is missing or does not verify.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  webhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('stripe-signature') signature: string | undefined,
+  ): Promise<WebhookData> {
+    return this.payments
+      .handleWebhook(req.rawBody, signature)
+      .then(() => ({ received: true as const }));
   }
 }

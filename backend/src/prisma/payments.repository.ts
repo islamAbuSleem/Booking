@@ -31,11 +31,15 @@ export interface UpsertPaymentData {
   amountCents: number;
   currency: string;
   status: PaymentStatus;
+  /** The charge receipt URL when Stripe reports one; null until T27 fills it. */
+  receiptUrl?: string | null;
 }
 
 export interface PaymentsRepository {
   /** Null when no intent has been created for the booking yet. */
   findByBooking(bookingId: string): Promise<PaymentRecord | null>;
+  /** The webhook's entry point: which booking a Stripe intent belongs to. */
+  findByIntent(stripePaymentIntentId: string): Promise<PaymentRecord | null>;
   /**
    * One row per booking: `booking_id` is unique, so a repeated intent for the same
    * booking replaces the row rather than appending a second one. The Stripe-side
