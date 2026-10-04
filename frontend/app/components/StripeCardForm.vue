@@ -25,9 +25,19 @@ let element: StripeCardElement | null = null
 
 onMounted(async () => {
   const key = useRuntimeConfig().public.stripePublishableKey as string
-  if (!key || !mountPoint.value) return
+  if (!key || !mountPoint.value) {
+    reportUnavailable()
+    return
+  }
   stripe = await loadStripe(key)
-  if (!stripe || !mountPoint.value) return
+  if (!stripe || !mountPoint.value) {
+    // Blocked by an ad blocker or a CSP, or the script resolved to nothing. Said out
+    // loud through the same channel a card error uses, because without an element no
+    // `change` event ever fires and the page's pay button stays disabled forever inside
+    // an empty bordered box that explains nothing.
+    reportUnavailable()
+    return
+  }
   element = stripe.elements().create('card', {
     hidePostalCode: true,
     style: {
@@ -50,6 +60,15 @@ onUnmounted(() => {
   element?.unmount()
   element = null
 })
+
+/**
+ * The element never mounted — no key, a blocked script, or a missing container. Reported
+ * through the existing `change` channel so the page can show a message and stop offering a
+ * button that cannot work.
+ */
+function reportUnavailable(): void {
+  emit('change', false, 'unavailable')
+}
 
 /**
  * Confirms the intent behind `clientSecret` with the mounted card. A card decline is

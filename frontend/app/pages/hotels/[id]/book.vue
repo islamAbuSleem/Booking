@@ -302,7 +302,9 @@ async function startPayment(): Promise<void> {
 
 function onCardChange(complete: boolean, error: string): void {
   cardComplete.value = complete
-  cardFieldError.value = error
+  // `unavailable` is this page's own sentinel for "the element never mounted", not prose.
+  // Everything else is Stripe's own wording, which the field already renders as-is.
+  cardFieldError.value = error === 'unavailable' ? t('booking.cardNotReady') : error
 }
 
 const cardForm = ref<{ pay: () => Promise<{ ok: true } | { ok: false, message: string }> } | null>(null)
