@@ -28,6 +28,8 @@ const { t } = useI18n()
 
 const id = computed(() => String(route.params.id ?? ''))
 
+type HotelStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'
+
 interface RoomEdit {
   id: string
   name: string
@@ -124,7 +126,14 @@ interface Blackout {
 const hotelName = ref('')
 const hotelCity = ref('')
 const hotelDescription = ref('')
-const hotelStatus = ref<'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'>('PENDING')
+const hotelStatus = ref<HotelStatus>('PENDING')
+/**
+ * The status the server sent. A save sends `status` only when it differs from this,
+ * because the route refuses any host write carrying `PUBLISHED` — publishing is the
+ * admin's decision. Sending it always would make every save of an approved listing fail
+ * with a 403, even when the host only edited the name or the city.
+ */
+const serverStatus = ref<HotelStatus>('PENDING')
 const rooms = ref<RoomEdit[]>([])
 const blackouts = ref<Blackout[]>([])
 const newFrom = ref('')
@@ -144,6 +153,7 @@ watch(
     hotelCity.value = current.city
     hotelDescription.value = current.description
     hotelStatus.value = current.status
+    serverStatus.value = current.status
     rooms.value = current.rooms.map(room => ({
       id: room.id,
       name: room.name,
@@ -213,7 +223,8 @@ async function save(): Promise<void> {
         name: hotelName.value.trim(),
         description: hotelDescription.value.trim(),
         city: hotelCity.value.trim(),
-        status: hotelStatus.value,
+        // Only a real change — see `serverStatus`.
+        ...(hotelStatus.value !== serverStatus.value ? { status: hotelStatus.value } : {}),
       }),
       ...rooms.value.map(room =>
         updateRoom(room.id, { name: room.name.trim(), maxGuests: room.maxGuests }),
@@ -226,6 +237,9 @@ async function save(): Promise<void> {
         ),
     ])
     await refresh()
+    // The list is re-seeded only once, so the status the server now holds has to be
+    // recorded here — otherwise the next save re-sends the same `status` as a change.
+    serverStatus.value = hotelStatus.value
     saved.value = true
   }
   catch (error: unknown) {
