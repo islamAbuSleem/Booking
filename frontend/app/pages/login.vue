@@ -11,7 +11,7 @@
  */
 import { loginSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
-import { ApiRequestError } from '~/utils/api'
+import { isApiError, isApiFailure } from '~/utils/api'
 import { useAuth } from '~/composables/useAuth'
 
 const route = useRoute()
@@ -39,6 +39,24 @@ function validate(): boolean {
   return result.success
 }
 
+/**
+ * The same collapse the register page had: `NETWORK_ERROR` and `BAD_RESPONSE` are
+ * `ApiRequestError`s too, so a backend that is simply not there read as "wrong password".
+ * Only the API's own 401 gets the credentials message.
+ *
+ * A suspended account is its own answer. The password was right and the API refused the
+ * session with 403 `ACCOUNT_SUSPENDED`, so "check your details and try again" would send
+ * them round in circles — the fix is to contact support, and that has to be said in the
+ * visitor's language rather than leaked from `error.message`.
+ */
+function failureMessage(error: unknown): string {
+  if (!isApiError(error)) return t('common.unexpectedError')
+  if (error.code === 'INVALID_CREDENTIALS') return t('auth.invalidCredentials')
+  if (error.code === 'ACCOUNT_SUSPENDED') return t('auth.accountSuspended')
+  if (!isApiFailure(error)) return t('common.unexpectedError')
+  return error.message
+}
+
 async function submit(): Promise<void> {
   touched.value = { email: true, password: true }
   formError.value = ''
@@ -47,10 +65,8 @@ async function submit(): Promise<void> {
     await login({ email: email.value.trim(), password: password.value })
     await router.push(redirectTarget.value)
   }
-  catch (error) {
-    formError.value = error instanceof ApiRequestError
-      ? t('auth.invalidCredentials')
-      : t('common.unexpectedError')
+  catch (error: unknown) {
+    formError.value = failureMessage(error)
   }
   // A failed submit keeps the form filled: the values above are never cleared, so the
   // visitor can correct a typo instead of retyping everything.

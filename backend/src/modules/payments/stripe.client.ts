@@ -1,7 +1,7 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
-import { ApiError } from '../../common/errors/api-error.js';
+import { ApiError, type ErrorCode } from '../../common/errors/api-error.js';
 
 /**
  * T26 — the Stripe boundary, behind a DI token.
@@ -68,16 +68,30 @@ export class StripePaymentClient implements StripeClient {
     }
 
     const stripe = new Stripe(secret);
-    const intent = await stripe.paymentIntents.create(
-      {
-        amount: input.amountCents,
-        currency: input.currency.toLowerCase(),
-        metadata: { bookingId: input.bookingId, reference: input.reference },
-        // Test mode only (D7). The browser confirms with the test card; the API never
-        // sees card data, and no live key may ever be deployed.
-      },
-      { idempotencyKey: input.idempotencyKey },
-    );
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await stripe.paymentIntents.create(
+        {
+          amount: input.amountCents,
+          currency: input.currency.toLowerCase(),
+          metadata: { bookingId: input.bookingId, reference: input.reference },
+          // Test mode only (D7). The browser confirms with the test card; the API never
+          // sees card data, and no live key may ever be deployed.
+        },
+        { idempotencyKey: input.idempotencyKey },
+      );
+    } catch (error) {
+      // The SDK raises its own error classes here and none of them is an `HttpException`,
+      // so without this the exception filter renders a wrong key or an unreachable Stripe
+      // as an opaque 500 `INTERNAL_ERROR`: nothing for the operator to act on, and no code
+      // for the client to branch on. The `STRIPE_NOT_CONFIGURED` check above only covers a
+      // key that is *absent*; this one covers a key that is *wrong*.
+      this.logger.error(
+        `[payments] stripe ${stripeErrorLabel(error)} creating the intent for ${input.reference}`,
+      );
+      const failure = stripeFailure(error);
+      throw new ApiError(failure.status, failure.code, failure.message);
+    }
 
     if (!intent.client_secret) {
       // A successful create always carries one; its absence means the provider
@@ -134,4 +148,51 @@ function mapStatus(status: Stripe.PaymentIntent.Status): CreatedIntent['status']
     default:
       return 'requires_payment';
   }
+}
+
+export interface StripeFailure {
+  status: HttpStatus;
+  code: ErrorCode;
+  message: string;
+}
+
+/**
+ * Stripe's SDK error classes, translated into the only two answers this API can give.
+ *
+ *   - Bad credentials, or a key without permission on the resource, are a misconfigured
+ *     deployment — the same class of problem as a key that is missing, so they get the
+ *     same 503 `STRIPE_NOT_CONFIGURED`. The caller learns to come back later instead of
+ *     being shown a payment failure no retry will fix.
+ *   - Everything else the SDK raises (API error, unreachable host, rate limit, invalid
+ *     request) is the provider refusing or failing the call: 502 `PAYMENT_FAILED`, which
+ *     names the upstream that failed instead of reporting our own 500.
+ *
+ * Pure and exhaustive, so nothing reaches the filter as an unmapped error. Pinned
+ * without a network in `stripe.client.spec.ts`.
+ */
+export function stripeFailure(error: unknown): StripeFailure {
+  if (
+    error instanceof Stripe.errors.StripeAuthenticationError ||
+    error instanceof Stripe.errors.StripePermissionError
+  ) {
+    return {
+      status: HttpStatus.SERVICE_UNAVAILABLE,
+      code: 'STRIPE_NOT_CONFIGURED',
+      message: 'Payments are not configured on this deployment',
+    };
+  }
+
+  return {
+    status: HttpStatus.BAD_GATEWAY,
+    code: 'PAYMENT_FAILED',
+    message: 'The payment provider could not create the payment',
+  };
+}
+
+/**
+ * The class name for the log line. The message is not logged: Stripe quotes the key it
+ * rejected in an authentication error, and a secret never reaches a log.
+ */
+function stripeErrorLabel(error: unknown): string {
+  return error instanceof Stripe.errors.StripeError ? error.type : 'UnknownError';
 }

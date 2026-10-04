@@ -58,6 +58,13 @@ export const ERROR_CODES = [
   // code states which rule failed rather than hiding the row's existence (same shape
   // as T20's NOT_BOOKING_OWNER).
   'NOT_HOTEL_OWNER',
+  // T22 — a delete blocked by booking history. `Booking.room` is `onDelete: Restrict`, so a
+  // hotel or room with any booking cannot be removed. It gets its own codes rather than a
+  // bare `CONFLICT` because the client shows the reason, and because letting Prisma's P2003
+  // reach the filter would answer a misleading 400 about a "missing referenced record".
+  'HOTEL_HAS_BOOKINGS',
+  'ROOM_HAS_BOOKINGS',
+
   // T24 — reviews. One review per completed stay: the unique `bookingId` is the
   // authority, and a second write for the same stay is a 409 the form branches on
   // (showing the existing review instead of failing silently).
@@ -65,6 +72,18 @@ export const ERROR_CODES = [
   // T24 — the stay is not in a reviewable state. Only COMPLETED stays can be reviewed;
   // anything else (PENDING, CONFIRMED, CANCELLED) is a 400, not a silent no-op.
   'INVALID_REVIEW_STATE',
+
+  // T25 — admin moderation and suspension.
+  // `ADMIN_REQUIRED`: every `/api/admin/*` route, so the client distinguishes "sign in"
+  // (401) from "signed in as the wrong role" (this) instead of rendering one login wall.
+  'ADMIN_REQUIRED',
+  // `ACCOUNT_SUSPENDED`: login and every JWT-authenticated route for a suspended
+  // account. A distinct code — not INVALID_CREDENTIALS — because the fix is "contact
+  // support", not "retry the password", and the client must not offer a retry loop.
+  'ACCOUNT_SUSPENDED',
+  // `ADMIN_SELF_SUSPEND`: an admin suspending their own account, refused as a 400.
+  'ADMIN_SELF_SUSPEND',
+
   // T26 — payments.
   // `INVALID_PAYMENT_STATE`: only a PENDING booking can take an intent. Anything else
   // (CONFIRMED, COMPLETED, CANCELLED) is a 400 — the money for those states is settled
@@ -78,6 +97,7 @@ export const ERROR_CODES = [
   'STRIPE_NOT_CONFIGURED',
   // `PAYMENT_FAILED`: the provider answered something the contract cannot use.
   'PAYMENT_FAILED',
+
   // T27 — `INVALID_SIGNATURE`: the webhook signature did not verify. 400, and the
   // message says nothing about why: detail here is an oracle for forging.
   'INVALID_SIGNATURE',
@@ -91,6 +111,7 @@ export const ERROR_CODES = [
   'ACCOUNT_SUSPENDED',
   // `ADMIN_SELF_SUSPEND`: an admin suspending their own account, refused as a 400.
   'ADMIN_SELF_SUSPEND',
+
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -136,4 +157,12 @@ export function notFound(
   details?: unknown,
 ): ApiError {
   return new ApiError(HttpStatus.NOT_FOUND, code, message, details);
+}
+
+export function conflict(
+  code: ErrorCode,
+  message: string,
+  details?: unknown,
+): ApiError {
+  return new ApiError(HttpStatus.CONFLICT, code, message, details);
 }

@@ -16,7 +16,7 @@
  * the payload out of `useState` gets a shell that renders the wrong links and a 403 from
  * the API on every call.
  */
-import { apiFetch, ApiRequestError } from '~/utils/api'
+import { apiFetch, ApiRequestError, isApiFailure } from '~/utils/api'
 import type { components } from '~/types/api'
 
 /** From the generated contract, not hand-written — the API owns the shape (D38). */
@@ -41,6 +41,15 @@ export interface RegisterInput extends LoginInput {
 /** 401 is the *answer* to "is anyone signed in", not a failure to render a page. */
 function isUnauthenticated(error: unknown): boolean {
   return error instanceof ApiRequestError && error.code === 'UNAUTHORIZED'
+}
+
+/**
+ * 403 `ACCOUNT_SUSPENDED` answers the same question from the JWT guard: the token is still
+ * valid but the account may no longer act. It is not a blip to ride out either — every
+ * later call 403s the same way — so the session is dropped exactly like a 401.
+ */
+function isSuspended(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.code === 'ACCOUNT_SUSPENDED'
 }
 
 /**
@@ -73,8 +82,9 @@ export function useAuth() {
    * hydration by `app/plugins/auth.ts`; the route middleware calls it again only when it
    * has no user yet.
    *
-   * A 401 clears the user. Any other failure — no backend listening, a 500 — leaves the
-   * existing value alone rather than signing the user out because a service blinked.
+   * A 401 clears the user, and so does a 403 `ACCOUNT_SUSPENDED`. Any other failure — no
+   * backend listening, a 500 — leaves the existing value alone rather than signing the
+   * user out because a service blinked.
    */
   async function refresh(): Promise<void> {
     try {
@@ -82,7 +92,7 @@ export function useAuth() {
       current.value = user
     }
     catch (error) {
-      if (isUnauthenticated(error)) current.value = null
+      if (isUnauthenticated(error) || isSuspended(error)) current.value = null
     }
   }
 
@@ -119,16 +129,24 @@ export function useAuth() {
   /**
    * Clears the cookie server-side. A 401 is treated as already-signed-out rather than an
    * error: the goal state is "no session", and a cookie that was already gone satisfies it.
+   *
+   * The 204 empty body is a documented success (`tolerateEmptyBody`), not a broken
+   * response — without that the call threw `BAD_RESPONSE` on every logout, so the caller’s
+   * redirect after `await logout()` never ran and the shell kept rendering signed in.
    */
   async function logout(): Promise<void> {
     pending.value = true
     try {
-      await apiFetch<undefined>('/api/auth/logout', { method: 'POST' })
+      await apiFetch<undefined>('/api/auth/logout', { method: 'POST', tolerateEmptyBody: true })
       current.value = null
     }
     catch (error) {
-      if (isUnauthenticated(error)) current.value = null
-      else throw error
+      // Only a confirmed failure from this API is the caller’s to handle. When nothing
+      // answered at all — no backend, or something that is not this API — there is no
+      // server-side answer to respect, so the local session is dropped rather than left
+      // showing links every later call will 401 on.
+      if (isApiFailure(error) && !isUnauthenticated(error)) throw error
+      current.value = null
     }
     finally {
       pending.value = false

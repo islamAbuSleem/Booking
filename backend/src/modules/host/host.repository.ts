@@ -170,13 +170,43 @@ export interface HostBookingListPage {
 export interface HostRepository {
   findByHost(hostId: string): Promise<HostHotelListPage>;
   findByIdAndHost(id: string, hostId: string): Promise<HostHotelDetail | null>;
+  /**
+   * Host-agnostic slug probe. Slugs are unique across the whole platform
+   * (`hotels.slug @unique`), so the question "is this slug taken?" cannot be asked through
+   * the host-scoped `findByIdAndHost`: that one filters on `hostId`, and a sentinel id is
+   * both the wrong question and — against the `@db.Uuid` `host_id` column — a query the
+   * database rejects outright. This is the only lookup that answers the real question.
+   */
+  slugExists(slug: string): Promise<boolean>;
   create(data: CreateHotelData): Promise<HostHotelDetail>;
   update(id: string, hostId: string, data: UpdateHotelData): Promise<HostHotelDetail>;
   delete(id: string, hostId: string): Promise<void>;
+  /**
+   * How many bookings stand in the way of a delete. `Booking.room` is `onDelete: Restrict`,
+   * so one booking row of *any* status — a cancelled or completed stay included, because its
+   * history is still the record of a real stay — is enough to make the delete impossible.
+   * Counting here turns the FK violation into the documented 409 instead of letting Prisma
+   * raise P2003 and the error translator answer a misleading 400.
+   */
+  countBookingsForHotel(id: string): Promise<number>;
+  countBookingsForRoom(roomId: string): Promise<number>;
   createRoom(data: CreateRoomData): Promise<RoomDetail>;
   updateRoom(roomId: string, hostId: string, data: UpdateRoomData): Promise<RoomDetail>;
   deleteRoom(roomId: string, hostId: string): Promise<void>;
   createBlackout(data: CreateBlackoutData): Promise<{ id: string; roomId: string | null; hotelId: string; startsOn: Date; endsOn: Date; reason: string | null }>;
+  /**
+   * Whether this hotel already has a blackout reaching the given range.
+   *
+   * Scoped to the hotel, not to one room, because that is exactly what
+   * `buildOverlappingBlackoutsWhere` blocks a stay against: a `roomId: null` row closes the
+   * whole property, so two ranges in the same hotel must not reach into each other whatever
+   * room they name. The comparison is inclusive on both ends, like the blackout itself.
+   */
+  hasOverlappingBlackout(
+    hotelId: string,
+    startsOn: Date,
+    endsOn: Date,
+  ): Promise<boolean>;
   deleteBlackout(id: string, hostId: string): Promise<void>;
   findBookingsByHost(hostId: string): Promise<HostBookingListPage>;
   /**

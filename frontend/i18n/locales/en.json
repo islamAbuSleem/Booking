@@ -278,6 +278,7 @@
     "passwordTooShort": "Passwords run at least 8 characters.",
     "nameTooShort": "Enter your full name.",
     "invalidCredentials": "That email and password combination didn't match an account.",
+    "accountSuspended": "This account has been suspended. Please contact support.",
     "rememberMe": "Remember me",
     "forgotPassword": "Forgot password?",
     "signIn": "Sign in",
