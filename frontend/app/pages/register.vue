@@ -1,16 +1,19 @@
 <script setup lang="ts">
 /**
- * /register — same narrow column as login, plus the name field and the
- * host-intent checkbox. Any well-formed registration signs in as a fake user
- * carrying the typed name, email, and host intent.
+ * /register — same narrow column as login, plus the name field and the host-intent
+ * checkbox. `wantsToHost` is a first-class API field, not a client-side flag: T14 promotes
+ * the new account to HOST server-side, and the role that comes back on the session is the
+ * one the dashboard middleware will read.
  */
 import { registerSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
+import { isApiError, isApiFailure } from '~/utils/api'
+import { useAuth } from '~/composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const { signInRegistered } = useSession()
+const { register, startOAuth, pending } = useAuth()
 
 const name = ref('')
 const email = ref('')
@@ -18,11 +21,12 @@ const password = ref('')
 const wantsToHost = ref(false)
 const fieldErrors = ref<FieldErrors>({})
 const touched = ref({ name: false, email: false, password: false })
-const pending = ref(false)
+const formError = ref('')
 
 const redirectTarget = computed(() => {
   const raw = route.query.redirect
-  return typeof raw === 'string' && raw.startsWith('/') ? raw : '/'
+  // A single leading slash only: `//host` is protocol-relative and would leave the origin.
+  return typeof raw === 'string' && /^\/(?!\/)/.test(raw) ? raw : '/'
 })
 
 function validate(): boolean {
@@ -36,27 +40,43 @@ function validate(): boolean {
   return result.success
 }
 
+/**
+ * Only the API's own answers get the API's prose. `NETWORK_ERROR` and `BAD_RESPONSE` are
+ * `ApiRequestError`s too, so `instanceof` alone told a visitor with the backend down that
+ * their email was taken — the one message that tells them not to try again.
+ */
+function failureMessage(error: unknown): string {
+  if (!isApiError(error)) return t('common.unexpectedError')
+  if (error.code === 'EMAIL_TAKEN' || error.code === 'CONFLICT') return t('auth.emailExists')
+  if (!isApiFailure(error)) return t('common.unexpectedError')
+  return error.message
+}
+
 async function submit(): Promise<void> {
   touched.value = { name: true, email: true, password: true }
+  formError.value = ''
   if (!validate() || pending.value) return
-  pending.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    signInRegistered(name.value.trim(), email.value.trim(), wantsToHost.value)
+    await register({
+      name: name.value.trim(),
+      email: email.value.trim(),
+      password: password.value,
+      wantsToHost: wantsToHost.value,
+    })
     await router.push(redirectTarget.value)
   }
-  finally {
-    pending.value = false
+  catch (error: unknown) {
+    formError.value = failureMessage(error)
   }
+  // The form keeps its values on failure — retyping a password to fix a duplicate email
+  // is the kind of friction that loses the signup.
 }
 
 function signInWith(provider: 'google' | 'github'): void {
   if (pending.value) return
-  // Same mock as login: OAuth resolves to a fake user. The name is marked as
-  // the provider account because there is no profile fetch in Phase 1.
-  const label = provider === 'google' ? 'Google guest' : 'GitHub guest'
-  signInRegistered(label, `${provider}-guest@example.com`, false)
-  void router.push(redirectTarget.value)
+  // OAuth cannot carry the host intent: the provider owns the profile, so the account is
+  // created as a GUEST and promoted later from the dashboard.
+  startOAuth(provider, redirectTarget.value)
 }
 
 useSeoMeta({
@@ -78,6 +98,20 @@ useSeoMeta({
       <p class="text-fg-muted mt-2 text-center text-sm">
         {{ $t('auth.registerSubtitle') }}
       </p>
+
+      <!--
+        `tone="danger"` already renders `role="alert"`, so a screen reader announces the
+        refusal. Without this the duplicate-email answer from the API was set in
+        `formError` and never shown — a silent failure on the one error every visitor
+        eventually hits.
+      -->
+      <BaseAlert
+        v-if="formError"
+        tone="danger"
+        class="mt-6"
+      >
+        {{ formError }}
+      </BaseAlert>
 
       <form
         class="mt-8 flex flex-col gap-5"

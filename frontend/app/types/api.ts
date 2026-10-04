@@ -390,6 +390,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/host/hotels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List my hotels
+         * @description Returns all hotels owned by the authenticated host, regardless of status.
+         */
+        get: operations["HostController_listMyHotels"];
+        put?: never;
+        /**
+         * Create a new hotel listing
+         * @description Creates a hotel in PENDING status. Admin approval required to publish.
+         */
+        post: operations["HostController_createHotel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/host/hotels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get my hotel detail
+         * @description Returns the full hotel detail including rooms, images, amenities and blackout dates. Only accessible by the owning host.
+         */
+        get: operations["HostController_getMyHotel"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete my hotel
+         * @description Deletes the hotel and all its rooms, images, and blackout dates. Only if no confirmed bookings exist.
+         */
+        delete: operations["HostController_deleteHotel"];
+        options?: never;
+        head?: never;
+        /**
+         * Update my hotel
+         * @description Updates hotel fields. A host can suspend their own listing, but only an admin can publish it.
+         */
+        patch: operations["HostController_updateHotel"];
+        trace?: never;
+    };
+    "/api/host/hotels/{id}/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a room to my hotel
+         * @description Creates a room type with prices (per currency), images, and inventory.
+         */
+        post: operations["HostController_createRoom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/host/hotels/rooms/{roomId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a room
+         * @description Deletes the room and its blackout dates. Only if no confirmed bookings exist for this room.
+         */
+        delete: operations["HostController_deleteRoom"];
+        options?: never;
+        head?: never;
+        /**
+         * Update a room
+         * @description Updates room fields. Prices and images are managed separately (not in this ticket).
+         */
+        patch: operations["HostController_updateRoom"];
+        trace?: never;
+    };
+    "/api/host/hotels/{id}/blackouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add blackout dates
+         * @description Creates a blackout date range. If roomId is null, applies to the whole hotel. If roomId is provided, applies only to that room.
+         */
+        post: operations["HostController_createBlackout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/host/hotels/blackouts/{blackoutId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a blackout date */
+        delete: operations["HostController_deleteBlackout"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/host/hotels/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List incoming bookings for my hotels
+         * @description Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.
+         */
+        get: operations["HostController_listMyBookings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -452,7 +605,11 @@ export interface components {
             coverImage: components["schemas"]["HotelImage"] | null;
             amenityIds: components["schemas"]["AmenitySlug"][];
             rating: components["schemas"]["RatingSummary"];
-            priceFrom: components["schemas"]["Money"] | null;
+            priceFrom: {
+                amountCents: number;
+                /** @description ISO 4217 code. */
+                currency: string;
+            } | null;
             /** @description ISO 4217 code the prices are quoted in. */
             currency: string;
         };
@@ -464,7 +621,11 @@ export interface components {
             bedType: string;
             maxGuests: number;
             totalInventory: number;
-            price: components["schemas"]["Money"] | null;
+            price: {
+                amountCents: number;
+                /** @description ISO 4217 code. */
+                currency: string;
+            } | null;
             images: components["schemas"]["HotelImage"][];
         };
         HotelDetail: {
@@ -772,6 +933,214 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["HotelImage"];
+        };
+        CreateHotel: {
+            name: string;
+            description: string;
+            addressLine: string;
+            city: string;
+            country: string;
+            lat: number;
+            lng: number;
+            starRating: number;
+            checkInTime: string;
+            checkOutTime: string;
+            amenityIds?: string[];
+        };
+        UpdateHotel: {
+            name?: string;
+            description?: string;
+            addressLine?: string;
+            city?: string;
+            country?: string;
+            lat?: number;
+            lng?: number;
+            starRating?: number;
+            checkInTime?: string;
+            checkOutTime?: string;
+            amenityIds?: string[];
+            /** @enum {string} */
+            status?: "PENDING" | "PUBLISHED" | "REJECTED" | "SUSPENDED";
+        };
+        CreateRoom: {
+            name: string;
+            description: string;
+            bedType: string;
+            maxGuests: number;
+            totalInventory: number;
+            /** @default 0 */
+            sortOrder: number;
+            prices: components["schemas"]["CreateRoom-__schema0"][];
+            /** @default [] */
+            images: {
+                /** Format: uri */
+                url: string;
+                publicId: string;
+                altText: string | null;
+                sortOrder: number;
+                isCover: boolean;
+            }[];
+        };
+        "CreateRoom-__schema0": {
+            currency: string;
+            priceCents: number;
+        };
+        UpdateRoom: {
+            name?: string;
+            description?: string;
+            bedType?: string;
+            maxGuests?: number;
+            totalInventory?: number;
+            sortOrder?: number;
+        };
+        CreateBlackout: {
+            /** Format: uuid */
+            roomId: string | null;
+            startsOn: string;
+            endsOn: string;
+            reason: string | null;
+        };
+        ImageSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uri */
+            url: string;
+            altText: string | null;
+            aspect: string;
+            width: number;
+            height: number;
+            sortOrder: number;
+            isCover: boolean;
+        };
+        RoomPrice: {
+            currency: string;
+            priceCents: number;
+        };
+        BlackoutDate: {
+            /** Format: uuid */
+            id: string;
+            startsOn: string;
+            endsOn: string;
+            reason: string | null;
+        };
+        RoomDetail: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            description: string;
+            bedType: string;
+            maxGuests: number;
+            totalInventory: number;
+            sortOrder: number;
+            prices: components["schemas"]["RoomPrice"][];
+            images: components["schemas"]["ImageSummary"][];
+            blackoutDates: components["schemas"]["BlackoutDate"][];
+        };
+        HostHotelListItem: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            city: string;
+            country: string;
+            starRating: number;
+            /** @enum {string} */
+            status: "PENDING" | "PUBLISHED" | "REJECTED" | "SUSPENDED";
+            /** Format: uri */
+            coverImageUrl: string | null;
+            roomsCount: number;
+            upcomingBookingsCount: number;
+            createdAt: string;
+        };
+        HostHotelDetail: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            description: string;
+            addressLine: string;
+            city: string;
+            country: string;
+            lat: number;
+            lng: number;
+            starRating: number;
+            /** @enum {string} */
+            status: "PENDING" | "PUBLISHED" | "REJECTED" | "SUSPENDED";
+            checkInTime: string;
+            checkOutTime: string;
+            /** Format: uri */
+            coverImageUrl: string | null;
+            images: components["schemas"]["ImageSummary"][];
+            amenityIds: string[];
+            rooms: components["schemas"]["RoomDetail"][];
+            host: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+        };
+        HostHotelListData: {
+            items: components["schemas"]["HostHotelListItem"][];
+            total: number;
+        };
+        HostHotelEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HostHotelDetail"];
+        };
+        HostHotelListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HostHotelListData"];
+        };
+        HostBookingListItem: {
+            /** Format: uuid */
+            id: string;
+            reference: string;
+            hotel: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                slug: string;
+            };
+            room: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            guest: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                email: string;
+            };
+            checkIn: string;
+            checkOut: string;
+            guestsCount: number;
+            nights: number;
+            totalCents: number;
+            currency: string;
+            status: string;
+            createdAt: string;
+        };
+        HostBookingListData: {
+            items: components["schemas"]["HostBookingListItem"][];
+            total: number;
+        };
+        HostBookingListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HostBookingListData"];
+        };
+        RoomEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["RoomDetail"];
+        };
+        BlackoutEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BlackoutDate"];
         };
     };
     responses: never;
@@ -1584,6 +1953,577 @@ export interface operations {
             };
             /** @description No such hotel, or it is not visible to this caller. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_listMyHotels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of hotels with status badges and upcoming booking counts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostHotelListEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_createHotel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The created hotel with its rooms, images and amenities (empty initially). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostHotelEnvelope"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_getMyHotel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Full hotel detail. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostHotelEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_deleteHotel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel has confirmed bookings and cannot be deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_updateHotel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated hotel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostHotelEnvelope"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, not the owner, or a host attempting to publish. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_createRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The created room with its prices and images. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomEnvelope"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner of the hotel. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_deleteRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The room to delete, by uuid. */
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner of the hotel. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Room not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Room has confirmed bookings and cannot be deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_updateRoom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The room to update, by uuid. */
+                roomId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated room. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoomEnvelope"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner of the hotel. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Room not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_createBlackout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The created blackout date. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlackoutEnvelope"];
+                };
+            };
+            /** @description Validation failed (dates must be YYYY-MM-DD, no overlap with existing blackouts). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner of the hotel. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_deleteBlackout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The blackout date to delete, by uuid. */
+                blackoutId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner of the hotel. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Blackout not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_listMyBookings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of bookings with hotel, room, guest and price snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostBookingListEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host or admin. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
