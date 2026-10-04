@@ -104,6 +104,41 @@ export class HostController {
     return this.host.createHotel(hostId, data as unknown as CreateHotelData);
   }
 
+  // --- Bookings ---
+
+  /**
+   * Declared *before* `@Get(':id')` on purpose. Nest registers routes in method-declaration
+   * order and Express matches in that order too, so a literal path segment declared after a
+   * `:id` param is unreachable: `/host/hotels/bookings` would be dispatched to
+   * `getMyHotel('bookings', hostId)` and fail the uuid filter. Any new literal segment under
+   * this prefix belongs above the `:id` handlers.
+   */
+  @Get('bookings')
+  @ApiOperation({
+    summary: 'List incoming bookings for my hotels',
+    description: 'Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'A page of bookings with hotel, room, guest and price snapshot.',
+    schema: { $ref: contractRef('HostBookingListEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Not a host or admin.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async listMyBookings(
+    @CurrentUser('id') hostId: string,
+  ): Promise<HostBookingListDataDto> {
+    return this.host.listMyBookings(hostId);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get my hotel detail',
@@ -454,31 +489,4 @@ export class HostController {
     await this.host.deleteBlackout(blackoutId, hostId);
   }
 
-  // --- Bookings ---
-
-  @Get('bookings')
-  @ApiOperation({
-    summary: 'List incoming bookings for my hotels',
-    description: 'Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'A page of bookings with hotel, room, guest and price snapshot.',
-    schema: { $ref: contractRef('HostBookingListEnvelope') },
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Not authenticated.',
-    schema: { $ref: contractRef('ApiErrorEnvelope') },
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Not a host or admin.',
-    schema: { $ref: contractRef('ApiErrorEnvelope') },
-  })
-  async listMyBookings(
-    @CurrentUser('id') hostId: string,
-  ): Promise<HostBookingListDataDto> {
-    return this.host.listMyBookings(hostId);
   }
-}

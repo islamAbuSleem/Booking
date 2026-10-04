@@ -333,4 +333,33 @@ describe('Host API (e2e)', () => {
       expect(response.body.error.code).toBe('NOT_HOTEL_OWNER');
     });
   });
+
+  /**
+   * Route registration order, pinned over HTTP: `@Get('bookings')` declared after
+   * `@Get(':id')` is unreachable, and the failure mode is a 500 from the uuid filter
+   * rather than a 404 — so only this test catches a regression.
+   */
+  describe('GET /api/host/hotels/bookings', () => {
+    it('answers the bookings page instead of falling into :id', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/host/hotels/bookings')
+        .set('Cookie', cookieA)
+        .expect(200);
+      expect(response.body).toEqual({
+        success: true,
+        data: { items: [], total: 0 },
+      });
+    });
+
+    it('401s an anonymous caller', async () => {
+      await request(app.getHttpServer()).get('/api/host/hotels/bookings').expect(401);
+    });
+
+    it('403s a guest: the role guard is exact membership, no hierarchy', async () => {
+      await request(app.getHttpServer())
+        .get('/api/host/hotels/bookings')
+        .set('Cookie', cookieGuest)
+        .expect(403);
+    });
+  });
 });
