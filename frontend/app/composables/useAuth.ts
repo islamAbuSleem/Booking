@@ -78,12 +78,28 @@ function isSafeInternalPath(value: unknown): value is string {
 
 export function useAuth() {
   const current = useState<AuthUser | null>('auth:user', () => null)
-  const pending = useState<boolean>('auth:pending', () => false)
+  // An in-flight *count*, not a flag. `register`, `login` and `logout` share one
+  // composable, and a single boolean let whichever settled first re-enable the submit
+  // button while another request was still running — a duplicate submit — or let an
+  // in-flight logout disable the login form. `pending` stays a boolean for every caller.
+  const inFlight = useState<number>('auth:pending', () => 0)
+  const pending = computed(() => inFlight.value > 0)
 
   const isSignedIn = computed(() => current.value !== null)
   const role = computed<AuthRole | null>(() => current.value?.role ?? null)
   const isHost = computed(() => role.value === 'HOST' || role.value === 'ADMIN')
   const isAdmin = computed(() => role.value === 'ADMIN')
+
+  /** Runs `work` with the shared in-flight count held up, whatever it settles to. */
+  async function tracked<T>(work: () => Promise<T>): Promise<T> {
+    inFlight.value += 1
+    try {
+      return await work()
+    }
+    finally {
+      inFlight.value -= 1
+    }
+  }
 
   /**
    * Re-reads the session from the API. Called once per SSR request and once on client
@@ -104,33 +120,25 @@ export function useAuth() {
   }
 
   async function register(input: RegisterInput): Promise<AuthUser> {
-    pending.value = true
-    try {
+    return tracked(async () => {
       const session = await apiFetch<AuthSessionData>('/api/auth/register', {
         method: 'POST',
         body: { ...input },
       })
       current.value = session.user
       return session.user
-    }
-    finally {
-      pending.value = false
-    }
+    })
   }
 
   async function login(input: LoginInput): Promise<AuthUser> {
-    pending.value = true
-    try {
+    return tracked(async () => {
       const session = await apiFetch<AuthSessionData>('/api/auth/login', {
         method: 'POST',
         body: { ...input },
       })
       current.value = session.user
       return session.user
-    }
-    finally {
-      pending.value = false
-    }
+    })
   }
 
   /**
@@ -138,18 +146,16 @@ export function useAuth() {
    * value; see `isSignedOut` for why a bodyless 204 counts.
    */
   async function logout(): Promise<void> {
-    pending.value = true
-    try {
-      await apiFetch<undefined>('/api/auth/logout', { method: 'POST' })
-      current.value = null
-    }
-    catch (error) {
-      if (isSignedOut(error)) current.value = null
-      else throw error
-    }
-    finally {
-      pending.value = false
-    }
+    return tracked(async () => {
+      try {
+        await apiFetch<undefined>('/api/auth/logout', { method: 'POST' })
+        current.value = null
+      }
+      catch (error) {
+        if (isSignedOut(error)) current.value = null
+        else throw error
+      }
+    })
   }
 
   /**
