@@ -154,6 +154,13 @@ const blackouts = ref<Blackout[]>([])
 const newFrom = ref('')
 const newTo = ref('')
 const blackoutError = ref('')
+/**
+ * Server ids for the hotel-scoped ranges this page created. The detail payload does not
+ * return them (`roomId: null` rows are not part of `RoomDetail.blackoutDates`), so they are
+ * the only record that those rows exist — without them every later save would create the same
+ * range again and a removed one could never be deleted.
+ */
+const postedBlackoutIds = ref<Set<string>>(new Set())
 const saved = ref(false)
 const saving = ref(false)
 const saveError = ref('')
@@ -227,9 +234,13 @@ async function save(): Promise<void> {
       return
     }
     const current = hotel.value
-    const previousIds = new Set(
-      current.rooms.flatMap(room => room.blackoutDates.map(entry => entry.id)),
-    )
+    // Hotel-scoped blackouts (`roomId: null`) are never in the detail payload, so the rooms'
+    // lists alone are not every id that exists: the ones this page created are tracked here
+    // or the same range is POSTed again on every save and can never be removed.
+    const previousIds = new Set([
+      ...current.rooms.flatMap(room => room.blackoutDates.map(entry => entry.id)),
+      ...postedBlackoutIds.value,
+    ])
     const keptIds = new Set(
       blackouts.value.flatMap(entry => (entry.id === null ? [] : [entry.id])),
     )
@@ -246,9 +257,18 @@ async function save(): Promise<void> {
       ...[...previousIds].filter(serverId => !keptIds.has(serverId)).map(serverId => deleteBlackout(serverId)),
       ...blackouts.value
         .filter(entry => entry.id === null)
-        .map(entry =>
-          createBlackout(current.id, { roomId: entry.roomId, startsOn: entry.from, endsOn: entry.to, reason: null }),
-        ),
+        .map(async (entry) => {
+          // The id comes back on the write, so it is written onto the entry: a range that
+          // already exists is then a keep, not another create.
+          const created = await createBlackout(current.id, {
+            roomId: entry.roomId,
+            startsOn: entry.from,
+            endsOn: entry.to,
+            reason: null,
+          })
+          entry.id = created.id
+          postedBlackoutIds.value.add(created.id)
+        }),
     ])
     await refresh()
     saved.value = true
