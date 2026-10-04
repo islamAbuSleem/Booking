@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { buildOverlappingBookingsWhere } from '../../prisma/prisma-availability.repository.js';
 import {
   type CreateBlackoutData,
   type CreateHotelData,
@@ -112,11 +113,18 @@ const BOOKING_LIST_SELECT = {
 
 type HotelDetailRow = Prisma.HotelGetPayload<{ select: typeof HOTEL_DETAIL_SELECT }>;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** `YYYY-MM-DD` in UTC, the shape a `@db.Date` column is compared as. */
+function toNightDate(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
 @Injectable()
 export class PrismaHostRepository implements HostRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
-  async findByHost(hostId: string): Promise<HostHotelListPage> {
+  async findByHost(hostId: string, now: Date = new Date()): Promise<HostHotelListPage> {
     const [rows, total] = await Promise.all([
       this.prisma.hotel.findMany({
         where: { hostId },
@@ -126,21 +134,25 @@ export class PrismaHostRepository implements HostRepository {
       this.prisma.hotel.count({ where: { hostId } }),
     ]);
 
-    const hotelIds = rows.map((r) => r.id);
-    const upcomingBookings = await this.prisma.booking.groupBy({
-      by: ['roomId'],
-      where: {
-        room: { hotelId: { in: hotelIds } },
-        status: { in: ['PENDING', 'CONFIRMED'] },
-      },
-      _count: true,
-    });
-
-    const bookingCountByHotel = new Map<string, number>();
     const hotelIdByRoom = new Map<string, string>();
     for (const row of rows) {
       for (const room of row.rooms) hotelIdByRoom.set(room.id, room.hotelId);
     }
+
+    // "Upcoming" is the same question the availability module already answers, so it reuses
+    // that rule instead of a second one: `CONFIRMED` counts, `PENDING` counts only while its
+    // hold is still live, and the stay must not have finished. Counting on the status list
+    // alone put last month's checkout and an abandoned cart in a number the dashboard labels
+    // "upcoming".
+    const today = toNightDate(now);
+    const tomorrow = toNightDate(new Date(now.getTime() + DAY_MS));
+    const upcomingBookings = await this.prisma.booking.groupBy({
+      by: ['roomId'],
+      where: buildOverlappingBookingsWhere([...hotelIdByRoom.keys()], today, tomorrow, now),
+      _count: true,
+    });
+
+    const bookingCountByHotel = new Map<string, number>();
     for (const b of upcomingBookings) {
       // Joined in memory from the select above: the grouped rows only carry a `roomId`, and a
       // `room.findUnique` per row made the list endpoint cost `2 + R` queries against Neon.
