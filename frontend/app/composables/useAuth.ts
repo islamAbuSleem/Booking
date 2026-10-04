@@ -44,6 +44,15 @@ function isUnauthenticated(error: unknown): boolean {
 }
 
 /**
+ * 403 `ACCOUNT_SUSPENDED` answers the same question from the JWT guard: the token is still
+ * valid but the account may no longer act. It is not a blip to ride out either — every
+ * later call 403s the same way — so the session is dropped exactly like a 401.
+ */
+function isSuspended(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.code === 'ACCOUNT_SUSPENDED'
+}
+
+/**
  * Where the visitor was heading before an OAuth detour.
  *
  * The API's callback remembers only the *origin* it started on (`oauth_origin` carries a
@@ -73,8 +82,9 @@ export function useAuth() {
    * hydration by `app/plugins/auth.ts`; the route middleware calls it again only when it
    * has no user yet.
    *
-   * A 401 clears the user. Any other failure — no backend listening, a 500 — leaves the
-   * existing value alone rather than signing the user out because a service blinked.
+   * A 401 clears the user, and so does a 403 `ACCOUNT_SUSPENDED`. Any other failure — no
+   * backend listening, a 500 — leaves the existing value alone rather than signing the
+   * user out because a service blinked.
    */
   async function refresh(): Promise<void> {
     try {
@@ -82,7 +92,7 @@ export function useAuth() {
       current.value = user
     }
     catch (error) {
-      if (isUnauthenticated(error)) current.value = null
+      if (isUnauthenticated(error) || isSuspended(error)) current.value = null
     }
   }
 
