@@ -16,6 +16,10 @@ export class StubHostRepository implements HostRepository {
     return null;
   }
 
+  async slugExists(_slug: string): Promise<boolean> {
+    return false;
+  }
+
   async create(_data: unknown): Promise<HostHotelDetail> {
     throw new Error('not implemented in stub');
   }

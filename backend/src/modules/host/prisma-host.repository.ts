@@ -161,6 +161,14 @@ export class PrismaHostRepository implements HostRepository {
     return { items, total };
   }
 
+  async slugExists(slug: string): Promise<boolean> {
+    const row = await this.prisma.hotel.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   async findByIdAndHost(id: string, hostId: string): Promise<HostHotelDetail | null> {
     const row = await this.prisma.hotel.findFirst({
       where: { OR: [{ id }, { slug: id }], hostId },

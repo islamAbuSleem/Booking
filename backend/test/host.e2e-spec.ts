@@ -66,6 +66,10 @@ class OneHotelWorld implements HostRepository {
     return (id === HOTEL_ID || id === HOTEL.slug) && hostId === HOST_A ? HOTEL : null;
   }
 
+  async slugExists(slug: string): Promise<boolean> {
+    return slug === HOTEL.slug;
+  }
+
   async create(): Promise<HostHotelDetail> {
     throw new Error('unused');
   }

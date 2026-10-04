@@ -150,11 +150,13 @@ export class HostService {
   private async generateUniqueSlug(base: string): Promise<string> {
     let slug = base;
     let suffix = 0;
-    while (true) {
-      const exists = await this.repo.findByIdAndHost(slug, 'dummy-host-id-for-slug-check');
-      if (!exists) return slug;
+    // Platform-wide uniqueness, checked host-agnostically: `hotels.slug` is `@unique`, so a
+    // probe scoped to this host would only ever find the host's *own* slug and hand back a
+    // value the write then rejects with a 409 instead of the suffixed slug this produces.
+    while (await this.repo.slugExists(slug)) {
       suffix++;
       slug = `${base}-${suffix}`;
     }
+    return slug;
   }
 }

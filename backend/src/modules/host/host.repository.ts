@@ -170,6 +170,14 @@ export interface HostBookingListPage {
 export interface HostRepository {
   findByHost(hostId: string): Promise<HostHotelListPage>;
   findByIdAndHost(id: string, hostId: string): Promise<HostHotelDetail | null>;
+  /**
+   * Host-agnostic slug probe. Slugs are unique across the whole platform
+   * (`hotels.slug @unique`), so the question "is this slug taken?" cannot be asked through
+   * the host-scoped `findByIdAndHost`: that one filters on `hostId`, and a sentinel id is
+   * both the wrong question and — against the `@db.Uuid` `host_id` column — a query the
+   * database rejects outright. This is the only lookup that answers the real question.
+   */
+  slugExists(slug: string): Promise<boolean>;
   create(data: CreateHotelData): Promise<HostHotelDetail>;
   update(id: string, hostId: string, data: UpdateHotelData): Promise<HostHotelDetail>;
   delete(id: string, hostId: string): Promise<void>;
