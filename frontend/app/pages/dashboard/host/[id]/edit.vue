@@ -28,6 +28,22 @@ const { t } = useI18n()
 
 const id = computed(() => String(route.params.id ?? ''))
 
+type HotelStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'
+
+/**
+ * The one status a host may set here. Publishing (and the other moderation outcomes) is the
+ * admin's decision, so `PUBLISHED` is never offered — offering it would sell a control that
+ * always answers 403.
+ */
+const HOST_SETTABLE_STATUS: HotelStatus = 'SUSPENDED'
+
+const STATUS_LABEL_KEYS: Record<HotelStatus, string> = {
+  PENDING: 'status.pending',
+  PUBLISHED: 'status.published',
+  REJECTED: 'status.rejected',
+  SUSPENDED: 'status.suspended',
+}
+
 interface RoomEdit {
   id: string
   name: string
@@ -124,12 +140,27 @@ interface Blackout {
 const hotelName = ref('')
 const hotelCity = ref('')
 const hotelDescription = ref('')
-const hotelStatus = ref<'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'>('PENDING')
+const hotelStatus = ref<HotelStatus>('PENDING')
+/**
+ * The status the server last reported. `status` is only sent when the host actually moved
+ * it: an untouched field sent anyway makes every save of a live listing a 403
+ * (`Hosts can only suspend their own listing`), and because the listing PATCH shares a
+ * `Promise.all` with the room and blackout writes, those siblings succeed and the batch
+ * fails anyway.
+ */
+const savedStatus = ref<HotelStatus | null>(null)
 const rooms = ref<RoomEdit[]>([])
 const blackouts = ref<Blackout[]>([])
 const newFrom = ref('')
 const newTo = ref('')
 const blackoutError = ref('')
+/**
+ * Server ids for the hotel-scoped ranges this page created. The detail payload does not
+ * return them (`roomId: null` rows are not part of `RoomDetail.blackoutDates`), so they are
+ * the only record that those rows exist — without them every later save would create the same
+ * range again and a removed one could never be deleted.
+ */
+const postedBlackoutIds = ref<Set<string>>(new Set())
 const saved = ref(false)
 const saving = ref(false)
 const saveError = ref('')
@@ -144,6 +175,7 @@ watch(
     hotelCity.value = current.city
     hotelDescription.value = current.description
     hotelStatus.value = current.status
+    savedStatus.value = current.status
     rooms.value = current.rooms.map(room => ({
       id: room.id,
       name: room.name,
@@ -202,9 +234,13 @@ async function save(): Promise<void> {
       return
     }
     const current = hotel.value
-    const previousIds = new Set(
-      current.rooms.flatMap(room => room.blackoutDates.map(entry => entry.id)),
-    )
+    // Hotel-scoped blackouts (`roomId: null`) are never in the detail payload, so the rooms'
+    // lists alone are not every id that exists: the ones this page created are tracked here
+    // or the same range is POSTed again on every save and can never be removed.
+    const previousIds = new Set([
+      ...current.rooms.flatMap(room => room.blackoutDates.map(entry => entry.id)),
+      ...postedBlackoutIds.value,
+    ])
     const keptIds = new Set(
       blackouts.value.flatMap(entry => (entry.id === null ? [] : [entry.id])),
     )
@@ -213,7 +249,7 @@ async function save(): Promise<void> {
         name: hotelName.value.trim(),
         description: hotelDescription.value.trim(),
         city: hotelCity.value.trim(),
-        status: hotelStatus.value,
+        ...(hotelStatus.value === savedStatus.value ? {} : { status: hotelStatus.value }),
       }),
       ...rooms.value.map(room =>
         updateRoom(room.id, { name: room.name.trim(), maxGuests: room.maxGuests }),
@@ -221,9 +257,18 @@ async function save(): Promise<void> {
       ...[...previousIds].filter(serverId => !keptIds.has(serverId)).map(serverId => deleteBlackout(serverId)),
       ...blackouts.value
         .filter(entry => entry.id === null)
-        .map(entry =>
-          createBlackout(current.id, { roomId: entry.roomId, startsOn: entry.from, endsOn: entry.to, reason: null }),
-        ),
+        .map(async (entry) => {
+          // The id comes back on the write, so it is written onto the entry: a range that
+          // already exists is then a keep, not another create.
+          const created = await createBlackout(current.id, {
+            roomId: entry.roomId,
+            startsOn: entry.from,
+            endsOn: entry.to,
+            reason: null,
+          })
+          entry.id = created.id
+          postedBlackoutIds.value.add(created.id)
+        }),
     ])
     await refresh()
     saved.value = true
@@ -236,12 +281,17 @@ async function save(): Promise<void> {
   }
 }
 
-const statusOptions = computed(() => [
-  { value: 'PENDING', label: t('status.pending') },
-  { value: 'PUBLISHED', label: t('status.published') },
-  { value: 'REJECTED', label: t('status.rejected') },
-  { value: 'SUSPENDED', label: t('status.suspended') },
-])
+const statusOptions = computed(() => {
+  // The listing's current status stays in the list so an already-published listing shows
+  // its real value instead of a blank control; it is a reading of the state, not a target
+  // a host can pick. The only other choice is the one status they may set.
+  const current = hotelStatus.value
+  const options = [{ value: current, label: t(STATUS_LABEL_KEYS[current]) }]
+  if (current !== HOST_SETTABLE_STATUS) {
+    options.push({ value: HOST_SETTABLE_STATUS, label: t(STATUS_LABEL_KEYS[HOST_SETTABLE_STATUS]) })
+  }
+  return options
+})
 
 useSeoMeta({
   title: () => `${t('host.editTitle')} · ${t('common.brand')}`,

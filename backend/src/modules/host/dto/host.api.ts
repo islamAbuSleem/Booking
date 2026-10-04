@@ -61,11 +61,27 @@ export const updateRoomSchema = z.object({
   sortOrder: z.int().min(0).optional(),
 });
 
+/**
+ * A blackout blocks an inclusive date span, so the shape check is not enough: an inverted
+ * range (`endsOn` before `startsOn`) is a range no guest can read and no UI would let you
+ * type. Ordering is a property of the two fields together, so it is a refinement — a
+ * per-field rule cannot see its neighbour. The overlap half of the rule needs the hotel's
+ * existing rows, so it belongs to the service.
+ */
 export const createBlackoutSchema = z.object({
   roomId: z.uuid().nullable(),
   startsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   reason: z.string().max(200).nullable(),
+}).superRefine((value, ctx) => {
+  // Lexicographic on `YYYY-MM-DD` is chronological, so no date parsing is needed here.
+  if (value.endsOn < value.startsOn) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['endsOn'],
+      message: 'endsOn must be on or after startsOn',
+    });
+  }
 });
 
 // --- Output DTOs ---
