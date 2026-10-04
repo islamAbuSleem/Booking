@@ -4,6 +4,8 @@ import {
   Post,
   Patch,
   Delete,
+  HttpCode,
+  HttpStatus,
   Param,
   Body,
   Inject,
@@ -12,6 +14,7 @@ import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth, ApiParam } from '@ne
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { SkipEnvelope } from '../../common/envelope.js';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import {
   createHotelSchema,
@@ -104,6 +107,41 @@ export class HostController {
     return this.host.createHotel(hostId, data as unknown as CreateHotelData);
   }
 
+  // --- Bookings ---
+
+  /**
+   * Declared *before* `@Get(':id')` on purpose. Nest registers routes in method-declaration
+   * order and Express matches in that order too, so a literal path segment declared after a
+   * `:id` param is unreachable: `/host/hotels/bookings` would be dispatched to
+   * `getMyHotel('bookings', hostId)` and fail the uuid filter. Any new literal segment under
+   * this prefix belongs above the `:id` handlers.
+   */
+  @Get('bookings')
+  @ApiOperation({
+    summary: 'List incoming bookings for my hotels',
+    description: 'Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'A page of bookings with hotel, room, guest and price snapshot.',
+    schema: { $ref: contractRef('HostBookingListEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Not a host or admin.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async listMyBookings(
+    @CurrentUser('id') hostId: string,
+  ): Promise<HostBookingListDataDto> {
+    return this.host.listMyBookings(hostId);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get my hotel detail',
@@ -189,9 +227,14 @@ export class HostController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete my hotel',
-    description: 'Deletes the hotel and all its rooms, images, and blackout dates. Only if no confirmed bookings exist.',
+    description:
+      'Deletes the hotel and all its rooms, images, and blackout dates. Only if none of its ' +
+      'rooms has any booking: booking history is kept, so a hotel that has hosted a stay is ' +
+      'not removable (409 HOTEL_HAS_BOOKINGS).',
   })
   @ApiParam({
     name: 'id',
@@ -221,7 +264,9 @@ export class HostController {
   })
   @ApiResponse({
     status: 409,
-    description: 'Hotel has confirmed bookings and cannot be deleted.',
+    description:
+      'The hotel has bookings on any of its rooms (`HOTEL_HAS_BOOKINGS`). Booking history ' +
+      'is kept, so a listing with past stays is not removable either.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   async deleteHotel(
@@ -236,7 +281,11 @@ export class HostController {
   @Post(':id/rooms')
   @ApiOperation({
     summary: 'Add a room to my hotel',
-    description: 'Creates a room type with prices (per currency), images, and inventory.',
+    description:
+      'Creates a room type with prices (per currency), images, and inventory. Every image ' +
+      "`publicId` must start with the caller's own `booking/hotels/{hostId}/` folder or the " +
+      'request is 403 `UPLOAD_FOREIGN` — the rule T21 applies to `/api/uploads/attach`, since ' +
+      'a room image is the same row.',
   })
   @ApiParam({
     name: 'id',
@@ -262,7 +311,9 @@ export class HostController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Not a host/admin, or not the owner of the hotel.',
+    description:
+      'Not a host/admin, not the owner of the hotel, or an image `publicId` outside the ' +
+      "caller's own folder (`UPLOAD_FOREIGN`).",
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   @ApiResponse({
@@ -324,9 +375,13 @@ export class HostController {
   }
 
   @Delete('rooms/:roomId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete a room',
-    description: 'Deletes the room and its blackout dates. Only if no confirmed bookings exist for this room.',
+    description:
+      'Deletes the room and its blackout dates. Only if no booking exists for this room, ' +
+      'cancelled or completed ones included (409 ROOM_HAS_BOOKINGS).',
   })
   @ApiParam({
     name: 'roomId',
@@ -356,7 +411,9 @@ export class HostController {
   })
   @ApiResponse({
     status: 409,
-    description: 'Room has confirmed bookings and cannot be deleted.',
+    description:
+      'The room has bookings on it (`ROOM_HAS_BOOKINGS`). Booking history is kept, so a ' +
+      'room with past stays is not removable either.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   async deleteRoom(
@@ -418,6 +475,8 @@ export class HostController {
   }
 
   @Delete('blackouts/:blackoutId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete a blackout date',
   })
@@ -454,31 +513,4 @@ export class HostController {
     await this.host.deleteBlackout(blackoutId, hostId);
   }
 
-  // --- Bookings ---
-
-  @Get('bookings')
-  @ApiOperation({
-    summary: 'List incoming bookings for my hotels',
-    description: 'Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'A page of bookings with hotel, room, guest and price snapshot.',
-    schema: { $ref: contractRef('HostBookingListEnvelope') },
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Not authenticated.',
-    schema: { $ref: contractRef('ApiErrorEnvelope') },
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Not a host or admin.',
-    schema: { $ref: contractRef('ApiErrorEnvelope') },
-  })
-  async listMyBookings(
-    @CurrentUser('id') hostId: string,
-  ): Promise<HostBookingListDataDto> {
-    return this.host.listMyBookings(hostId);
   }
-}
