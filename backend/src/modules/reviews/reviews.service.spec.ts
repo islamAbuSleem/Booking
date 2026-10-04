@@ -74,6 +74,7 @@ function setup(world: Partial<World> = {}) {
     findHotelSnapshots: () => Promise.resolve([]),
     findRoomPriceCurrency: () => Promise.resolve(null),
     updateStatus: () => Promise.resolve(null),
+    transitionStatus: () => Promise.resolve(null),
   };
   const reviewsRepo: ReviewsRepository = {
     resolveHotelId: (idOrSlug: string) => Promise.resolve(world.hotels?.has(idOrSlug) ? idOrSlug : null),
