@@ -63,4 +63,13 @@ export class StubHostRepository implements HostRepository {
   async findBlackoutHost(_id: string): Promise<string | null> {
     return null;
   }
+
+  async hasBlackoutOverlap(
+    _hotelId: string,
+    _roomId: string | null,
+    _startsOn: Date,
+    _endsOn: Date,
+  ): Promise<boolean> {
+    return false;
+  }
 }

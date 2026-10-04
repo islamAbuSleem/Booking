@@ -196,4 +196,20 @@ export interface HostRepository {
    */
   findRoomHost(roomId: string): Promise<string | null>;
   findBlackoutHost(id: string): Promise<string | null>;
+  /**
+   * Whether a blackout covering this span already exists and would clash.
+   *
+   * A room-scoped probe also matches the hotel's own (`roomId: null`) blackouts, because a
+   * hotel-wide closure shadows every room in it — checking only same-room ranges would let
+   * the two coexist and corrupt the availability math that compares overlaps. A hotel-scoped
+   * probe matches every range on the hotel, for the same reason.
+   *
+   * Ranges are inclusive on both ends, so touching days count as overlapping.
+   */
+  hasBlackoutOverlap(
+    hotelId: string,
+    roomId: string | null,
+    startsOn: Date,
+    endsOn: Date,
+  ): Promise<boolean>;
 }

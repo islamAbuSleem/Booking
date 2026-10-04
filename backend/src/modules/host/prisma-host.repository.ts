@@ -359,6 +359,27 @@ export class PrismaHostRepository implements HostRepository {
     return blackout.room?.hotel.hostId ?? blackout.hotel.hostId;
   }
 
+  async hasBlackoutOverlap(
+    hotelId: string,
+    roomId: string | null,
+    startsOn: Date,
+    endsOn: Date,
+  ): Promise<boolean> {
+    const row = await this.prisma.blackoutDate.findFirst({
+      // Inclusive ranges, so `lte`/`gte` on both bounds — days that touch are a clash.
+      where: {
+        hotelId,
+        startsOn: { lte: endsOn },
+        endsOn: { gte: startsOn },
+        // A hotel-wide new range shadows every room; a room-scoped one is shadowed by the
+        // hotel's own ranges. Only ever one `OR` key at this level.
+        ...(roomId === null ? {} : { OR: [{ roomId }, { roomId: null }] }),
+      },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   async findBookingsByHost(hostId: string): Promise<HostBookingListPage> {    const hotelIds = await this.getHotelIdsByHost(hostId);
 
     const [rows, total] = await Promise.all([

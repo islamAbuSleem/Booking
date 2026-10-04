@@ -70,6 +70,10 @@ class OneHotelWorld implements HostRepository {
     return slug === HOTEL.slug;
   }
 
+  async hasBlackoutOverlap(): Promise<boolean> {
+    return false;
+  }
+
   async create(): Promise<HostHotelDetail> {
     throw new Error('unused');
   }

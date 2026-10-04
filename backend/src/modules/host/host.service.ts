@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { forbidden } from '../../common/errors/api-error.js';
+import { badRequest, forbidden } from '../../common/errors/api-error.js';
 import {
   type CreateBlackoutData,
   type CreateHotelData,
@@ -117,11 +117,25 @@ export class HostService {
       if (!room) this.notOwner();
     }
 
+    // Both ranges the route documents as a 400, checked here beside the ownership probes
+    // because both are business rules and neither is expressible in the DTO: the schema only
+    // knows the two dates are shaped like dates, not which order they are in or what they
+    // would collide with. Persisting either would corrupt the availability math, which
+    // compares blackout spans and cannot make sense of an inverted or doubled range.
+    const startsOn = new Date(data.startsOn);
+    const endsOn = new Date(data.endsOn);
+    if (endsOn < startsOn) {
+      throw badRequest('A blackout must end on or after the day it starts');
+    }
+    if (await this.repo.hasBlackoutOverlap(hotelId, data.roomId, startsOn, endsOn)) {
+      throw badRequest('This range overlaps an existing blackout');
+    }
+
     const result = await this.repo.createBlackout({
       ...data,
       hotelId,
-      startsOn: new Date(data.startsOn),
-      endsOn: new Date(data.endsOn),
+      startsOn,
+      endsOn,
     });
 
     return {
