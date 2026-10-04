@@ -254,21 +254,33 @@ function validateDetails(): boolean {
  * in and back — an anonymous hold cannot exist. Anything else real is an error state;
  * only nothing-answered is unreachable here, because the quote above already proved
  * the backend is listening.
+ *
+ * A hold created here is *kept* on failure. Throwing it away would make the retry issue a
+ * second `POST /api/bookings` for the same stay: two bookings for one guest, the first
+ * still holding inventory and unreachable from the UI, and the "never mint a second
+ * booking" invariant this page asserts false.
  */
 async function startPayment(): Promise<void> {
-  if (payment.value.kind !== 'idle' && payment.value.kind !== 'failed') return
+  const state = payment.value
+  if (state.kind !== 'idle' && state.kind !== 'failed') return
   if (!hotel.value || !validateDetails() || !selectedRoom.value) return
+
+  // A hold that already exists is resumed, never re-created — only the intent is missing.
+  // Held in a local so the failure arm can carry a booking made by *this* call too.
+  let booking: ApiBooking | null = state.kind === 'failed' ? state.booking : null
   payment.value = { kind: 'creating' }
   try {
-    const booking = await createBooking({
-      roomId: selectedRoom.value.id,
-      checkIn: checkIn.value,
-      checkOut: checkOut.value,
-      guests: guests.value,
-      guestName: guestName.value.trim(),
-      guestEmail: guestEmail.value.trim(),
-      guestPhone: guestPhone.value.trim(),
-    })
+    if (!booking) {
+      booking = await createBooking({
+        roomId: selectedRoom.value.id,
+        checkIn: checkIn.value,
+        checkOut: checkOut.value,
+        guests: guests.value,
+        guestName: guestName.value.trim(),
+        guestEmail: guestEmail.value.trim(),
+        guestPhone: guestPhone.value.trim(),
+      })
+    }
     const intent = await createPaymentIntent(booking.id)
     if (pollCancelled) return
     payment.value = { kind: 'card', booking, intent }
@@ -282,7 +294,7 @@ async function startPayment(): Promise<void> {
     payment.value = {
       kind: 'failed',
       message: isApiError(error) ? error.message : t('common.unexpectedError'),
-      booking: null,
+      booking,
       intent: null,
     }
   }
@@ -384,7 +396,8 @@ function onSubmit(): void {
     return
   }
   if (state.kind === 'failed') {
-    // An intent already exists: retry the payment, never mint a second booking.
+    // An intent exists → retry the payment against it. Only the hold exists → mint its
+    // intent. Both routes resume what is already there; neither books a second stay.
     if (state.booking && state.intent) void payNow()
     else void startPayment()
     return
