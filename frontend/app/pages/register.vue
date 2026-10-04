@@ -7,7 +7,7 @@
  */
 import { registerSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
-import { ApiRequestError } from '~/utils/api'
+import { isApiError, isApiFailure } from '~/utils/api'
 import { useAuth } from '~/composables/useAuth'
 
 const route = useRoute()
@@ -40,6 +40,18 @@ function validate(): boolean {
   return result.success
 }
 
+/**
+ * Only the API's own answers get the API's prose. `NETWORK_ERROR` and `BAD_RESPONSE` are
+ * `ApiRequestError`s too, so `instanceof` alone told a visitor with the backend down that
+ * their email was taken — the one message that tells them not to try again.
+ */
+function failureMessage(error: unknown): string {
+  if (!isApiError(error)) return t('common.unexpectedError')
+  if (error.code === 'EMAIL_TAKEN' || error.code === 'CONFLICT') return t('auth.emailExists')
+  if (!isApiFailure(error)) return t('common.unexpectedError')
+  return error.message
+}
+
 async function submit(): Promise<void> {
   touched.value = { name: true, email: true, password: true }
   formError.value = ''
@@ -53,11 +65,8 @@ async function submit(): Promise<void> {
     })
     await router.push(redirectTarget.value)
   }
-  catch (error) {
-    // The API owns the "that email is taken" answer; the client only maps it to prose.
-    formError.value = error instanceof ApiRequestError
-      ? t('auth.emailExists')
-      : t('common.unexpectedError')
+  catch (error: unknown) {
+    formError.value = failureMessage(error)
   }
   // The form keeps its values on failure — retyping a password to fix a duplicate email
   // is the kind of friction that loses the signup.

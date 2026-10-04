@@ -16,7 +16,7 @@
  * the payload out of `useState` gets a shell that renders the wrong links and a 403 from
  * the API on every call.
  */
-import { apiFetch, ApiRequestError } from '~/utils/api'
+import { apiFetch, ApiRequestError, isApiFailure } from '~/utils/api'
 import type { components } from '~/types/api'
 
 /** From the generated contract, not hand-written — the API owns the shape (D38). */
@@ -119,16 +119,24 @@ export function useAuth() {
   /**
    * Clears the cookie server-side. A 401 is treated as already-signed-out rather than an
    * error: the goal state is "no session", and a cookie that was already gone satisfies it.
+   *
+   * The 204 empty body is a documented success (`tolerateEmptyBody`), not a broken
+   * response — without that the call threw `BAD_RESPONSE` on every logout, so the caller’s
+   * redirect after `await logout()` never ran and the shell kept rendering signed in.
    */
   async function logout(): Promise<void> {
     pending.value = true
     try {
-      await apiFetch<undefined>('/api/auth/logout', { method: 'POST' })
+      await apiFetch<undefined>('/api/auth/logout', { method: 'POST', tolerateEmptyBody: true })
       current.value = null
     }
     catch (error) {
-      if (isUnauthenticated(error)) current.value = null
-      else throw error
+      // Only a confirmed failure from this API is the caller’s to handle. When nothing
+      // answered at all — no backend, or something that is not this API — there is no
+      // server-side answer to respect, so the local session is dropped rather than left
+      // showing links every later call will 401 on.
+      if (isApiFailure(error) && !isUnauthenticated(error)) throw error
+      current.value = null
     }
     finally {
       pending.value = false
