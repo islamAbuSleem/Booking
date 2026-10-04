@@ -278,6 +278,7 @@
     "passwordTooShort": "Passwords run at least 8 characters.",
     "nameTooShort": "Enter your full name.",
     "invalidCredentials": "That email and password combination didn't match an account.",
+    "accountSuspended": "This account has been suspended. Please contact support.",
     "rememberMe": "Remember me",
     "forgotPassword": "Forgot password?",
     "signIn": "Sign in",
@@ -432,7 +433,14 @@
     "hideBody": "The review leaves the site immediately. The guest is not notified in this build.",
     "hideConfirm": "Yes, hide it",
     "reviewsEmptyTitle": "No open reports",
-    "reviewsEmptyHint": "Flagged reviews land here for a decision."
+    "reviewsEmptyHint": "Flagged reviews land here for a decision.",
+    "unhide": "Unhide",
+    "unhideTitle": "Show review by {name}?",
+    "unhideBody": "The review by {name} will be visible on the property page again.",
+    "unhideConfirm": "Show review",
+    "statHidden": "Hidden reviews",
+    "hiddenState": "Hidden",
+    "visibleState": "Visible"
   },
   "reviews": {
     "formTitle": "Write a review",

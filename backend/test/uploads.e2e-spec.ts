@@ -126,6 +126,7 @@ async function seededHost(
     avatarUrl: null,
     passwordHash: await passwords.hash(PASSWORD),
     role: 'HOST',
+    status: 'ACTIVE',
     oauthProvider: null,
     oauthAccountId: null,
     createdAt: new Date(),

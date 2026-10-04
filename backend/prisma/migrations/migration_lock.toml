@@ -1,0 +1,5 @@
+# This file pins the database provider for `prisma migrate`.
+# It is required when the migrations directory is created fresh (T12 scaffolded the
+# schema but committed no migrations, so T25 establishes the directory).
+
+provider = "postgresql"

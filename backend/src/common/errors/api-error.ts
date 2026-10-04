@@ -66,13 +66,23 @@ export const ERROR_CODES = [
   // T24 — the stay is not in a reviewable state. Only COMPLETED stays can be reviewed;
   // anything else (PENDING, CONFIRMED, CANCELLED) is a 400, not a silent no-op.
   'INVALID_REVIEW_STATE',
-=======
-  // T22 — a delete blocked by booking history. `Booking.room` is `onDelete: Restrict`, so a
+// T22 — a delete blocked by booking history. `Booking.room` is `onDelete: Restrict`, so a
   // hotel or room with any booking cannot be removed. It gets its own codes rather than a
   // bare `CONFLICT` because the client shows the reason, and because letting Prisma's P2003
   // reach the filter would answer a misleading 400 about a "missing referenced record".
   'HOTEL_HAS_BOOKINGS',
   'ROOM_HAS_BOOKINGS',
+
+  // T25 — admin moderation and suspension.
+  // `ADMIN_REQUIRED`: every `/api/admin/*` route, so the client distinguishes "sign in"
+  // (401) from "signed in as the wrong role" (this) instead of rendering one login wall.
+  'ADMIN_REQUIRED',
+  // `ACCOUNT_SUSPENDED`: login and every JWT-authenticated route for a suspended
+  // account. A distinct code — not INVALID_CREDENTIALS — because the fix is "contact
+  // support", not "retry the password", and the client must not offer a retry loop.
+  'ACCOUNT_SUSPENDED',
+  // `ADMIN_SELF_SUSPEND`: an admin suspending their own account, refused as a 400.
+  'ADMIN_SELF_SUSPEND',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

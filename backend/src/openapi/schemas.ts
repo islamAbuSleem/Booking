@@ -7,6 +7,7 @@ import { DTO_SCHEMAS as FAVORITES_DTO_SCHEMAS } from '../modules/favorites/dto/f
 import { DTO_SCHEMAS } from '../modules/hotels/dto/hotel.dto.js';
 import { DTO_SCHEMAS as HOST_DTO_SCHEMAS } from '../modules/host/dto/host.api.js';
 import { DTO_SCHEMAS as REVIEWS_DTO_SCHEMAS } from '../modules/reviews/dto/review.dto.js';
+import { DTO_SCHEMAS as ADMIN_DTO_SCHEMAS } from '../modules/admin/dto/admin.dto.js';
 import { DTO_SCHEMAS as UPLOADS_DTO_SCHEMAS } from '../modules/uploads/dto/uploads.dto.js';
 import { DTO_SCHEMAS as USER_DTO_SCHEMAS } from '../modules/users/dto/user.dto.js';
 
@@ -43,6 +44,9 @@ export const CONTRACT_SCHEMAS = {
   // T24 — reviews. `ALREADY_REVIEWED` and `INVALID_REVIEW_STATE` join `ERROR_CODES`
   // the same way; the `ApiErrorEnvelope` code stays an untyped `z.string()` (D54).
   ...REVIEWS_DTO_SCHEMAS,
+  // T25 — admin console components. `ADMIN_REQUIRED`, `ACCOUNT_SUSPENDED` and
+  // `ADMIN_SELF_SUSPEND` join `ERROR_CODES` the same way.
+  ...ADMIN_DTO_SCHEMAS,
 } as const satisfies Record<string, z.ZodType>;
 
 export type ContractSchemaName = keyof typeof CONTRACT_SCHEMAS;

@@ -71,7 +71,7 @@
 - [x] T22 Host listing management API
 - [x] T23 Wire auth into the frontend
 - [x] T24 Reviews
-- [ ] T25 Admin moderation
+- [x] T25 Admin moderation
 
 ### Phase 3 — Advanced
 - [ ] T26 Stripe payment intent
@@ -538,6 +538,23 @@
   `formatStayDate` pins UTC midnight and a full instant would shift it. Fixture reviews
   render only under a fixture hotel. The booking-detail form renders only for a live
   COMPLETED booking with `canReview: true`; fixtures are read-only.
+- **D67 — suspension is persisted state, enforced at three points.** `UserStatus`
+  (`ACTIVE`/`SUSPENDED`, default `ACTIVE`) ships as an offline-written additive
+  migration — no live DB exists here, so the SQL in `prisma/migrations/` is what
+  `migrate deploy` applies on Neon, and the directory gains the `migration_lock.toml`
+  T12 never committed. Enforcement: login and all three OAuth session paths answer 403
+  `ACCOUNT_SUSPENDED` after credentials verify, and `JwtAuthGuard` rejects a live JWT
+  on the next request, so suspension bites immediately rather than at token expiry.
+- **D68 — the admin 403 names its code via `@RolesCode`, and the audit trail is the
+  API log.** `RolesGuard` defaults to `FORBIDDEN` as before; the admin controller sets
+  `ADMIN_REQUIRED` so the client tells "sign in" from "wrong role". Every moderation
+  action — reads included — logs `[admin] <actor> …`, and self-suspension is refused
+  pre-delegation (400 `ADMIN_SELF_SUSPEND`) while self-reactivation stays allowed.
+- **D69 — the console filters listings server-side and moderates the whole review
+  corpus.** There is no report system, so the flagged queue exists only in fixture
+  mode; live rows show hide/unhide by status. A real 403 never degrades to fixtures,
+  and mock mutations re-fetch so the local overrides stay the single source they
+  always were.
 
 ## Notes
 

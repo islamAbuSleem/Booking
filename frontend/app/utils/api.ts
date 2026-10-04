@@ -48,6 +48,13 @@ export type ApiReview = components['schemas']['Review']
 export type ApiReviewListData = components['schemas']['ReviewListData']
 export type ApiReviewable = components['schemas']['ReviewableData']
 export type ApiCreateReview = components['schemas']['CreateReview']
+export type ApiAdminHotel = components['schemas']['AdminHotel']
+export type ApiAdminUser = components['schemas']['AdminUser']
+export type ApiAdminReview = components['schemas']['AdminReview']
+export type ApiAdminStats = components['schemas']['AdminStats']
+export type ApiAdminHotelStatus = ApiAdminHotel['status']
+export type ApiAdminUserStatus = ApiAdminUser['status']
+export type ApiAdminReviewStatus = ApiAdminReview['status']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -405,6 +412,50 @@ export async function createReview(hotelId: string, body: ApiCreateReview): Prom
  */
 export async function fetchReviewable(bookingId: string): Promise<ApiReviewable> {
   return apiFetch<ApiReviewable>(`/api/bookings/${encodeURIComponent(bookingId)}/reviewable`)
+}
+
+/**
+ * T25. The moderation console reads. Every one is admin-only: a host gets 403
+ * `ADMIN_REQUIRED`, which pages treat as a real error (never fixtures — fixtures must
+ * not stand in for access control).
+ */
+export async function fetchAdminStats(): Promise<ApiAdminStats> {
+  return apiFetch<ApiAdminStats>('/api/admin/stats')
+}
+
+export async function fetchAdminListings(status?: string): Promise<ApiAdminHotel[]> {
+  return apiFetch<{ items: ApiAdminHotel[] }>('/api/admin/listings', {
+    query: status && status !== 'ALL' ? { status } : {},
+  }).then(page => page.items)
+}
+
+export async function setAdminListingStatus(id: string, status: ApiAdminHotelStatus): Promise<ApiAdminHotel> {
+  return apiFetch<ApiAdminHotel>(`/api/admin/listings/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    json: { status },
+  })
+}
+
+export async function fetchAdminUsers(): Promise<ApiAdminUser[]> {
+  return apiFetch<{ items: ApiAdminUser[] }>('/api/admin/users').then(page => page.items)
+}
+
+export async function setAdminUserStatus(id: string, status: ApiAdminUserStatus): Promise<ApiAdminUser> {
+  return apiFetch<ApiAdminUser>(`/api/admin/users/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    json: { status },
+  })
+}
+
+export async function fetchAdminReviews(): Promise<ApiAdminReview[]> {
+  return apiFetch<{ items: ApiAdminReview[] }>('/api/admin/reviews').then(page => page.items)
+}
+
+export async function setAdminReviewStatus(id: string, status: ApiAdminReviewStatus): Promise<ApiAdminReview> {
+  return apiFetch<ApiAdminReview>(`/api/admin/reviews/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    json: { status },
+  })
 }
 
 /**
