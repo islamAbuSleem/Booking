@@ -69,6 +69,8 @@ class OneHotelWorld implements HostRepository {
   bookingsOnHotel = 0;
   bookingsOnRoom = 0;
 
+  createdRooms: string[] = [];
+
   /** Set by the blackout tests: ranges the hotel is already closed for. */
   blackouts: Array<{ startsOn: string; endsOn: string }> = [];
   createdBlackouts: string[] = [];
@@ -119,8 +121,20 @@ class OneHotelWorld implements HostRepository {
     this.deleted.push(`blackout:${id}`);
   }
 
-  async createRoom(): Promise<never> {
-    throw new Error('unused');
+  async createRoom(data: { hotelId: string; name: string; images: Array<{ publicId: string }> }) {
+    this.createdRooms.push(data.name);
+    return {
+      id: `room-${this.createdRooms.length}`,
+      name: data.name,
+      description: '',
+      bedType: '',
+      maxGuests: 1,
+      totalInventory: 1,
+      sortOrder: 0,
+      prices: [],
+      images: [],
+      blackoutDates: [],
+    };
   }
 
   async updateRoom(): Promise<never> {
@@ -485,6 +499,106 @@ describe('Host API (e2e)', () => {
         .expect(204);
       expect(response.text).toBe('');
       expect(world.deleted).toContain(`blackout:${BLACKOUT_ID}`);
+    });
+  });
+
+  describe('POST /api/host/hotels/:id/rooms', () => {
+    const OWN_PUBLIC_ID = `booking/hotels/${HOST_A}/suite-1`;
+    const ROOM = {
+      name: 'Suite',
+      description: 'A suite.',
+      bedType: 'king',
+      maxGuests: 2,
+      totalInventory: 1,
+      prices: [{ currency: 'USD', priceCents: 10_000 }],
+      images: [] as Array<{
+        url: string
+        publicId: string
+        altText: string | null
+        sortOrder: number
+        isCover: boolean
+      }>,
+    };
+
+    beforeEach(() => {
+      world.createdRooms.length = 0;
+    });
+
+    it('201s a room whose image publicId is in the caller\'s own folder', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/rooms`)
+        .set('Cookie', cookieA)
+        .send({
+          ...ROOM,
+          images: [
+            {
+              url: `https://res.cloudinary.com/x/image/upload/${OWN_PUBLIC_ID}.jpg`,
+              publicId: OWN_PUBLIC_ID,
+              altText: null,
+              sortOrder: 0,
+              isCover: true,
+            },
+          ],
+        })
+        .expect(201);
+      expect(world.createdRooms).toEqual(['Suite']);
+    });
+
+    it('403s UPLOAD_FOREIGN for another host\'s asset, writing no room', async () => {
+      const foreign = `booking/hotels/${HOST_B}/suite-1`;
+      const response = await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/rooms`)
+        .set('Cookie', cookieA)
+        .send({
+          ...ROOM,
+          images: [
+            {
+              url: `https://res.cloudinary.com/x/image/upload/${foreign}.jpg`,
+              publicId: foreign,
+              altText: null,
+              sortOrder: 0,
+              isCover: true,
+            },
+          ],
+        })
+        .expect(403);
+      expect(response.body).toEqual({
+        success: false,
+        error: { code: 'UPLOAD_FOREIGN', message: 'This asset is not in your upload folder' },
+      });
+      expect(world.createdRooms).toEqual([]);
+    });
+
+    it('403s a sibling folder that merely shares the platform prefix', async () => {
+      // `booking/hotels/{HOST_A}-extra/` starts with nothing the caller owns, and a plain
+      // `startsWith('booking/hotels/')` would have let it through.
+      const sibling = `booking/hotels/${HOST_A}-extra/suite-1`;
+      await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/rooms`)
+        .set('Cookie', cookieA)
+        .send({
+          ...ROOM,
+          images: [
+            {
+              url: `https://res.cloudinary.com/x/image/upload/${sibling}.jpg`,
+              publicId: sibling,
+              altText: null,
+              sortOrder: 0,
+              isCover: true,
+            },
+          ],
+        })
+        .expect(403);
+      expect(world.createdRooms).toEqual([]);
+    });
+
+    it('201s a room with no images at all: there is nothing to check', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/rooms`)
+        .set('Cookie', cookieA)
+        .send(ROOM)
+        .expect(201);
+      expect(world.createdRooms).toEqual(['Suite']);
     });
   });
 

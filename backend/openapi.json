@@ -1412,7 +1412,7 @@
     },
     "/api/host/hotels/{id}/rooms": {
       "post": {
-        "description": "Creates a room type with prices (per currency), images, and inventory.",
+        "description": "Creates a room type with prices (per currency), images, and inventory. Every image `publicId` must start with the caller's own `booking/hotels/{hostId}/` folder or the request is 403 `UPLOAD_FOREIGN` — the rule T21 applies to `/api/uploads/attach`, since a room image is the same row.",
         "operationId": "HostController_createRoom",
         "parameters": [
           {
@@ -1458,7 +1458,7 @@
             }
           },
           "403": {
-            "description": "Not a host/admin, or not the owner of the hotel.",
+            "description": "Not a host/admin, not the owner of the hotel, or an image `publicId` outside the caller's own folder (`UPLOAD_FOREIGN`).",
             "content": {
               "application/json": {
                 "schema": {

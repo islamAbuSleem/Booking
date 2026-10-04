@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { badRequest, conflict, forbidden } from '../../common/errors/api-error.js';
 import {
@@ -15,6 +16,7 @@ import {
   HOST_REPOSITORY,
 } from './host.repository.js';
 import { slugify } from '../../common/utils/slugify.js';
+import { hostFolderPrefix } from '../uploads/cloudinary.signature.js';
 
 /**
  * The moderation state machine, in one allow-list. A host owns exactly one transition:
@@ -49,6 +51,7 @@ export class HostService {
 
   constructor(
     @Inject(HOST_REPOSITORY) private readonly repo: HostRepository,
+    @Inject(ConfigService) private readonly config: ConfigService,
   ) {}
 
   /** A hotel that is not this host's — or no hotel at all — is the caller's 403. */
@@ -118,6 +121,18 @@ export class HostService {
     const hotel = await this.repo.findByIdAndHost(hotelId, hostId);
     if (!hotel) this.notOwner();
 
+    // T21's folder-prefix rule applies here too: a room image is the same `hotel_images` row,
+    // so without this a host could point their own room at another host's Cloudinary asset and
+    // inherit its url. The check is a DB-free string comparison against the caller's own
+    // `booking/hotels/{hostId}/` folder, and it runs before the write, so a foreign id never
+    // gets as far as a partially-created room.
+    const prefix = hostFolderPrefix(this.uploadPath(), hostId);
+    for (const image of data.images) {
+      if (!image.publicId.startsWith(prefix)) {
+        throw forbidden('UPLOAD_FOREIGN', 'This asset is not in your upload folder');
+      }
+    }
+
     return this.repo.createRoom({ ...data, hotelId });
   }
 
@@ -171,6 +186,11 @@ export class HostService {
       startsOn: result.startsOn.toISOString().split('T')[0],
       endsOn: result.endsOn.toISOString().split('T')[0],
     };
+  }
+
+  /** The platform-wide folder; each host appends their own id. */
+  private uploadPath(): string {
+    return this.config.get<string>('CLOUDINARY_UPLOAD_PATH') ?? 'booking/hotels/';
   }
 
   async deleteBlackout(id: string, hostId: string): Promise<void> {

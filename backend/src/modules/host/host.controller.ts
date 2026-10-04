@@ -281,7 +281,11 @@ export class HostController {
   @Post(':id/rooms')
   @ApiOperation({
     summary: 'Add a room to my hotel',
-    description: 'Creates a room type with prices (per currency), images, and inventory.',
+    description:
+      'Creates a room type with prices (per currency), images, and inventory. Every image ' +
+      "`publicId` must start with the caller's own `booking/hotels/{hostId}/` folder or the " +
+      'request is 403 `UPLOAD_FOREIGN` — the rule T21 applies to `/api/uploads/attach`, since ' +
+      'a room image is the same row.',
   })
   @ApiParam({
     name: 'id',
@@ -307,7 +311,9 @@ export class HostController {
   })
   @ApiResponse({
     status: 403,
-    description: 'Not a host/admin, or not the owner of the hotel.',
+    description:
+      'Not a host/admin, not the owner of the hotel, or an image `publicId` outside the ' +
+      "caller's own folder (`UPLOAD_FOREIGN`).",
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   @ApiResponse({

@@ -56,6 +56,14 @@ export class StubHostRepository implements HostRepository {
     throw new Error('not implemented in stub');
   }
 
+  async hasOverlappingBlackout(
+    _hotelId: string,
+    _startsOn: Date,
+    _endsOn: Date,
+  ): Promise<boolean> {
+    return false;
+  }
+
   async deleteBlackout(_id: string, _hostId: string): Promise<void> {
     throw new Error('not implemented in stub');
   }

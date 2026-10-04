@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { ConfigService } from '@nestjs/config';
 import { HostService } from './host.service.js';
 import type { CreateHotelData, HostHotelDetail, HostRepository } from './host.repository.js';
 
 const HOST_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+/** Only the upload path the folder-prefix rule reads. */
+const CONFIG = { get: (key: string): string | undefined => (key === 'CLOUDINARY_UPLOAD_PATH' ? 'booking/hotels/' : undefined) };
+
+function makeService(repo: HostRepository): HostService {
+  return new HostService(repo, new ConfigService(CONFIG));
+}
 
 const CREATE: Omit<CreateHotelData, 'slug'> = {
   hostId: HOST_ID,
@@ -49,6 +57,15 @@ class RecordingRepo implements HostRepository {
   async delete(): Promise<void> {
     throw new Error('unused');
   }
+  async countBookingsForHotel(): Promise<number> {
+    return 0;
+  }
+  async countBookingsForRoom(): Promise<number> {
+    return 0;
+  }
+  async hasOverlappingBlackout(): Promise<boolean> {
+    return false;
+  }
   async createRoom(): Promise<never> {
     throw new Error('unused');
   }
@@ -78,7 +95,7 @@ class RecordingRepo implements HostRepository {
 describe('HostService.createHotel slug', () => {
   it('uses the plain slug when nothing has taken it', async () => {
     const repo = new RecordingRepo(new Set());
-    await new HostService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
+    await makeService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
 
     expect(repo.slugProbes).toEqual(['casa-azul']);
     expect(repo.createArgs?.slug).toBe('casa-azul');
@@ -88,7 +105,7 @@ describe('HostService.createHotel slug', () => {
     // `hotels.slug` is `@unique` platform-wide, so the collision is another host's row —
     // the case a host-scoped probe could never see.
     const repo = new RecordingRepo(new Set(['casa-azul']));
-    await new HostService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
+    await makeService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
 
     expect(repo.slugProbes).toEqual(['casa-azul', 'casa-azul-1']);
     expect(repo.createArgs?.slug).toBe('casa-azul-1');
@@ -96,14 +113,14 @@ describe('HostService.createHotel slug', () => {
 
   it('keeps counting until it finds a free slug', async () => {
     const repo = new RecordingRepo(new Set(['casa-azul', 'casa-azul-1', 'casa-azul-2']));
-    await new HostService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
+    await makeService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
 
     expect(repo.createArgs?.slug).toBe('casa-azul-3');
   });
 
   it('probes host-agnostically: the uuid host_id filter is never asked a slug question', async () => {
     const repo = new RecordingRepo(new Set());
-    await new HostService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
+    await makeService(repo).createHotel(HOST_ID, { ...CREATE } as CreateHotelData);
 
     // `findByIdAndHost` filters on `Hotel.hostId @db.Uuid`, so probing a slug through it needs
     // a sentinel id that Postgres rejects with 22P02. The slug check goes through its own
