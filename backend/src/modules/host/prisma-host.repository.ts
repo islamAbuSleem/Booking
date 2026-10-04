@@ -133,14 +133,20 @@ export class PrismaHostRepository implements HostRepository {
       _count: true,
     });
 
+    // `groupBy` returns one row per room, so the hotel id is needed per row. Fetched in ONE
+    // more query rather than one per row: a host with N rooms would otherwise cost N+1
+    // queries on every dashboard load.
+    const roomHotel = await this.prisma.room.findMany({
+      where: { id: { in: upcomingBookings.map((b) => b.roomId) } },
+      select: { id: true, hotelId: true },
+    });
+    const hotelIdByRoom = new Map(roomHotel.map((room) => [room.id, room.hotelId]));
+
     const bookingCountByHotel = new Map<string, number>();
     for (const b of upcomingBookings) {
-      const room = await this.prisma.room.findUnique({
-        where: { id: b.roomId },
-        select: { hotelId: true },
-      });
-      if (room) {
-        bookingCountByHotel.set(room.hotelId, (bookingCountByHotel.get(room.hotelId) ?? 0) + b._count);
+      const hotelId = hotelIdByRoom.get(b.roomId);
+      if (hotelId) {
+        bookingCountByHotel.set(hotelId, (bookingCountByHotel.get(hotelId) ?? 0) + b._count);
       }
     }
 
