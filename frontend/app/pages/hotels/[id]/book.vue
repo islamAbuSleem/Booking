@@ -662,13 +662,20 @@ useSeoMeta({
               </p>
               <div class="mt-4 max-w-[480px]">
                 <StripeCardForm
-                  v-if="activeIntent"
+                  v-if="hasStripeKey && activeIntent"
                   ref="cardForm"
                   :client-secret="activeIntent.clientSecret"
                   @change="onCardChange"
                 />
+                <!--
+                  About `hasStripeKey`, NOT about `activeIntent`. Those are independent:
+                  `polling` has no intent by design, and keying this on the intent told a
+                  guest whose payment was actively being confirmed that card payments were
+                  unavailable. With a key but no intent there is simply nothing to mount
+                  yet, which is not an error.
+                -->
                 <BaseAlert
-                  v-else
+                  v-else-if="!hasStripeKey"
                   tone="info"
                   :title="$t('booking.stripeMissingTitle')"
                   class="mt-2"
