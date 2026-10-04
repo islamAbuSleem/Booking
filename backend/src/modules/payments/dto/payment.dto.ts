@@ -43,15 +43,24 @@ const paymentSchema = z.object({
 const intentEnvelopeSchema = envelopeSchema(intentDataSchema);
 const paymentEnvelopeSchema = envelopeSchema(paymentSchema);
 
+const webhookDataSchema = z.object({
+  received: z.literal(true),
+});
+
+const webhookEnvelopeSchema = envelopeSchema(webhookDataSchema);
+
 export const DTO_SCHEMAS = {
   IntentRequest: intentRequestSchema,
   IntentData: intentDataSchema,
   IntentEnvelope: intentEnvelopeSchema,
   Payment: paymentSchema,
   PaymentEnvelope: paymentEnvelopeSchema,
+  WebhookData: webhookDataSchema,
+  WebhookEnvelope: webhookEnvelopeSchema,
 } as const satisfies Record<string, z.ZodType>;
 
 export type IntentRequest = z.infer<typeof intentRequestSchema>;
 export type PaymentBookingParam = z.infer<typeof paymentBookingParamSchema>;
 export type IntentData = z.infer<typeof intentDataSchema>;
 export type PaymentDto = z.infer<typeof paymentSchema>;
+export type WebhookData = z.infer<typeof webhookDataSchema>;

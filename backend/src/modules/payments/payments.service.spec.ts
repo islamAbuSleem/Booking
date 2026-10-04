@@ -9,7 +9,6 @@ import type {
 } from '../../prisma/payments.repository.js';
 import { PaymentsService } from './payments.service.js';
 import type { CreatedIntent, StripeClient } from './stripe.client.js';
-
 /**
  * T26 — the intent rules with no database and no network. The wire codes are pinned
  * over HTTP in `test/payments.e2e-spec.ts`; this file pins the two decisions money
@@ -54,9 +53,11 @@ function setup(options: { bookings?: Map<string, BookingRecord> } = {}) {
     findHotelSnapshots: () => Promise.resolve([]),
     findRoomPriceCurrency: () => Promise.resolve(null),
     updateStatus: () => Promise.resolve(null),
+    transitionStatus: () => Promise.resolve(null),
   };
   const payments: PaymentsRepository = {
     findByBooking: () => Promise.resolve(null),
+    findByIntent: () => Promise.resolve(null),
     upsert: (data: UpsertPaymentData) => {
       upserts.push(data);
       return Promise.resolve({
@@ -78,6 +79,7 @@ function setup(options: { bookings?: Map<string, BookingRecord> } = {}) {
       intents.push(intent);
       return Promise.resolve(intent);
     },
+    verifyWebhook: () => { throw new Error('unused'); },
   };
   const service = new PaymentsService(bookings, payments, stripe);
   return { service, keys, upserts };

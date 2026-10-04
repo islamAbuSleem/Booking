@@ -35,15 +35,24 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
     return row ? toRecord(row) : null;
   }
 
+  async findByIntent(stripePaymentIntentId: string): Promise<PaymentRecord | null> {
+    const row = await this.prisma.payment.findUnique({
+      where: { stripePaymentIntentId },
+      select: PAYMENT_SELECT,
+    });
+    return row ? toRecord(row) : null;
+  }
+
   async upsert(data: UpsertPaymentData): Promise<PaymentRecord> {
     const row = await this.prisma.payment.upsert({
       where: { bookingId: data.bookingId },
-      create: { ...data },
+      create: { ...data, receiptUrl: data.receiptUrl ?? null },
       update: {
         stripePaymentIntentId: data.stripePaymentIntentId,
         amountCents: data.amountCents,
         currency: data.currency,
         status: data.status,
+        ...(data.receiptUrl !== undefined ? { receiptUrl: data.receiptUrl } : {}),
       },
       select: PAYMENT_SELECT,
     });

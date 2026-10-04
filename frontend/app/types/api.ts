@@ -761,6 +761,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/payments/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stripe webhook: confirm or release a booking
+         * @description Signature-verified against the RAW body (`rawBody: true` at scaffold; never `@Body({ bodyParser: false })`, which does not exist, and never `app.use(express.json())`, which nulls `rawBody`). `payment_intent.succeeded` flips the booking PENDING → CONFIRMED and upserts the payment row with the receipt URL; `payment_intent.payment_failed` releases the hold (PENDING → CANCELLED). A late failure for an already-confirmed stay changes nothing. Unknown events 200 and are ignored, so a new Stripe event type never wedges deliveries into a retry loop. Fully idempotent: Stripe retries, and a repeated event finds nothing in `from` and writes nothing.
+         */
+        post: operations["PaymentsController_webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1589,6 +1609,15 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["Payment"];
+        };
+        WebhookData: {
+            /** @enum {boolean} */
+            received: true;
+        };
+        WebhookEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["WebhookData"];
         };
     };
     responses: never;
@@ -3601,6 +3630,35 @@ export interface operations {
             };
             /** @description No such booking, or no payment started for it yet. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PaymentsController_webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted — verified and dispatched, or verified and ignored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEnvelope"];
+                };
+            };
+            /** @description The signature is missing or does not verify. */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

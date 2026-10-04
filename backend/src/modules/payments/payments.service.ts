@@ -1,5 +1,6 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { ApiError, forbidden, notFound } from '../../common/errors/api-error.js';
+import type Stripe from 'stripe';
 import {
   BOOKINGS_REPOSITORY,
   type BookingRecord,
@@ -77,8 +78,7 @@ export class PaymentsService {
     };
   }
 
-  async getPayment(callerId: string, bookingId: string): Promise<PaymentDto> {
-    await this.requireOwnedBooking(callerId, bookingId);
+  async getPayment(callerId: string, bookingId: string): Promise<PaymentDto> {    await this.requireOwnedBooking(callerId, bookingId);
     const payment = await this.payments.findByBooking(bookingId);
     if (!payment) {
       throw notFound('PAYMENT_NOT_FOUND', 'No payment has been started for this booking');
@@ -95,6 +95,91 @@ export class PaymentsService {
     };
   }
 
+  /**
+   * T27 — the webhook entry point. Verifies first, dispatches second: nothing below
+   * runs on an unverified body, and the signature header missing entirely is the same
+   * 400 as a forged one (there is no "anonymous but well-formed" webhook).
+   */
+  async handleWebhook(rawBody: Buffer | string | undefined, signature: string | undefined): Promise<void> {
+    if (!rawBody || !signature) {
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_SIGNATURE',
+        'The webhook signature is invalid',
+      );
+    }
+    const event = await this.stripe.verifyWebhook(rawBody, signature);
+    await this.dispatchWebhookEvent(event);
+  }
+
+  /**
+   * Stripe retries every event until it gets a 200, so each arm must be safe to run
+   * twice: the conditional transition flips at most once (a retry finds nothing in
+   * `from` and writes nothing), and unknown types are logged and ignored rather than
+   * erroring the delivery into a retry loop.
+   */
+  private async dispatchWebhookEvent(event: Stripe.Event): Promise<void> {
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+        await this.onPaymentSucceeded(event.data.object as Stripe.PaymentIntent);
+        break;
+      case 'payment_intent.payment_failed':
+        await this.onPaymentFailed(event.data.object as Stripe.PaymentIntent);
+        break;
+      default:
+        this.logger.log(`[payments] ignored webhook event ${event.type}`);
+        break;
+    }
+  }
+
+  private async onPaymentSucceeded(intent: Stripe.PaymentIntent): Promise<void> {
+    const payment = await this.payments.findByIntent(intent.id);
+    if (!payment) {
+      // Not one of ours — possibly a different Stripe account's intent replayed here.
+      // Warn loudly, change nothing, still 200: Stripe must not retry what we will
+      // never accept.
+      this.logger.warn(`[payments] succeeded intent ${intent.id} matches no booking`);
+      return;
+    }
+    const booking = await this.bookings.transitionStatus(payment.bookingId, 'PENDING', 'CONFIRMED');
+    if (!booking) {
+      this.logger.log(`[payments] duplicate succeeded event for booking ${payment.bookingId}`);
+      return;
+    }
+    await this.payments.upsert({
+      bookingId: payment.bookingId,
+      stripePaymentIntentId: intent.id,
+      amountCents: payment.amountCents,
+      currency: payment.currency,
+      status: 'succeeded',
+      receiptUrl: receiptUrl(intent),
+    });
+    this.logger.log(`[payments] booking ${booking.reference} CONFIRMED by intent ${intent.id}`);
+  }
+
+  private async onPaymentFailed(intent: Stripe.PaymentIntent): Promise<void> {
+    const payment = await this.payments.findByIntent(intent.id);
+    if (!payment) {
+      this.logger.warn(`[payments] failed intent ${intent.id} matches no booking`);
+      return;
+    }
+    // Only a PENDING hold is released. A late failure for an already-CONFIRMED stay
+    // must not cancel it — the money moved, and the failure is Stripe's stale news.
+    const booking = await this.bookings.transitionStatus(payment.bookingId, 'PENDING', 'CANCELLED');
+    if (!booking) {
+      this.logger.log(`[payments] failed intent ${intent.id} arrived after confirmation`);
+      return;
+    }
+    await this.payments.upsert({
+      bookingId: payment.bookingId,
+      stripePaymentIntentId: intent.id,
+      amountCents: payment.amountCents,
+      currency: payment.currency,
+      status: 'failed',
+    });
+    this.logger.log(`[payments] booking ${booking.reference} CANCELLED by failed intent ${intent.id}`);
+  }
+
   private async requireOwnedBooking(callerId: string, bookingId: string): Promise<BookingRecord> {
     const booking = await this.bookings.findById(bookingId);
     if (!booking) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
@@ -103,4 +188,15 @@ export class PaymentsService {
     }
     return booking;
   }
+}
+
+/**
+ * The guest-facing receipt link, off the intent's first charge. Defensive at every
+ * level: test fixtures and some payment methods carry no charges array, and a missing
+ * receipt is null — never an empty string the client would render as a broken link.
+ */
+function receiptUrl(intent: Stripe.PaymentIntent): string | null {
+  const charges = (intent as unknown as { charges?: { data?: { receipt_url?: unknown }[] } }).charges;
+  const url = charges?.data?.[0]?.receipt_url;
+  return typeof url === 'string' && url.length > 0 ? url : null;
 }

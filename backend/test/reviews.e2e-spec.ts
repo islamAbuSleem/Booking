@@ -96,6 +96,10 @@ class StubBookings implements BookingsRepository {
   async updateStatus(): Promise<null> {
     return null;
   }
+
+  async transitionStatus(): Promise<null> {
+    return null;
+  }
 }
 
 class StubReviews implements ReviewsRepository {
