@@ -32,6 +32,14 @@ export class StubHostRepository implements HostRepository {
     throw new Error('not implemented in stub');
   }
 
+  async countBookingsForHotel(_id: string): Promise<number> {
+    return 0;
+  }
+
+  async countBookingsForRoom(_roomId: string): Promise<number> {
+    return 0;
+  }
+
   async createRoom(_data: unknown): Promise<RoomDetail> {
     throw new Error('not implemented in stub');
   }
@@ -48,6 +56,14 @@ export class StubHostRepository implements HostRepository {
     throw new Error('not implemented in stub');
   }
 
+  async hasOverlappingBlackout(
+    _hotelId: string,
+    _startsOn: Date,
+    _endsOn: Date,
+  ): Promise<boolean> {
+    return false;
+  }
+
   async deleteBlackout(_id: string, _hostId: string): Promise<void> {
     throw new Error('not implemented in stub');
   }
@@ -62,14 +78,5 @@ export class StubHostRepository implements HostRepository {
 
   async findBlackoutHost(_id: string): Promise<string | null> {
     return null;
-  }
-
-  async hasBlackoutOverlap(
-    _hotelId: string,
-    _roomId: string | null,
-    _startsOn: Date,
-    _endsOn: Date,
-  ): Promise<boolean> {
-    return false;
   }
 }

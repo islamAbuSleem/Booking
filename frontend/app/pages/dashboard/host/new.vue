@@ -156,9 +156,9 @@ function finish(): void {
  * retry a network call is the failure mode the UX rules forbid, and a listing that
  * was created but not finished is resumed from its edit page, not rebuilt.
  *
- * The hotel's id is recorded the moment it exists, before the work under it starts.
- * Leaving it until the end meant a single failed upload or room left `createdId` empty,
- * so "Finish listing" stayed enabled and the next click created a *second* listing —
+ * The hotel's id is recorded the moment `createHotel` resolves, before the work under it
+ * starts. Leaving it until the end meant a single failed upload or room left `createdId`
+ * empty, so "Finish listing" stayed enabled and the next click created a *second* listing —
  * with no id anywhere on screen for the host to resume the first one from.
  */
 async function submit(): Promise<void> {
@@ -185,6 +185,7 @@ async function submit(): Promise<void> {
         amenityIds: [...amenityIds.value],
       })
       hotelId = hotel.id
+      // From here on the listing exists. A retry continues this one instead of orphaning it.
       createdId.value = hotel.id
     }
 
@@ -535,9 +536,11 @@ useSeoMeta({
         >
           <p>{{ submitError }}</p>
           <!--
-            The listing exists whenever there is an id, so the host is given the way out
-            the doc comment promises. Without it the only route forward is another
-            "Finish listing", which is the duplicate-listing click.
+            The listing already exists whenever there is an id, so the host is given the way
+            out this comment promises: its edit page rather than another "Finish listing"
+            press, which is the duplicate-listing click. Shown only once there is an id to
+            link to. The link itself carries the 44px touch target, so it is a real target
+            on a phone rather than a line of text.
           -->
           <NuxtLink
             v-if="createdId"

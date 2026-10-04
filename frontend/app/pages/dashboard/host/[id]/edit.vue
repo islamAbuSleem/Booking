@@ -30,6 +30,20 @@ const id = computed(() => String(route.params.id ?? ''))
 
 type HotelStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'
 
+/**
+ * The one status a host may set here. Publishing (and the other moderation outcomes) is the
+ * admin's decision, so `PUBLISHED` is never offered — offering it would sell a control that
+ * always answers 403.
+ */
+const HOST_SETTABLE_STATUS: HotelStatus = 'SUSPENDED'
+
+const STATUS_LABEL_KEYS: Record<HotelStatus, string> = {
+  PENDING: 'status.pending',
+  PUBLISHED: 'status.published',
+  REJECTED: 'status.rejected',
+  SUSPENDED: 'status.suspended',
+}
+
 interface RoomEdit {
   id: string
   name: string
@@ -128,12 +142,15 @@ const hotelCity = ref('')
 const hotelDescription = ref('')
 const hotelStatus = ref<HotelStatus>('PENDING')
 /**
- * The status the server sent. A save sends `status` only when it differs from this,
- * because the route refuses any host write carrying `PUBLISHED` — publishing is the
- * admin's decision. Sending it always would make every save of an approved listing fail
- * with a 403, even when the host only edited the name or the city.
+ * The status the server last reported, and `null` until the page has read it. `status` is
+ * only sent when the host actually moved it: the route refuses any host write carrying
+ * `PUBLISHED` (publishing is the admin's decision), so an untouched field sent anyway makes
+ * every save of an approved listing a 403 — and because the listing PATCH shares a
+ * `Promise.all` with the room and blackout writes, those siblings succeed and the batch
+ * fails anyway. A `null` sentinel would report every pending listing as already 'PENDING'
+ * and silently skip the one save a host actually needs to make.
  */
-const serverStatus = ref<HotelStatus>('PENDING')
+const savedStatus = ref<HotelStatus | null>(null)
 const rooms = ref<RoomEdit[]>([])
 const blackouts = ref<Blackout[]>([])
 const newFrom = ref('')
@@ -169,7 +186,7 @@ watch(
     hotelCity.value = current.city
     hotelDescription.value = current.description
     hotelStatus.value = current.status
-    serverStatus.value = current.status
+    savedStatus.value = current.status
     rooms.value = current.rooms.map(room => ({
       id: room.id,
       name: room.name,
@@ -229,8 +246,9 @@ async function save(): Promise<void> {
       return
     }
     const current = hotel.value
-    // Every id the server is known to hold, not just the ones the payload nests under
-    // rooms — a hotel-scoped range appears in neither.
+    // Every id the server is known to hold. The rooms' own lists are not all of them: a
+    // hotel-scoped range (`roomId: null`) appears in neither, so it is tracked as this page
+    // creates it — or the same range is POSTed again on every save and can never be removed.
     rememberBlackouts(current.rooms)
     const previousIds = new Set(knownBlackoutIds)
     const keptIds = new Set(
@@ -243,8 +261,8 @@ async function save(): Promise<void> {
         name: hotelName.value.trim(),
         description: hotelDescription.value.trim(),
         city: hotelCity.value.trim(),
-        // Only a real change — see `serverStatus`.
-        ...(hotelStatus.value !== serverStatus.value ? { status: hotelStatus.value } : {}),
+        // Only a real change — see `savedStatus`.
+        ...(hotelStatus.value === savedStatus.value ? {} : { status: hotelStatus.value }),
       }),
       ...rooms.value.map(room =>
         updateRoom(room.id, { name: room.name.trim(), maxGuests: room.maxGuests }),
@@ -272,7 +290,7 @@ async function save(): Promise<void> {
     if (hotel.value) rememberBlackouts(hotel.value.rooms)
     // The list is re-seeded only once, so the status the server now holds has to be
     // recorded here — otherwise the next save re-sends the same `status` as a change.
-    serverStatus.value = hotelStatus.value
+    savedStatus.value = hotelStatus.value
     saved.value = true
   }
   catch (error: unknown) {
@@ -283,12 +301,17 @@ async function save(): Promise<void> {
   }
 }
 
-const statusOptions = computed(() => [
-  { value: 'PENDING', label: t('status.pending') },
-  { value: 'PUBLISHED', label: t('status.published') },
-  { value: 'REJECTED', label: t('status.rejected') },
-  { value: 'SUSPENDED', label: t('status.suspended') },
-])
+const statusOptions = computed(() => {
+  // The listing's current status stays in the list so an already-published listing shows
+  // its real value instead of a blank control; it is a reading of the state, not a target
+  // a host can pick. The only other choice is the one status they may set.
+  const current = hotelStatus.value
+  const options = [{ value: current, label: t(STATUS_LABEL_KEYS[current]) }]
+  if (current !== HOST_SETTABLE_STATUS) {
+    options.push({ value: HOST_SETTABLE_STATUS, label: t(STATUS_LABEL_KEYS[HOST_SETTABLE_STATUS]) })
+  }
+  return options
+})
 
 useSeoMeta({
   title: () => `${t('host.editTitle')} · ${t('common.brand')}`,

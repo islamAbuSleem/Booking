@@ -16,7 +16,7 @@
  * the payload out of `useState` gets a shell that renders the wrong links and a 403 from
  * the API on every call.
  */
-import { apiFetch, ApiRequestError } from '~/utils/api'
+import { apiFetch, ApiRequestError, isApiFailure } from '~/utils/api'
 import type { components } from '~/types/api'
 
 /** From the generated contract, not hand-written — the API owns the shape (D38). */
@@ -44,20 +44,12 @@ function isUnauthenticated(error: unknown): boolean {
 }
 
 /**
- * Sign-out is a goal state, not a success signal: what matters is "no session", and two
- * different answers satisfy it.
- *
- *   - `UNAUTHORIZED` — the cookie was already gone.
- *   - `BAD_RESPONSE` — the API's logout is a bodyless 204, and `apiFetch` only tolerates an
- *     empty body for DELETE, so a successful sign-out reaches us as an unreadable response.
- *     The request did exactly what we asked; clearing the session is the right reading.
- *
- * A real failure — a 500, a transport error — is still rethrown, so the caller learns the
- * cookie may still be valid rather than showing a signed-out header over a live session.
+ * 403 `ACCOUNT_SUSPENDED` answers the same question from the JWT guard: the token is still
+ * valid but the account may no longer act. It is not a blip to ride out either — every
+ * later call 403s the same way — so the session is dropped exactly like a 401.
  */
-function isSignedOut(error: unknown): boolean {
-  return isUnauthenticated(error)
-    || (error instanceof ApiRequestError && error.code === 'BAD_RESPONSE')
+function isSuspended(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.code === 'ACCOUNT_SUSPENDED'
 }
 
 /**
@@ -106,8 +98,9 @@ export function useAuth() {
    * hydration by `app/plugins/auth.ts`; the route middleware calls it again only when it
    * has no user yet.
    *
-   * A 401 clears the user. Any other failure — no backend listening, a 500 — leaves the
-   * existing value alone rather than signing the user out because a service blinked.
+   * A 401 clears the user, and so does a 403 `ACCOUNT_SUSPENDED`. Any other failure — no
+   * backend listening, a 500 — leaves the existing value alone rather than signing the
+   * user out because a service blinked.
    */
   async function refresh(): Promise<void> {
     try {
@@ -115,7 +108,7 @@ export function useAuth() {
       current.value = user
     }
     catch (error) {
-      if (isUnauthenticated(error)) current.value = null
+      if (isUnauthenticated(error) || isSuspended(error)) current.value = null
     }
   }
 
@@ -142,18 +135,34 @@ export function useAuth() {
   }
 
   /**
-   * Clears the cookie server-side. Both "there is no session" answers clear the local
-   * value; see `isSignedOut` for why a bodyless 204 counts.
+   * Clears the cookie server-side. The 204 empty body is a documented success
+   * (`tolerateEmptyBody`), not a broken response — without that the call threw
+   * `BAD_RESPONSE` on every logout, so the caller's redirect after `await logout()` never
+   * ran and the shell kept rendering signed in.
+   *
+   * Sign-out is a goal state, not a success signal: what matters is "no session", and
+   * several different answers satisfy it.
+   *
+   *   - `UNAUTHORIZED` — the cookie was already gone.
+   *   - `ACCOUNT_SUSPENDED` — the guard 403s logout itself, so tolerating it is the only
+   *     way a suspended guest can ever reach the sign-in form. Signing out is not "acting".
+   *   - No answer at all — no backend, or something that is not this API. There is no
+   *     server-side answer to respect, so the local session is dropped rather than left
+   *     showing links every later call will 401 on.
+   *
+   * A confirmed failure from this API (a 500) is still rethrown, so the caller learns the
+   * cookie may still be valid rather than showing a signed-out header over a live session.
    */
   async function logout(): Promise<void> {
     return tracked(async () => {
       try {
-        await apiFetch<undefined>('/api/auth/logout', { method: 'POST' })
+        await apiFetch<undefined>('/api/auth/logout', { method: 'POST', tolerateEmptyBody: true })
         current.value = null
       }
       catch (error) {
-        if (isSignedOut(error)) current.value = null
-        else throw error
+        // Only a confirmed failure from this API is the caller's to handle.
+        if (isApiFailure(error) && !isUnauthenticated(error) && !isSuspended(error)) throw error
+        current.value = null
       }
     })
   }
