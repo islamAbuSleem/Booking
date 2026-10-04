@@ -7,6 +7,7 @@ import {
 } from '../../prisma/bookings.repository.js';
 import {
   REVIEWS_REPOSITORY,
+  DuplicateReviewError,
   type ReviewsRepository,
 } from '../../prisma/reviews.repository.js';
 import type {
@@ -62,23 +63,37 @@ export class ReviewsService {
       );
     }
     if (await this.reviews.findByBooking(booking.id)) {
-      throw new ApiError(
-        HttpStatus.CONFLICT,
-        'ALREADY_REVIEWED',
-        'This stay already has a review',
-      );
+      this.alreadyReviewed();
     }
 
-    const created = await this.reviews.create({
-      bookingId: booking.id,
-      authorId: callerId,
-      hotelId,
-      rating: input.rating,
-      title: input.title.trim(),
-      body: input.body.trim(),
-    });
+    let created;
+    try {
+      created = await this.reviews.create({
+        bookingId: booking.id,
+        authorId: callerId,
+        hotelId,
+        rating: input.rating,
+        title: input.title.trim(),
+        body: input.body.trim(),
+      });
+    } catch (error: unknown) {
+      // The unique `bookingId` is the authority, and two concurrent POSTs both clear the
+      // check above. The repository reports the duplicate; this layer names it, so the
+      // client gets `ALREADY_REVIEWED` rather than a generic CONFLICT either way.
+      if (error instanceof DuplicateReviewError) this.alreadyReviewed();
+      throw error;
+    }
     this.logger.log(`[reviews] review ${created.id} for booking ${booking.id}`);
     return toDto(created);
+  }
+
+  /** One answer for both the check-then-write miss and the race that beats it. */
+  private alreadyReviewed(): never {
+    throw new ApiError(
+      HttpStatus.CONFLICT,
+      'ALREADY_REVIEWED',
+      'This stay already has a review',
+    );
   }
 
   async list(idOrSlug: string, page: number, pageSize: number): Promise<ReviewListData> {
