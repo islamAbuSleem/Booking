@@ -8,7 +8,7 @@ import {
   type HotelDetail,
   type HotelsRepository,
 } from '../../prisma/hotels.repository.js';
-import type { HotelListDataDto } from './dto/hotel.dto.js';
+import type { HotelListDataDto, SitemapUrlsDataDto } from './dto/hotel.dto.js';
 import type { HotelSearchQuery } from './dto/hotel-search-query.js';
 
 /**
@@ -76,6 +76,15 @@ export class HotelsService {
       throw notFound('HOTEL_NOT_FOUND', 'Hotel not found');
     }
     return hotel;
+  }
+
+  /**
+   * T31 — the sitemap feed. Slugs only, PUBLISHED only: the filter is the same SQL
+   * predicate as the public search, so a draft can never leak into the crawl.
+   */
+  async sitemapUrls(): Promise<SitemapUrlsDataDto> {
+    const items = await this.hotels.listPublishedSlugs();
+    return { items };
   }
 }
 

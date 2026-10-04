@@ -108,4 +108,10 @@ export interface HotelsRepository {
   findPublished(criteria: HotelSearchCriteria): Promise<HotelListPage>;
   /** Returns null when no hotel has that id. Visibility is the service's decision. */
   findById(id: string, currency: string): Promise<HotelDetail | null>;
+  /**
+   * Every PUBLISHED hotel's slug for the sitemap. Slugs only — the sitemap needs
+   * locs, not payloads, and a second field would be a second thing to keep fresh.
+   * `updatedAt` rides along as the sitemap `lastmod`.
+   */
+  listPublishedSlugs(): Promise<{ slug: string; updatedAt: string }[]>;
 }

@@ -1042,6 +1042,29 @@
         ]
       }
     },
+    "/api/sitemap/urls": {
+      "get": {
+        "description": "Slugs and lastmod timestamps for every PUBLISHED hotel. The Nuxt sitemap module reads this at build time; a non-published row never appears because the filter is in SQL, not applied afterwards.",
+        "operationId": "SitemapController_urls",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The slugs, with ISO 8601 lastmod each.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitemapUrlsEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Publishable hotel slugs for the sitemap",
+        "tags": [
+          "Sitemap"
+        ]
+      }
+    },
     "/api/host/hotels": {
       "get": {
         "description": "Returns all hotels owned by the authenticated host, regardless of status.",
@@ -3112,6 +3135,58 @@
           },
           "data": {
             "$ref": "#/components/schemas/HealthData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "SitemapUrl": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Stable, URL-safe. The detail route accepts this."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO 8601 lastmod for the sitemap entry."
+          }
+        },
+        "required": [
+          "slug",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SitemapUrlsData": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SitemapUrl"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "SitemapUrlsEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/SitemapUrlsData"
           }
         },
         "required": [

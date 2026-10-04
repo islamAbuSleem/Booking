@@ -225,6 +225,15 @@ export class PrismaHotelsRepository implements HotelsRepository {
     });
   }
 
+  async listPublishedSlugs(): Promise<{ slug: string; updatedAt: string }[]> {
+    const rows = await this.prisma.hotel.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { slug: true, updatedAt: true },
+      orderBy: { slug: 'asc' },
+    });
+    return rows.map((row) => ({ slug: row.slug, updatedAt: row.updatedAt.toISOString() }));
+  }
+
   private async reviewAggregates(
     hotelIds: string[],
   ): Promise<Map<string, ReviewAggregate>> {

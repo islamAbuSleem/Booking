@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint', '@nuxtjs/i18n', '@nuxt/fonts'],
+  modules: ['@nuxt/eslint', '@nuxtjs/i18n', '@nuxt/fonts', '@nuxtjs/sitemap', '@nuxtjs/robots'],
 
   css: ['~/assets/css/main.css'],
 
@@ -19,6 +19,39 @@ export default defineNuxtConfig({
        */
       stripePublishableKey: '',
     },
+  },
+
+  /**
+   * T31 — `/sitemap.xml` covers `/`, `/hotels`, and every PUBLISHED hotel detail
+   * URL. Static routes come from the app itself; detail locs come from
+   * `server/api/__sitemap__/urls.ts`, which reads `GET /api/sitemap/urls` and
+   * degrades to nothing (not to fixtures) when the backend is unreachable at
+   * generation time. Account, dashboard, and booking-flow routes never index.
+   *
+   * No `site.url` is set: with the SSR preset the modules resolve the public origin
+   * from the incoming request host at runtime, so deploy domains need no rebuild.
+   * Crawlable locs stay correct behind proxies via `x-forwarded-host`.
+   */
+  sitemap: {
+    sources: ['/api/__sitemap__/urls'],
+    exclude: [
+      '/dashboard',
+      '/dashboard/**',
+      '/login',
+      '/register',
+      '/bookings',
+      '/bookings/**',
+      '/hotels/**/book',
+    ],
+  },
+
+  /**
+   * T31 — crawlers stay out of account and dashboard surfaces. Both dashboard forms
+   * are listed so the intent reads plainly (`/dashboard` alone already prefixes
+   * children). The module appends the `Sitemap:` reference from `site.url` itself.
+   */
+  robots: {
+    disallow: ['/dashboard', '/dashboard/', '/login', '/register'],
   },
 
   future: {

@@ -39,6 +39,12 @@ class StubHotelsRepository implements HotelsRepository {
   async findById(id: string): Promise<HotelDetail | null> {
     return this.details.get(id) ?? null;
   }
+
+  async listPublishedSlugs(): Promise<{ slug: string; updatedAt: string }[]> {
+    return [...this.details.values()]
+      .filter((detail) => detail.status === 'PUBLISHED')
+      .map((detail) => ({ slug: detail.slug, updatedAt: new Date().toISOString() }));
+  }
 }
 
 const LARKSPUR: HotelDetail = {
@@ -227,6 +233,19 @@ describe('Booking API (e2e)', () => {
         success: false,
         error: { code: 'HOTEL_NOT_FOUND', message: 'Hotel not found' },
       });
+    });
+  });
+
+  describe('GET /api/sitemap/urls', () => {
+    it('lists published slugs with lastmod inside the envelope', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/api/sitemap/urls')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.items).toEqual([
+        { slug: 'the-larkspur-hotel', updatedAt: expect.any(String) },
+      ]);
     });
   });
 
