@@ -231,7 +231,10 @@ export class HostController {
   @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete my hotel',
-    description: 'Deletes the hotel and all its rooms, images, and blackout dates. Only if no confirmed bookings exist.',
+    description:
+      'Deletes the hotel and all its rooms, images, and blackout dates. Only if none of its ' +
+      'rooms has any booking: booking history is kept, so a hotel that has hosted a stay is ' +
+      'not removable (409 HOTEL_HAS_BOOKINGS).',
   })
   @ApiParam({
     name: 'id',
@@ -261,7 +264,9 @@ export class HostController {
   })
   @ApiResponse({
     status: 409,
-    description: 'Hotel has confirmed bookings and cannot be deleted.',
+    description:
+      'The hotel has bookings on any of its rooms (`HOTEL_HAS_BOOKINGS`). Booking history ' +
+      'is kept, so a listing with past stays is not removable either.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   async deleteHotel(
@@ -368,7 +373,9 @@ export class HostController {
   @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete a room',
-    description: 'Deletes the room and its blackout dates. Only if no confirmed bookings exist for this room.',
+    description:
+      'Deletes the room and its blackout dates. Only if no booking exists for this room, ' +
+      'cancelled or completed ones included (409 ROOM_HAS_BOOKINGS).',
   })
   @ApiParam({
     name: 'roomId',
@@ -398,7 +405,9 @@ export class HostController {
   })
   @ApiResponse({
     status: 409,
-    description: 'Room has confirmed bookings and cannot be deleted.',
+    description:
+      'The room has bookings on it (`ROOM_HAS_BOOKINGS`). Booking history is kept, so a ' +
+      'room with past stays is not removable either.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
   async deleteRoom(

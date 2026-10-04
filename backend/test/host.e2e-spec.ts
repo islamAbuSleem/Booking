@@ -59,6 +59,10 @@ const HOTEL: HostHotelDetail = {
 class OneHotelWorld implements HostRepository {
   readonly deleted: string[] = [];
 
+  /** Set by the delete-blocked tests: which side has bookings on it. */
+  bookingsOnHotel = 0;
+  bookingsOnRoom = 0;
+
   async findByHost(hostId: string) {
     return hostId === HOST_A
       ? { items: [{ id: HOTEL.id, slug: HOTEL.slug, name: HOTEL.name, city: HOTEL.city, country: HOTEL.country, starRating: HOTEL.starRating, status: HOTEL.status, coverImageUrl: null, roomsCount: 0, upcomingBookingsCount: 0, createdAt: new Date().toISOString() }], total: 1 }
@@ -87,6 +91,14 @@ class OneHotelWorld implements HostRepository {
 
   async delete(): Promise<void> {
     this.deleted.push('hotel');
+  }
+
+  async countBookingsForHotel(): Promise<number> {
+    return this.bookingsOnHotel;
+  }
+
+  async countBookingsForRoom(): Promise<number> {
+    return this.bookingsOnRoom;
   }
 
   async deleteRoom(roomId: string): Promise<void> {
@@ -374,6 +386,10 @@ describe('Host API (e2e)', () => {
    * site throws `BAD_RESPONSE` even though the delete worked.
    */
   describe('DELETE routes answer 204 with no body', () => {
+    beforeEach(() => {
+      world.deleted.length = 0;
+    });
+
     it('204s the hotel delete with an empty body', async () => {
       const response = await request(app.getHttpServer())
         .delete(`/api/host/hotels/${HOTEL_ID}`)
@@ -390,6 +406,48 @@ describe('Host API (e2e)', () => {
         .expect(204);
       expect(response.text).toBe('');
       expect(world.deleted).toContain(`room:${ROOM_ID}`);
+    });
+
+    it('409s a hotel delete blocked by bookings, before the FK ever trips', async () => {
+      world.bookingsOnHotel = 2;
+      try {
+        const response = await request(app.getHttpServer())
+          .delete(`/api/host/hotels/${HOTEL_ID}`)
+          .set('Cookie', cookieA)
+          .expect(409);
+        expect(response.body).toEqual({
+          success: false,
+          error: {
+            code: 'HOTEL_HAS_BOOKINGS',
+            message: 'This listing has bookings and cannot be deleted',
+          },
+        });
+        expect(world.deleted).not.toContain('hotel');
+      }
+      finally {
+        world.bookingsOnHotel = 0;
+      }
+    });
+
+    it('409s a room delete blocked by bookings, before the FK ever trips', async () => {
+      world.bookingsOnRoom = 1;
+      try {
+        const response = await request(app.getHttpServer())
+          .delete(`/api/host/hotels/rooms/${ROOM_ID}`)
+          .set('Cookie', cookieA)
+          .expect(409);
+        expect(response.body).toEqual({
+          success: false,
+          error: {
+            code: 'ROOM_HAS_BOOKINGS',
+            message: 'This room has bookings and cannot be deleted',
+          },
+        });
+        expect(world.deleted).not.toContain(`room:${ROOM_ID}`);
+      }
+      finally {
+        world.bookingsOnRoom = 0;
+      }
     });
 
     it('204s the blackout delete with an empty body', async () => {

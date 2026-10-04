@@ -181,6 +181,15 @@ export interface HostRepository {
   create(data: CreateHotelData): Promise<HostHotelDetail>;
   update(id: string, hostId: string, data: UpdateHotelData): Promise<HostHotelDetail>;
   delete(id: string, hostId: string): Promise<void>;
+  /**
+   * How many bookings stand in the way of a delete. `Booking.room` is `onDelete: Restrict`,
+   * so one booking row of *any* status — a cancelled or completed stay included, because its
+   * history is still the record of a real stay — is enough to make the delete impossible.
+   * Counting here turns the FK violation into the documented 409 instead of letting Prisma
+   * raise P2003 and the error translator answer a misleading 400.
+   */
+  countBookingsForHotel(id: string): Promise<number>;
+  countBookingsForRoom(roomId: string): Promise<number>;
   createRoom(data: CreateRoomData): Promise<RoomDetail>;
   updateRoom(roomId: string, hostId: string, data: UpdateRoomData): Promise<RoomDetail>;
   deleteRoom(roomId: string, hostId: string): Promise<void>;

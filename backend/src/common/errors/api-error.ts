@@ -58,6 +58,12 @@ export const ERROR_CODES = [
   // code states which rule failed rather than hiding the row's existence (same shape
   // as T20's NOT_BOOKING_OWNER).
   'NOT_HOTEL_OWNER',
+  // T22 — a delete blocked by booking history. `Booking.room` is `onDelete: Restrict`, so a
+  // hotel or room with any booking cannot be removed. It gets its own codes rather than a
+  // bare `CONFLICT` because the client shows the reason, and because letting Prisma's P2003
+  // reach the filter would answer a misleading 400 about a "missing referenced record".
+  'HOTEL_HAS_BOOKINGS',
+  'ROOM_HAS_BOOKINGS',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -103,4 +109,12 @@ export function notFound(
   details?: unknown,
 ): ApiError {
   return new ApiError(HttpStatus.NOT_FOUND, code, message, details);
+}
+
+export function conflict(
+  code: ErrorCode,
+  message: string,
+  details?: unknown,
+): ApiError {
+  return new ApiError(HttpStatus.CONFLICT, code, message, details);
 }

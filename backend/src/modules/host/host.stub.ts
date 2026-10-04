@@ -32,6 +32,14 @@ export class StubHostRepository implements HostRepository {
     throw new Error('not implemented in stub');
   }
 
+  async countBookingsForHotel(_id: string): Promise<number> {
+    return 0;
+  }
+
+  async countBookingsForRoom(_roomId: string): Promise<number> {
+    return 0;
+  }
+
   async createRoom(_data: unknown): Promise<RoomDetail> {
     throw new Error('not implemented in stub');
   }

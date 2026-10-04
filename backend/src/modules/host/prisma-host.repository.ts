@@ -230,6 +230,18 @@ export class PrismaHostRepository implements HostRepository {
     await this.prisma.hotel.delete({ where: { id, hostId } });
   }
 
+  async countBookingsForHotel(id: string): Promise<number> {
+    return this.prisma.booking.count({
+      where: { room: { hotelId: id } },
+    });
+  }
+
+  async countBookingsForRoom(roomId: string): Promise<number> {
+    return this.prisma.booking.count({
+      where: { roomId },
+    });
+  }
+
   async createRoom(data: CreateRoomData): Promise<RoomDetail> {
     const room = await this.prisma.room.create({
       data: {

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { forbidden } from '../../common/errors/api-error.js';
+import { conflict, forbidden } from '../../common/errors/api-error.js';
 import {
   type CreateBlackoutData,
   type CreateHotelData,
@@ -102,6 +102,15 @@ export class HostService {
     const hotel = await this.repo.findByIdAndHost(id, hostId);
     if (!hotel) this.notOwner();
 
+    // Checked here rather than left to the FK: `Booking.room` is `onDelete: Restrict`, so the
+    // delete would otherwise fail as a P2003 that the translator renders as a 400 "Referenced
+    // record does not exist" — the wrong status for "this listing has guests in it", and one
+    // the controller documents as a 409. Any booking counts, cancelled or completed: the row
+    // is the record of a real stay and the schema will not let it be deleted.
+    if ((await this.repo.countBookingsForHotel(hotel.id)) > 0) {
+      throw conflict('HOTEL_HAS_BOOKINGS', 'This listing has bookings and cannot be deleted');
+    }
+
     await this.repo.delete(id, hostId);
   }
 
@@ -119,6 +128,12 @@ export class HostService {
 
   async deleteRoom(roomId: string, hostId: string): Promise<void> {
     await this.assertRoomOwner(roomId, hostId);
+
+    // Same rule as the hotel delete, one level down: the FK would answer a misleading 400.
+    if ((await this.repo.countBookingsForRoom(roomId)) > 0) {
+      throw conflict('ROOM_HAS_BOOKINGS', 'This room has bookings and cannot be deleted');
+    }
+
     await this.repo.deleteRoom(roomId, hostId);
   }
 
