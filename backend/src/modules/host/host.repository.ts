@@ -170,6 +170,13 @@ export interface HostBookingListPage {
 export interface HostRepository {
   findByHost(hostId: string): Promise<HostHotelListPage>;
   findByIdAndHost(id: string, hostId: string): Promise<HostHotelDetail | null>;
+  /**
+   * Whether any hotel already answers to this slug. Deliberately NOT owner-scoped:
+   * `hotels.slug` is globally unique, so the collision probe has to be global too —
+   * an owner-scoped probe can never see another host's row and would hand back a slug
+   * that then fails the insert with a P2002.
+   */
+  slugExists(slug: string): Promise<boolean>;
   create(data: CreateHotelData): Promise<HostHotelDetail>;
   update(id: string, hostId: string, data: UpdateHotelData): Promise<HostHotelDetail>;
   delete(id: string, hostId: string): Promise<void>;

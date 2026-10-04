@@ -147,14 +147,21 @@ export class HostService {
     return this.repo.findBookingsByHost(hostId);
   }
 
+  /**
+   * `base`, then `base-1`, `base-2`, … until nothing answers to the slug.
+   *
+   * The probe is slug-only and global: `hotels.slug` is `@unique` across every host, so
+   * a slug taken by *another* host collides just as hard as one taken by this host.
+   * Scoping the probe to the caller (as an ownership-scoped lookup would) would make this
+   * loop return a taken slug and hand the insert a P2002 → 409.
+   */
   private async generateUniqueSlug(base: string): Promise<string> {
     let slug = base;
     let suffix = 0;
-    while (true) {
-      const exists = await this.repo.findByIdAndHost(slug, 'dummy-host-id-for-slug-check');
-      if (!exists) return slug;
+    while (await this.repo.slugExists(slug)) {
       suffix++;
       slug = `${base}-${suffix}`;
     }
+    return slug;
   }
 }
