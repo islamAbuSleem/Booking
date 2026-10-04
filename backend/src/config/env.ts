@@ -111,7 +111,20 @@ export const envSchema = z.object({
    * app builds and the whole suite passes with no keys. Test mode only — no live keys,
    * ever (D7). `STRIPE_WEBHOOK_SECRET` belongs to T27 and is validated there.
    */
-  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_SECRET_KEY: z
+    .string()
+    .optional()
+    // D7 enforced rather than merely documented: `JWT_SECRET` is checked for the same
+    // reason, and a live key passing validation silently is the one mistake this whole
+    // section exists to prevent. Optional stays optional — a missing key is a 503 on the
+    // payment routes, not a boot failure.
+    .refine(
+      (value) => value === undefined || /^(sk|rk)_test_/.test(value),
+      {
+        message:
+          'STRIPE_SECRET_KEY must be a test key (sk_test_ or rk_test_) — no live key may ever be deployed',
+      },
+    ),
   /**
    * T27 — verifies webhook signatures. Optional at boot like the secret key; a webhook
    * call without it is a 503, and a forged signature is a 400 that names nothing about
