@@ -31,6 +31,9 @@ const HOTEL_LIST_SELECT = {
     select: { url: true },
   },
   _count: { select: { rooms: true } },
+  // The room→hotel map the booking counts need, in the same round trip: without it each
+  // grouped booking row cost another `room.findUnique`.
+  rooms: { select: { id: true, hotelId: true } },
 } satisfies Prisma.HotelSelect;
 
 const HOTEL_DETAIL_SELECT = {
@@ -134,13 +137,16 @@ export class PrismaHostRepository implements HostRepository {
     });
 
     const bookingCountByHotel = new Map<string, number>();
+    const hotelIdByRoom = new Map<string, string>();
+    for (const row of rows) {
+      for (const room of row.rooms) hotelIdByRoom.set(room.id, room.hotelId);
+    }
     for (const b of upcomingBookings) {
-      const room = await this.prisma.room.findUnique({
-        where: { id: b.roomId },
-        select: { hotelId: true },
-      });
-      if (room) {
-        bookingCountByHotel.set(room.hotelId, (bookingCountByHotel.get(room.hotelId) ?? 0) + b._count);
+      // Joined in memory from the select above: the grouped rows only carry a `roomId`, and a
+      // `room.findUnique` per row made the list endpoint cost `2 + R` queries against Neon.
+      const hotelId = hotelIdByRoom.get(b.roomId);
+      if (hotelId !== undefined) {
+        bookingCountByHotel.set(hotelId, (bookingCountByHotel.get(hotelId) ?? 0) + b._count);
       }
     }
 
