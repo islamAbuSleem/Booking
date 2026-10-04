@@ -4,6 +4,7 @@ import {
   type CreateBlackoutData,
   type CreateHotelData,
   type CreateRoomData,
+  type HotelStatus,
   type HostBookingListPage,
   type HostHotelDetail,
   type HostHotelListPage,
@@ -14,6 +15,20 @@ import {
   HOST_REPOSITORY,
 } from './host.repository.js';
 import { slugify } from '../../common/utils/slugify.js';
+
+/**
+ * The moderation state machine, in one allow-list. A host owns exactly one transition:
+ * suspend their own listing. Everything else — `PENDING` (re-queueing a rejected listing for
+ * re-approval with no admin involved), `PUBLISHED` (putting it back on the public shelf),
+ * `REJECTED` (self-rejecting into a state only an admin should set) — belongs to the T25
+ * moderation endpoints.
+ *
+ * Denying one value instead would leave `SUSPENDED -> PENDING` and `PUBLISHED -> PENDING`
+ * open, which is how a host unpublishes their own live listing. There is deliberately no
+ * admin bypass: an admin publishes through moderation, so this route has one rule for every
+ * caller.
+ */
+const HOST_SETTABLE_STATUS: HotelStatus = 'SUSPENDED';
 
 /**
  * T22 — host listing management service.
@@ -73,12 +88,11 @@ export class HostService {
     const hotel = await this.repo.findByIdAndHost(id, hostId);
     if (!hotel) this.notOwner();
 
-    // Publishing is the admin's moderation decision (T25), never a host write: a host can
-    // suspend their own listing but cannot put it back on the public shelf from here.
-    // There is deliberately no admin bypass — an admin publishes through the moderation
-    // endpoints, so this route has exactly one rule for every caller.
-    if (data.status === 'PUBLISHED') {
-      throw forbidden('FORBIDDEN', 'Only admins can publish listings');
+    if (data.status !== undefined && data.status !== HOST_SETTABLE_STATUS) {
+      throw forbidden(
+        'FORBIDDEN',
+        'Hosts can only suspend their own listing',
+      );
     }
 
     return this.repo.update(id, hostId, data);

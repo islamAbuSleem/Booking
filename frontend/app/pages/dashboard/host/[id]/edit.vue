@@ -144,8 +144,9 @@ const hotelStatus = ref<HotelStatus>('PENDING')
 /**
  * The status the server last reported. `status` is only sent when the host actually moved
  * it: an untouched field sent anyway makes every save of a live listing a 403
- * (`Only admins can publish listings`), and because the listing PATCH shares a `Promise.all`
- * with the room and blackout writes, those siblings succeed and the batch fails anyway.
+ * (`Hosts can only suspend their own listing`), and because the listing PATCH shares a
+ * `Promise.all` with the room and blackout writes, those siblings succeed and the batch
+ * fails anyway.
  */
 const savedStatus = ref<HotelStatus | null>(null)
 const rooms = ref<RoomEdit[]>([])

@@ -307,8 +307,34 @@ describe('Host API (e2e)', () => {
         .expect(403);
       expect(response.body).toEqual({
         success: false,
-        error: { code: 'FORBIDDEN', message: 'Only admins can publish listings' },
+        error: { code: 'FORBIDDEN', message: 'Hosts can only suspend their own listing' },
       });
+    });
+
+    it('403s a host re-queueing a rejected listing, or unpublishing a live one', async () => {
+      // Denying only `PUBLISHED` left every other status host-writable, so a host could
+      // re-approve their own rejection or pull a live listing off the shelf.
+      for (const status of ['PENDING', 'REJECTED'] as const) {
+        const response = await request(app.getHttpServer())
+          .patch(`/api/host/hotels/${HOTEL_ID}`)
+          .set('Cookie', cookieA)
+          .send({ status })
+          .expect(403);
+        expect(response.body).toEqual({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Hosts can only suspend their own listing' },
+        });
+      }
+    });
+
+    it('still writes the other fields when the status is left out entirely', async () => {
+      // The allow-list only speaks about `status`; a plain rename must not trip it.
+      const response = await request(app.getHttpServer())
+        .patch(`/api/host/hotels/${HOTEL_ID}`)
+        .set('Cookie', cookieA)
+        .send({ name: 'Casa Azul Nova' })
+        .expect(200);
+      expect(response.body.data).toMatchObject({ name: 'Casa Azul Nova' });
     });
 
     it('lets the owner suspend their own listing', async () => {
