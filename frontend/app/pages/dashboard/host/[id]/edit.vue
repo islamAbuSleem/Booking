@@ -28,6 +28,22 @@ const { t } = useI18n()
 
 const id = computed(() => String(route.params.id ?? ''))
 
+type HotelStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'
+
+/**
+ * The one status a host may set here. Publishing (and the other moderation outcomes) is the
+ * admin's decision, so `PUBLISHED` is never offered — offering it would sell a control that
+ * always answers 403.
+ */
+const HOST_SETTABLE_STATUS: HotelStatus = 'SUSPENDED'
+
+const STATUS_LABEL_KEYS: Record<HotelStatus, string> = {
+  PENDING: 'status.pending',
+  PUBLISHED: 'status.published',
+  REJECTED: 'status.rejected',
+  SUSPENDED: 'status.suspended',
+}
+
 interface RoomEdit {
   id: string
   name: string
@@ -124,7 +140,14 @@ interface Blackout {
 const hotelName = ref('')
 const hotelCity = ref('')
 const hotelDescription = ref('')
-const hotelStatus = ref<'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'>('PENDING')
+const hotelStatus = ref<HotelStatus>('PENDING')
+/**
+ * The status the server last reported. `status` is only sent when the host actually moved
+ * it: an untouched field sent anyway makes every save of a live listing a 403
+ * (`Only admins can publish listings`), and because the listing PATCH shares a `Promise.all`
+ * with the room and blackout writes, those siblings succeed and the batch fails anyway.
+ */
+const savedStatus = ref<HotelStatus | null>(null)
 const rooms = ref<RoomEdit[]>([])
 const blackouts = ref<Blackout[]>([])
 const newFrom = ref('')
@@ -144,6 +167,7 @@ watch(
     hotelCity.value = current.city
     hotelDescription.value = current.description
     hotelStatus.value = current.status
+    savedStatus.value = current.status
     rooms.value = current.rooms.map(room => ({
       id: room.id,
       name: room.name,
@@ -213,7 +237,7 @@ async function save(): Promise<void> {
         name: hotelName.value.trim(),
         description: hotelDescription.value.trim(),
         city: hotelCity.value.trim(),
-        status: hotelStatus.value,
+        ...(hotelStatus.value === savedStatus.value ? {} : { status: hotelStatus.value }),
       }),
       ...rooms.value.map(room =>
         updateRoom(room.id, { name: room.name.trim(), maxGuests: room.maxGuests }),
@@ -236,12 +260,17 @@ async function save(): Promise<void> {
   }
 }
 
-const statusOptions = computed(() => [
-  { value: 'PENDING', label: t('status.pending') },
-  { value: 'PUBLISHED', label: t('status.published') },
-  { value: 'REJECTED', label: t('status.rejected') },
-  { value: 'SUSPENDED', label: t('status.suspended') },
-])
+const statusOptions = computed(() => {
+  // The listing's current status stays in the list so an already-published listing shows
+  // its real value instead of a blank control; it is a reading of the state, not a target
+  // a host can pick. The only other choice is the one status they may set.
+  const current = hotelStatus.value
+  const options = [{ value: current, label: t(STATUS_LABEL_KEYS[current]) }]
+  if (current !== HOST_SETTABLE_STATUS) {
+    options.push({ value: HOST_SETTABLE_STATUS, label: t(STATUS_LABEL_KEYS[HOST_SETTABLE_STATUS]) })
+  }
+  return options
+})
 
 useSeoMeta({
   title: () => `${t('host.editTitle')} · ${t('common.brand')}`,
