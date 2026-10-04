@@ -80,6 +80,7 @@ function setup(options: { bookings?: Map<string, BookingRecord> } = {}) {
       return Promise.resolve(intent);
     },
     verifyWebhook: () => { throw new Error('unused'); },
+    receiptUrl: () => Promise.resolve(null),
   };
   const service = new PaymentsService(bookings, payments, stripe);
   return { service, keys, upserts };

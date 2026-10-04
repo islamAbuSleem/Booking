@@ -42,6 +42,17 @@ export interface StripeClient {
    * mocking the verifier.
    */
   verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event>;
+  /**
+   * The guest-facing receipt link for a succeeded intent, or null when there is none.
+   *
+   * Lives on this side of the boundary because the pinned API version no longer returns a
+   * `charges` list on the PaymentIntent — the only charge handle an event carries is
+   * `latest_charge`, which is a bare id on a webhook payload. Resolving it is SDK work.
+   *
+   * Never throws: a receipt is a nice-to-have, and failing the read must not turn a
+   * settled payment into a webhook Stripe retries forever.
+   */
+  receiptUrl(intent: Stripe.PaymentIntent): Promise<string | null>;
 }
 
 /**
@@ -96,6 +107,27 @@ export class StripePaymentClient implements StripeClient {
       clientSecret: intent.client_secret,
       status: mapStatus(intent.status),
     };
+  }
+
+  async receiptUrl(intent: Stripe.PaymentIntent): Promise<string | null> {
+    const secret = this.config.get<string>('STRIPE_SECRET_KEY');
+    const latest = intent.latest_charge;
+    // No key, or a payment method that settles without a charge at all.
+    if (!secret || !latest) return null;
+    try {
+      // An expanded `latest_charge` carries the receipt already; a webhook payload
+      // carries only the id, so that is one read against the charges resource.
+      const charge = typeof latest === 'string'
+        ? await new Stripe(secret).charges.retrieve(latest)
+        : latest;
+      const url = charge.receipt_url;
+      return typeof url === 'string' && url.length > 0 ? url : null;
+    } catch (error: unknown) {
+      // Logged, not thrown: the payment row is still correct without a receipt, and a
+      // 500 here would make Stripe redeliver a settlement that already happened.
+      this.logger.warn(`[payments] could not read the receipt for intent ${intent.id}`);
+      return null;
+    }
   }
 
   async verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event> {

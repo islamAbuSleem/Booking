@@ -49,6 +49,9 @@ const CONFIRMED_ID = '66666666-6666-4666-8666-666666666666';
 /** A second hold, reserved for the webhook tests so intent tests never touch it. */
 const WEBHOOK_ID = '77777777-7777-4777-8777-777777777777';
 const PASSWORD = 'correct-password-1';
+/** A webhook payload carries `latest_charge` as a bare id, never an expanded charge. */
+const CHARGE_ID = 'ch_test_receipt';
+const RECEIPT_URL = 'https://receipt.test/1';
 
 function booking(id: string, overrides: Partial<BookingRecord> = {}): BookingRecord {
   return {
@@ -87,6 +90,12 @@ const WEBHOOK_SECRET = 'whsec_test_only_never_deploy';
 class RecordingStripe implements StripeClient {
   readonly keys: string[] = [];
   private readonly byKey = new Map<string, CreatedIntent>();
+  /** Stands in for the `charges` resource the real client reads `latest_charge` from. */
+  private readonly charges = new Map<string, string>();
+
+  seedCharge(id: string, receiptUrl: string): void {
+    this.charges.set(id, receiptUrl);
+  }
 
   async createIntent(input: CreateIntentInput): Promise<CreatedIntent> {
     this.keys.push(input.idempotencyKey);
@@ -99,6 +108,13 @@ class RecordingStripe implements StripeClient {
     };
     this.byKey.set(input.idempotencyKey, intent);
     return intent;
+  }
+
+  async receiptUrl(intent: Stripe.PaymentIntent): Promise<string | null> {
+    const latest = intent.latest_charge;
+    if (!latest) return null;
+    const id = typeof latest === 'string' ? latest : latest.id;
+    return this.charges.get(id) ?? null;
   }
 
   async verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event> {
@@ -263,6 +279,7 @@ describe('Payments API (e2e)', () => {
     const ada = await seededUser(passwords, ADA_ID, 'ada@example.com');
     const bo = await seededUser(passwords, BO_ID, 'bo@example.com');
     stripe = new RecordingStripe();
+    stripe.seedCharge(CHARGE_ID, RECEIPT_URL);
     payments = new StubPayments();
     bookings = new StubBookings(
       new Map([
@@ -427,7 +444,7 @@ describe('Payments API (e2e)', () => {
           object: {
             id: intentId,
             object: 'payment_intent',
-            charges: { data: [{ receipt_url: 'https://receipt.test/1' }] },
+            latest_charge: CHARGE_ID,
           },
         },
       });
@@ -451,7 +468,7 @@ describe('Payments API (e2e)', () => {
         .get(`/api/payments/${WEBHOOK_ID}`)
         .set('Cookie', adaCookie)
         .expect(200);
-      expect(read.body.data).toMatchObject({ status: 'succeeded', receiptUrl: 'https://receipt.test/1' });
+      expect(read.body.data).toMatchObject({ status: 'succeeded', receiptUrl: RECEIPT_URL });
 
       const trip = await request(app.getHttpServer())
         .get(`/api/bookings/${WEBHOOK_ID}`)

@@ -152,7 +152,7 @@ export class PaymentsService {
       amountCents: payment.amountCents,
       currency: payment.currency,
       status: 'succeeded',
-      receiptUrl: receiptUrl(intent),
+      receiptUrl: await this.stripe.receiptUrl(intent),
     });
     this.logger.log(`[payments] booking ${booking.reference} CONFIRMED by intent ${intent.id}`);
   }
@@ -188,15 +188,4 @@ export class PaymentsService {
     }
     return booking;
   }
-}
-
-/**
- * The guest-facing receipt link, off the intent's first charge. Defensive at every
- * level: test fixtures and some payment methods carry no charges array, and a missing
- * receipt is null — never an empty string the client would render as a broken link.
- */
-function receiptUrl(intent: Stripe.PaymentIntent): string | null {
-  const charges = (intent as unknown as { charges?: { data?: { receipt_url?: unknown }[] } }).charges;
-  const url = charges?.data?.[0]?.receipt_url;
-  return typeof url === 'string' && url.length > 0 ? url : null;
 }
