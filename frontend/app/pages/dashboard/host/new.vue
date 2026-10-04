@@ -155,28 +155,38 @@ function finish(): void {
  * on another. A failure leaves the form exactly as it was: retyping a description to
  * retry a network call is the failure mode the UX rules forbid, and a listing that
  * was created but not finished is resumed from its edit page, not rebuilt.
+ *
+ * The hotel's id is recorded the moment it exists, before the work under it starts.
+ * Leaving it until the end meant a single failed upload or room left `createdId` empty,
+ * so "Finish listing" stayed enabled and the next click created a *second* listing —
+ * with no id anywhere on screen for the host to resume the first one from.
  */
 async function submit(): Promise<void> {
   if (submitting.value) return
   submitting.value = true
   submitError.value = ''
   try {
-    const hotel = await createHotel({
-      name: name.value.trim(),
-      description: description.value.trim(),
-      addressLine: addressLine.value.trim(),
-      city: city.value.trim(),
-      country: country.value.trim(),
-      // No location picker yet (maps are a placeholder per D28), so the listing is
-      // created at 0,0 rather than at an invented address. A real coordinate belongs
-      // to the map seam, not to this form.
-      lat: 0,
-      lng: 0,
-      starRating: Number(starRating.value),
-      checkInTime: checkInTime.value,
-      checkOutTime: checkOutTime.value,
-      amenityIds: [...amenityIds.value],
-    })
+    let hotelId = createdId.value
+    if (!hotelId) {
+      const hotel = await createHotel({
+        name: name.value.trim(),
+        description: description.value.trim(),
+        addressLine: addressLine.value.trim(),
+        city: city.value.trim(),
+        country: country.value.trim(),
+        // No location picker yet (maps are a placeholder per D28), so the listing is
+        // created at 0,0 rather than at an invented address. A real coordinate belongs
+        // to the map seam, not to this form.
+        lat: 0,
+        lng: 0,
+        starRating: Number(starRating.value),
+        checkInTime: checkInTime.value,
+        checkOutTime: checkOutTime.value,
+        amenityIds: [...amenityIds.value],
+      })
+      hotelId = hotel.id
+      createdId.value = hotel.id
+    }
 
     const staged = stagedPhotos.value
     await Promise.all([
@@ -185,7 +195,7 @@ async function submit(): Promise<void> {
         if (!uploaded) return Promise.resolve()
         // Attach order is creation order: the first done photo carries the cover flag.
         return attachUpload({
-          hotelId: hotel.id,
+          hotelId,
           url: uploaded.url,
           publicId: uploaded.publicId,
           isCover: index === 0,
@@ -202,11 +212,10 @@ async function submit(): Promise<void> {
           prices: [{ currency: 'USD', priceCents: Math.round(room.priceDollars * 100) }],
           images: [],
         }
-        return createRoom(hotel.id, body)
+        return createRoom(hotelId, body)
       }),
     ])
 
-    createdId.value = hotel.id
     finished.value = true
   }
   catch (error: unknown) {
@@ -524,7 +533,19 @@ useSeoMeta({
           tone="danger"
           class="mt-4"
         >
-          {{ submitError }}
+          <p>{{ submitError }}</p>
+          <!--
+            The listing exists whenever there is an id, so the host is given the way out
+            the doc comment promises. Without it the only route forward is another
+            "Finish listing", which is the duplicate-listing click.
+          -->
+          <NuxtLink
+            v-if="createdId"
+            :to="`/dashboard/host/${createdId}/edit`"
+            class="text-link mt-3 inline-flex h-11 items-center text-sm underline-offset-4 hover:underline"
+          >
+            {{ $t('host.editTitle') }}
+          </NuxtLink>
         </BaseAlert>
 
         <div class="mt-6 flex flex-wrap gap-3">
