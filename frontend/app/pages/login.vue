@@ -11,7 +11,7 @@
  */
 import { loginSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
-import { ApiRequestError } from '~/utils/api'
+import { isApiError } from '~/utils/api'
 import { useAuth } from '~/composables/useAuth'
 
 const route = useRoute()
@@ -48,7 +48,12 @@ async function submit(): Promise<void> {
     await router.push(redirectTarget.value)
   }
   catch (error) {
-    formError.value = error instanceof ApiRequestError
+    // Branch on the code, never on the message (context/code-standards.md). Only a
+    // credential answer says the password is wrong: reading every `ApiRequestError` that
+    // way reported a 500, a 429 and a dead backend as a bad password, telling the guest
+    // their credentials were at fault when the service was.
+    formError.value = isApiError(error)
+      && (error.code === 'INVALID_CREDENTIALS' || error.code === 'UNAUTHORIZED')
       ? t('auth.invalidCredentials')
       : t('common.unexpectedError')
   }

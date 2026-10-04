@@ -7,7 +7,7 @@
  */
 import { registerSchema } from '~/utils/validation'
 import type { FieldErrors } from '~/utils/validation'
-import { ApiRequestError } from '~/utils/api'
+import { isApiError } from '~/utils/api'
 import { useAuth } from '~/composables/useAuth'
 
 const route = useRoute()
@@ -55,7 +55,9 @@ async function submit(): Promise<void> {
   }
   catch (error) {
     // The API owns the "that email is taken" answer; the client only maps it to prose.
-    formError.value = error instanceof ApiRequestError
+    // Branched on the code so a 500 or a transport failure is not reported as a duplicate
+    // email — the mirror of the same bug on /login.
+    formError.value = isApiError(error) && error.code === 'EMAIL_TAKEN'
       ? t('auth.emailExists')
       : t('common.unexpectedError')
   }
