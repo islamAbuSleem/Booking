@@ -543,6 +543,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hotels/{hotelId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A hotel’s visible reviews, newest first
+         * @description Public, like the detail page that renders it. Only VISIBLE rows; hidden ones are T25 moderation’s to surface, not this list’s. The average is over the same VISIBLE set, so the breakdown and the number above it can never disagree.
+         */
+        get: operations["ReviewsController_list"];
+        put?: never;
+        /**
+         * Review a completed stay
+         * @description One review per booking, written only by the booking’s owner and only once the stay is COMPLETED. A confirmed-but-not-stayed booking answers 400 `INVALID_REVIEW_STATE`; a second review for the same stay answers 409 `ALREADY_REVIEWED`. Unknown emails and wrong passwords share one code elsewhere; here unknown bookings and other guests’ bookings stay distinguishable (404 vs 403) exactly like the booking routes, because the form branches on them.
+         */
+        post: operations["ReviewsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}/reviewable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether the caller may review this booking right now
+         * @description The review form’s gate: it renders only on `{ canReview: true }`, and the `reason` selects the message otherwise. A non-completed stay or an existing review is data here, not an error — the 404/403/400/409 answers belong to the write, not to the question.
+         */
+        get: operations["ReviewsController_reviewable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1141,6 +1185,59 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["BlackoutDate"];
+        };
+        CreateReview: {
+            /** Format: uuid */
+            bookingId: string;
+            rating: number;
+            title: string;
+            body: string;
+        };
+        Review: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            bookingId: string;
+            author: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            /** Format: uuid */
+            hotelId: string;
+            rating: number;
+            title: string;
+            body: string;
+            /** @enum {string} */
+            status: "VISIBLE" | "HIDDEN";
+            /** @description ISO 8601 instant the review was written. */
+            createdAt: string;
+        };
+        ReviewListData: {
+            items: components["schemas"]["Review"][];
+            /** @description Total VISIBLE reviews, ignoring pagination. */
+            total: number;
+            average: number | null;
+        };
+        ReviewEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Review"];
+        };
+        ReviewListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ReviewListData"];
+        };
+        ReviewableData: {
+            canReview: boolean;
+            /** @enum {string} */
+            reason?: "NOT_COMPLETED" | "ALREADY_REVIEWED";
+        };
+        ReviewableEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ReviewableData"];
         };
     };
     responses: never;
@@ -2524,6 +2621,169 @@ export interface operations {
             };
             /** @description Not a host or admin. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ReviewsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug — the same identifier the detail route takes. */
+                hotelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page, the total, and the 1–5 average (null when unreviewed). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewListEnvelope"];
+                };
+            };
+            /** @description The query string failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such hotel. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ReviewsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel the stay was at, by uuid. */
+                hotelId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReview"];
+            };
+        };
+        responses: {
+            /** @description The review that was created, VISIBLE immediately. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewEnvelope"];
+                };
+            };
+            /** @description The body failed validation, or the stay is not COMPLETED. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking, or not for this hotel. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description This stay already has a review. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ReviewsController_reviewable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The verdict, with a machine-readable reason when negative. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewableEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

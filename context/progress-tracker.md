@@ -70,7 +70,7 @@
 - [x] T21 Cloudinary upload
 - [x] T22 Host listing management API
 - [x] T23 Wire auth into the frontend
-- [ ] T24 Reviews
+- [x] T24 Reviews
 - [ ] T25 Admin moderation
 
 ### Phase 3 — Advanced
@@ -523,6 +523,21 @@
 - **D64 — `BaseInput` accepts `time`, and the wizard's star rating rides as text.**
   `BaseSelect` is string-modelled, so the 1–5 rating is selected as `'3'` and converted
   with `Number()` at the submit edge rather than widening the shared component's model.
+- **D65 — T24 checks five rules cheapest-first, each with its own answer.** Missing
+  booking → 404 `BOOKING_NOT_FOUND`; foreign booking → 403 `NOT_BOOKING_OWNER` (the T20
+  code); booking from another hotel → 404 (posted *under* a hotel, so "not found here");
+  non-COMPLETED stay → 400 `INVALID_REVIEW_STATE`; second review → 409
+  `ALREADY_REVIEWED` on the unique `bookingId`. The aggregate is derived at read time
+  from the same VISIBLE rows — "recalculate on write" is a no-op by construction, and
+  there is no column to drift. `GET reviewable` returns data, not errors, for the two
+  negative states.
+- **D66 — the reviews list resolves uuid-or-slug so it never waterfalls behind the
+  detail fetch.** Both run concurrently on the raw route param. The card renders a
+  `ReviewView`, not the mock shape: the API carries no author location (dropped, never
+  invented) and its `createdAt` instant is truncated to the day, because
+  `formatStayDate` pins UTC midnight and a full instant would shift it. Fixture reviews
+  render only under a fixture hotel. The booking-detail form renders only for a live
+  COMPLETED booking with `canReview: true`; fixtures are read-only.
 
 ## Notes
 
