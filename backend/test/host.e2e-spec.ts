@@ -6,6 +6,7 @@ import { configureApp } from '../src/bootstrap.js';
 import { PasswordService } from '../src/modules/auth/password.service.js';
 import {
   HOST_REPOSITORY,
+  type CreateBlackoutData,
   type HostHotelDetail,
   type HostRepository,
 } from '../src/modules/host/host.repository.js';
@@ -33,6 +34,11 @@ const HOTEL_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const ROOM_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const BLACKOUT_ID = 'abababab-abab-4bab-8bab-abababababab';
 const PASSWORD = 'correct-password-1';
+
+/** A blackout `Date` back to the `YYYY-MM-DD` the API speaks in. */
+function toDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 const HOTEL: HostHotelDetail = {
   id: HOTEL_ID,
@@ -62,6 +68,10 @@ class OneHotelWorld implements HostRepository {
   /** Set by the delete-blocked tests: which side has bookings on it. */
   bookingsOnHotel = 0;
   bookingsOnRoom = 0;
+
+  /** Set by the blackout tests: ranges the hotel is already closed for. */
+  blackouts: Array<{ startsOn: string; endsOn: string }> = [];
+  createdBlackouts: string[] = [];
 
   async findByHost(hostId: string) {
     return hostId === HOST_A
@@ -117,8 +127,26 @@ class OneHotelWorld implements HostRepository {
     throw new Error('unused');
   }
 
-  async createBlackout(): Promise<never> {
-    throw new Error('unused') as never;
+  async hasOverlappingBlackout(
+    _hotelId: string,
+    startsOn: Date,
+    endsOn: Date,
+  ): Promise<boolean> {
+    return this.blackouts.some(
+      (row) => row.startsOn <= toDay(endsOn) && row.endsOn >= toDay(startsOn),
+    );
+  }
+
+  async createBlackout(data: CreateBlackoutData) {
+    this.createdBlackouts.push(`${data.startsOn.toISOString().slice(0, 10)}..${data.endsOn.toISOString().slice(0, 10)}`);
+    return {
+      id: `blackout-${this.createdBlackouts.length}`,
+      roomId: data.roomId,
+      hotelId: data.hotelId,
+      startsOn: data.startsOn,
+      endsOn: data.endsOn,
+      reason: data.reason,
+    };
   }
 
   async findBookingsByHost() {
@@ -457,6 +485,76 @@ describe('Host API (e2e)', () => {
         .expect(204);
       expect(response.text).toBe('');
       expect(world.deleted).toContain(`blackout:${BLACKOUT_ID}`);
+    });
+  });
+
+  describe('POST /api/host/hotels/:id/blackouts', () => {
+    beforeEach(() => {
+      world.blackouts = [{ startsOn: '2026-03-10', endsOn: '2026-03-20' }];
+      world.createdBlackouts.length = 0;
+    });
+
+    it('201s a range that reaches no existing blackout', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/blackouts`)
+        .set('Cookie', cookieA)
+        .send({ roomId: null, startsOn: '2026-04-01', endsOn: '2026-04-03', reason: null })
+        .expect(201);
+      expect(response.body.data).toMatchObject({ startsOn: '2026-04-01', endsOn: '2026-04-03' });
+      expect(world.createdBlackouts).toEqual(['2026-04-01..2026-04-03']);
+    });
+
+    it('400s an inverted range instead of persisting it', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/blackouts`)
+        .set('Cookie', cookieA)
+        .send({ roomId: null, startsOn: '2026-05-10', endsOn: '2026-05-01', reason: null })
+        .expect(400);
+      expect(response.body.error).toMatchObject({
+        code: 'VALIDATION_FAILED',
+        details: [expect.objectContaining({ path: 'endsOn' })],
+      });
+      expect(world.createdBlackouts).toEqual([]);
+    });
+
+    it('400s a range overlapping an existing one, whichever side reaches in', async () => {
+      for (const range of [
+        { startsOn: '2026-03-19', endsOn: '2026-03-25' },
+        { startsOn: '2026-03-05', endsOn: '2026-03-11' },
+        { startsOn: '2026-03-01', endsOn: '2026-03-31' },
+      ]) {
+        const response = await request(app.getHttpServer())
+          .post(`/api/host/hotels/${HOTEL_ID}/blackouts`)
+          .set('Cookie', cookieA)
+          .send({ ...range, roomId: null, reason: null })
+          .expect(400);
+        expect(response.body.error.code).toBe('BAD_REQUEST');
+      }
+      // A blackout is inclusive on both ends, so touching it is an overlap too.
+      const edge = await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/blackouts`)
+        .set('Cookie', cookieA)
+        .send({ roomId: null, startsOn: '2026-03-20', endsOn: '2026-03-20', reason: null })
+        .expect(400);
+      expect(edge.body.error.code).toBe('BAD_REQUEST');
+      expect(world.createdBlackouts).toEqual([]);
+    });
+
+    it('201s a range that only touches the day after the existing one', async () => {
+      await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/blackouts`)
+        .set('Cookie', cookieA)
+        .send({ roomId: null, startsOn: '2026-03-21', endsOn: '2026-03-22', reason: null })
+        .expect(201);
+    });
+
+    it('403s host B before any overlap check answers for him', async () => {
+      const response = await request(app.getHttpServer())
+        .post(`/api/host/hotels/${HOTEL_ID}/blackouts`)
+        .set('Cookie', cookieB)
+        .send({ roomId: null, startsOn: '2026-03-01', endsOn: '2026-03-02', reason: null })
+        .expect(403);
+      expect(response.body.error.code).toBe('NOT_HOTEL_OWNER');
     });
   });
 

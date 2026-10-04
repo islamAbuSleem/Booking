@@ -194,6 +194,19 @@ export interface HostRepository {
   updateRoom(roomId: string, hostId: string, data: UpdateRoomData): Promise<RoomDetail>;
   deleteRoom(roomId: string, hostId: string): Promise<void>;
   createBlackout(data: CreateBlackoutData): Promise<{ id: string; roomId: string | null; hotelId: string; startsOn: Date; endsOn: Date; reason: string | null }>;
+  /**
+   * Whether this hotel already has a blackout reaching the given range.
+   *
+   * Scoped to the hotel, not to one room, because that is exactly what
+   * `buildOverlappingBlackoutsWhere` blocks a stay against: a `roomId: null` row closes the
+   * whole property, so two ranges in the same hotel must not reach into each other whatever
+   * room they name. The comparison is inclusive on both ends, like the blackout itself.
+   */
+  hasOverlappingBlackout(
+    hotelId: string,
+    startsOn: Date,
+    endsOn: Date,
+  ): Promise<boolean>;
   deleteBlackout(id: string, hostId: string): Promise<void>;
   findBookingsByHost(hostId: string): Promise<HostBookingListPage>;
   /**

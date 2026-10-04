@@ -335,6 +335,24 @@ export class PrismaHostRepository implements HostRepository {
     return blackout;
   }
 
+  async hasOverlappingBlackout(
+    hotelId: string,
+    startsOn: Date,
+    endsOn: Date,
+  ): Promise<boolean> {
+    const row = await this.prisma.blackoutDate.findFirst({
+      where: {
+        hotelId,
+        // A blackout is inclusive on both ends, so it reaches this range when it starts on or
+        // before the last night and ends on or after the first.
+        startsOn: { lte: endsOn },
+        endsOn: { gte: startsOn },
+      },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
   async deleteBlackout(id: string, hostId: string): Promise<void> {
     const hotelIds = await this.getHotelIdsByHost(hostId);
     await this.prisma.blackoutDate.delete({

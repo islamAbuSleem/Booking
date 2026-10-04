@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { conflict, forbidden } from '../../common/errors/api-error.js';
+import { badRequest, conflict, forbidden } from '../../common/errors/api-error.js';
 import {
   type CreateBlackoutData,
   type CreateHotelData,
@@ -146,11 +146,24 @@ export class HostService {
       if (!room) this.notOwner();
     }
 
+    const startsOn = new Date(data.startsOn);
+    const endsOn = new Date(data.endsOn);
+
+    // Ordering is the schema's (it can see both fields); overlap needs the hotel's existing
+    // rows, so it is the service's. The controller documents this as a 400 and the client-side
+    // check in the edit form is not a substitute: any direct API caller bypasses it.
+    if (endsOn.getTime() < startsOn.getTime()) {
+      throw badRequest('Blackout dates must not end before they start');
+    }
+    if (await this.repo.hasOverlappingBlackout(hotelId, startsOn, endsOn)) {
+      throw badRequest('Blackout dates must not overlap an existing blackout');
+    }
+
     const result = await this.repo.createBlackout({
       ...data,
       hotelId,
-      startsOn: new Date(data.startsOn),
-      endsOn: new Date(data.endsOn),
+      startsOn,
+      endsOn,
     });
 
     return {

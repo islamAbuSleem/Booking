@@ -3447,23 +3447,16 @@
         "type": "object",
         "properties": {
           "roomId": {
-            "nullable": true,
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            "$ref": "#/components/schemas/CreateBlackout-__schema0"
           },
           "startsOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "$ref": "#/components/schemas/CreateBlackout-__schema1"
           },
           "endsOn": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "$ref": "#/components/schemas/CreateBlackout-__schema2"
           },
           "reason": {
-            "nullable": true,
-            "type": "string",
-            "maxLength": 200
+            "$ref": "#/components/schemas/CreateBlackout-__schema3"
           }
         },
         "required": [
@@ -3473,6 +3466,25 @@
           "reason"
         ],
         "additionalProperties": false
+      },
+      "CreateBlackout-__schema0": {
+        "nullable": true,
+        "type": "string",
+        "format": "uuid",
+        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+      },
+      "CreateBlackout-__schema1": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "CreateBlackout-__schema2": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+      },
+      "CreateBlackout-__schema3": {
+        "nullable": true,
+        "type": "string",
+        "maxLength": 200
       },
       "ImageSummary": {
         "type": "object",
