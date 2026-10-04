@@ -38,10 +38,18 @@ const REVIEW_SELECT = {
 /**
  * T25 — Prisma implementation of `AdminRepository`.
  *
- * Moderation reads are deliberately unpaginated: the console serves a team, not the
- * public, and the queues are short. If they ever outgrow memory the seam is these two
+ * Moderation reads are bounded rather than paginated: the console serves a team, not the
+ * public, so there is no paging UI to drive — but "short queue" is not a guarantee, and an
+ * unbounded `findMany` on `users` loads every row and every `contains` search compiles to
+ * an `ILIKE '%term%'` no index can serve. The seam if they ever outgrow this cap is these
  * list methods — nothing above them changes.
  */
+
+/**
+ * Rows one console screen may pull. Generous enough that no realistic queue is truncated,
+ * and bounded so a full-table load is never one refresh away.
+ */
+const MODERATION_ROW_CAP = 500;
 @Injectable()
 export class PrismaAdminRepository implements AdminRepository {
   // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`, so an
@@ -92,6 +100,7 @@ export class PrismaAdminRepository implements AdminRepository {
       where: status ? { status } : {},
       select: HOTEL_SELECT,
       orderBy: { createdAt: 'desc' },
+      take: MODERATION_ROW_CAP,
     });
     return rows.map((row) => ({
       id: row.id,
@@ -141,6 +150,7 @@ export class PrismaAdminRepository implements AdminRepository {
       },
       select: { id: true, email: true, name: true, role: true, status: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
+      take: MODERATION_ROW_CAP,
     });
     return rows.map((row) => ({
       id: row.id,
@@ -173,6 +183,7 @@ export class PrismaAdminRepository implements AdminRepository {
       where: status ? { status } : {},
       select: REVIEW_SELECT,
       orderBy: { createdAt: 'desc' },
+      take: MODERATION_ROW_CAP,
     });
     return rows.map((row) => ({
       id: row.id,
