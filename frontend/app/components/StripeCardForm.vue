@@ -56,6 +56,12 @@ onUnmounted(() => {
  * data (`ok: false` + Stripe's message), not a throw — the page shows it beside a
  * retry that calls this again. Only a missing element (script blocked, key missing)
  * reports unavailability instead.
+ *
+ * `return_url` is mandatory for any card that needs 3-D Secure: without it that
+ * authentication redirect has nowhere to come back to and the payment fails with an
+ * error the guest cannot act on. `redirect: 'if_required'` keeps the common
+ * non-redirecting card on this page, so only a card that actually challenges leaves it —
+ * and this page recovers on re-entry by re-reading the booking from the API.
  */
 async function pay(): Promise<{ ok: true } | { ok: false, message: string }> {
   if (!stripe || !element) {
@@ -63,6 +69,8 @@ async function pay(): Promise<{ ok: true } | { ok: false, message: string }> {
   }
   const result = await stripe.confirmCardPayment(props.clientSecret, {
     payment_method: { card: element },
+    return_url: window.location.href,
+    redirect: 'if_required',
   })
   if (result.error) {
     return { ok: false, message: result.error.message ?? 'declined' }
