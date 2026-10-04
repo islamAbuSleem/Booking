@@ -31,6 +31,7 @@ const GUEST = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const ADMIN = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const HOTEL_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const ROOM_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const BLACKOUT_ID = 'abababab-abab-4bab-8bab-abababababab';
 const PASSWORD = 'correct-password-1';
 
 const HOTEL: HostHotelDetail = {
@@ -56,6 +57,8 @@ const HOTEL: HostHotelDetail = {
 
 /** One hotel, one owner. Every id that is not HOTEL_ID belongs to nobody. */
 class OneHotelWorld implements HostRepository {
+  readonly deleted: string[] = [];
+
   async findByHost(hostId: string) {
     return hostId === HOST_A
       ? { items: [{ id: HOTEL.id, slug: HOTEL.slug, name: HOTEL.name, city: HOTEL.city, country: HOTEL.country, starRating: HOTEL.starRating, status: HOTEL.status, coverImageUrl: null, roomsCount: 0, upcomingBookingsCount: 0, createdAt: new Date().toISOString() }], total: 1 }
@@ -83,7 +86,15 @@ class OneHotelWorld implements HostRepository {
   }
 
   async delete(): Promise<void> {
-    throw new Error('unused');
+    this.deleted.push('hotel');
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    this.deleted.push(`room:${roomId}`);
+  }
+
+  async deleteBlackout(id: string): Promise<void> {
+    this.deleted.push(`blackout:${id}`);
   }
 
   async createRoom(): Promise<never> {
@@ -94,16 +105,8 @@ class OneHotelWorld implements HostRepository {
     throw new Error('unused');
   }
 
-  async deleteRoom(): Promise<void> {
-    throw new Error('unused');
-  }
-
   async createBlackout(): Promise<never> {
     throw new Error('unused') as never;
-  }
-
-  async deleteBlackout(): Promise<void> {
-    throw new Error('unused');
   }
 
   async findBookingsByHost() {
@@ -114,8 +117,8 @@ class OneHotelWorld implements HostRepository {
     return roomId === ROOM_ID ? HOST_A : null;
   }
 
-  async findBlackoutHost(): Promise<string | null> {
-    return null;
+  async findBlackoutHost(id: string): Promise<string | null> {
+    return id === BLACKOUT_ID ? HOST_A : null;
   }
 }
 
@@ -172,6 +175,7 @@ describe('Host API (e2e)', () => {
   let cookieB: string;
   let cookieGuest: string;
   let cookieAdmin: string;
+  let world: OneHotelWorld;
 
   beforeAll(async () => {
     const passwords = new PasswordService();
@@ -198,7 +202,7 @@ describe('Host API (e2e)', () => {
         ),
       )
       .overrideProvider(HOST_REPOSITORY)
-      .useValue(new OneHotelWorld())
+      .useValue((world = new OneHotelWorld()))
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -335,6 +339,40 @@ describe('Host API (e2e)', () => {
         .send({ name: 'Stolen Room' })
         .expect(403);
       expect(response.body.error.code).toBe('NOT_HOTEL_OWNER');
+    });
+  });
+
+  /**
+   * The client only tolerates an empty body on a `DELETE`, so a void handler that keeps
+   * Nest's default 200 answers `{"success":true}` — no `data` key — and every delete call
+   * site throws `BAD_RESPONSE` even though the delete worked.
+   */
+  describe('DELETE routes answer 204 with no body', () => {
+    it('204s the hotel delete with an empty body', async () => {
+      const response = await request(app.getHttpServer())
+        .delete(`/api/host/hotels/${HOTEL_ID}`)
+        .set('Cookie', cookieA)
+        .expect(204);
+      expect(response.text).toBe('');
+      expect(world.deleted).toContain('hotel');
+    });
+
+    it('204s the room delete with an empty body', async () => {
+      const response = await request(app.getHttpServer())
+        .delete(`/api/host/hotels/rooms/${ROOM_ID}`)
+        .set('Cookie', cookieA)
+        .expect(204);
+      expect(response.text).toBe('');
+      expect(world.deleted).toContain(`room:${ROOM_ID}`);
+    });
+
+    it('204s the blackout delete with an empty body', async () => {
+      const response = await request(app.getHttpServer())
+        .delete(`/api/host/hotels/blackouts/${BLACKOUT_ID}`)
+        .set('Cookie', cookieA)
+        .expect(204);
+      expect(response.text).toBe('');
+      expect(world.deleted).toContain(`blackout:${BLACKOUT_ID}`);
     });
   });
 

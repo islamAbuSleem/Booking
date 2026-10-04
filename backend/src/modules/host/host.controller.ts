@@ -4,6 +4,8 @@ import {
   Post,
   Patch,
   Delete,
+  HttpCode,
+  HttpStatus,
   Param,
   Body,
   Inject,
@@ -12,6 +14,7 @@ import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth, ApiParam } from '@ne
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
+import { SkipEnvelope } from '../../common/envelope.js';
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import {
   createHotelSchema,
@@ -224,6 +227,8 @@ export class HostController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete my hotel',
     description: 'Deletes the hotel and all its rooms, images, and blackout dates. Only if no confirmed bookings exist.',
@@ -359,6 +364,8 @@ export class HostController {
   }
 
   @Delete('rooms/:roomId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete a room',
     description: 'Deletes the room and its blackout dates. Only if no confirmed bookings exist for this room.',
@@ -453,6 +460,8 @@ export class HostController {
   }
 
   @Delete('blackouts/:blackoutId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @SkipEnvelope()
   @ApiOperation({
     summary: 'Delete a blackout date',
   })
