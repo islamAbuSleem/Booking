@@ -1,7 +1,13 @@
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint', '@nuxtjs/i18n', '@nuxt/fonts', '@nuxtjs/sitemap', '@nuxtjs/robots'],
+  modules: [
+    '@nuxt/eslint',
+    '@nuxtjs/i18n',
+    '@nuxt/fonts',
+    '@nuxtjs/sitemap',
+    '@nuxtjs/robots',
+  ],
 
   css: ['~/assets/css/main.css'],
 
@@ -12,7 +18,7 @@ export default defineNuxtConfig({
     public: {
       apiBase: 'http://localhost:3000',
       /**
-       * T28 — Stripe publishable key (test mode: `pk_test_…`). Public by design: it
+       * T28 — Stripe publishable key (test mode: `pk_test_...`). Public by design: it
        * identifies the account to Stripe.js and cannot charge anything alone. Empty
        * disables the card form with a configuration notice instead of failing obscurely
        * at confirm time. Secret keys never leave the API.
@@ -32,6 +38,10 @@ export default defineNuxtConfig({
    * from the incoming request host at runtime, so deploy domains need no rebuild.
    * Crawlable locs stay correct behind proxies via `x-forwarded-host`.
    */
+  future: {
+    compatibilityVersion: 4,
+  },
+
   sitemap: {
     sources: ['/api/__sitemap__/urls'],
     exclude: [
@@ -73,6 +83,7 @@ export default defineNuxtConfig({
   // @nuxtjs/google-fonts. It is ZERO-CONFIG in 0.14 — there is no `fonts` key in
   // NuxtConfig. It reads the families declared in main.css, downloads them, and
   // applies automatic metric fallbacks. Do not add a `fonts:` block here.
+  fonts: {},
 
   i18n: {
     // T2 stands this up so later tickets extract strings as they build. T30
@@ -81,6 +92,7 @@ export default defineNuxtConfig({
     defaultLocale: 'en',
     locales: [{ code: 'en', language: 'en-US', name: 'English', file: 'en.json' }],
     // One locale makes browser detection pointless and it can cause a surprise redirect.
-    detectBrowserLanguage: false,
+    detectBrowserLanguage: false
   },
-})
+}
+)
