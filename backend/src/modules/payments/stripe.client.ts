@@ -68,6 +68,15 @@ export class StripePaymentClient implements StripeClient {
   // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`.
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
+  /**
+   * The SDK, with the retry policy context/library-docs.md prescribes: one network blip
+   * must not fail payment creation outright. Safe here because every call carries an
+   * idempotency key or is a pure read.
+   */
+  private stripe(secret: string): Stripe {
+    return new Stripe(secret, { maxNetworkRetries: 2 });
+  }
+
   async createIntent(input: CreateIntentInput): Promise<CreatedIntent> {
     const secret = this.config.get<string>('STRIPE_SECRET_KEY');
     if (!secret) {
@@ -78,17 +87,24 @@ export class StripePaymentClient implements StripeClient {
       );
     }
 
-    const stripe = new Stripe(secret);
-    const intent = await stripe.paymentIntents.create(
-      {
-        amount: input.amountCents,
-        currency: input.currency.toLowerCase(),
-        metadata: { bookingId: input.bookingId, reference: input.reference },
-        // Test mode only (D7). The browser confirms with the test card; the API never
-        // sees card data, and no live key may ever be deployed.
-      },
-      { idempotencyKey: input.idempotencyKey },
-    );
+    const stripe = this.stripe(secret);
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await stripe.paymentIntents.create(
+        {
+          amount: input.amountCents,
+          currency: input.currency.toLowerCase(),
+          metadata: { bookingId: input.bookingId, reference: input.reference },
+          // Test mode only (D7). The browser confirms with the test card; the API never
+          // sees card data, and no live key may ever be deployed.
+        },
+        { idempotencyKey: input.idempotencyKey },
+      );
+    } catch (error: unknown) {
+      // The SDK raises its own classes, none of them an HttpException, so an outage, a 429
+      // or a rejected amount would otherwise render as an opaque 500 INTERNAL_ERROR.
+      throw stripeFailure(error);
+    }
 
     if (!intent.client_secret) {
       // A successful create always carries one; its absence means the provider
@@ -118,11 +134,11 @@ export class StripePaymentClient implements StripeClient {
       // An expanded `latest_charge` carries the receipt already; a webhook payload
       // carries only the id, so that is one read against the charges resource.
       const charge = typeof latest === 'string'
-        ? await new Stripe(secret).charges.retrieve(latest)
+        ? await this.stripe(secret).charges.retrieve(latest)
         : latest;
       const url = charge.receipt_url;
       return typeof url === 'string' && url.length > 0 ? url : null;
-    } catch (error: unknown) {
+    } catch {
       // Logged, not thrown: the payment row is still correct without a receipt, and a
       // 500 here would make Stripe redeliver a settlement that already happened.
       this.logger.warn(`[payments] could not read the receipt for intent ${intent.id}`);
@@ -154,6 +170,59 @@ export class StripePaymentClient implements StripeClient {
       );
     }
   }
+}
+
+/**
+ * Turns a Stripe SDK error into the `ApiError` the client contract declares.
+ *
+ * Each class gets the answer a caller can act on, and they are genuinely different
+ * situations: a throttled call is worth retrying, a rejected amount is the guest's stay
+ * that cannot be charged, and credentials are a misconfigured deployment. Collapsing
+ * them all into one 500 makes a provider outage indistinguishable from a server bug.
+ *
+ * Anything unrecognised becomes a 502 rather than being allowed to reach the exception
+ * filter, so no raw SDK error can render as `INTERNAL_ERROR`.
+ *
+ * The message never quotes the provider's detail: Stripe's messages carry the rejected
+ * key, which is a credential.
+ */
+export function stripeFailure(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+
+  if (error instanceof Stripe.errors.StripeAuthenticationError
+    || error instanceof Stripe.errors.StripePermissionError) {
+    // A key that exists but is refused is the same deployment fault as no key at all,
+    // and no retry fixes either.
+    return new ApiError(
+      HttpStatus.SERVICE_UNAVAILABLE,
+      'STRIPE_NOT_CONFIGURED',
+      'Payments are not configured on this deployment',
+    );
+  }
+
+  if (error instanceof Stripe.errors.StripeRateLimitError) {
+    return new ApiError(
+      HttpStatus.TOO_MANY_REQUESTS,
+      'RATE_LIMITED',
+      'The payment provider is busy. Try again in a moment',
+    );
+  }
+
+  if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+    // Stripe refused the request itself — an amount under the currency minimum, an
+    // unknown currency. That is this booking's problem to fix, not the server's.
+    return new ApiError(
+      HttpStatus.BAD_REQUEST,
+      'BAD_REQUEST',
+      'The payment provider rejected this amount',
+    );
+  }
+
+  return new ApiError(
+    HttpStatus.BAD_GATEWAY,
+    'PAYMENT_FAILED',
+    'The payment provider could not be reached',
+  );
 }
 
 /** Stripe's lifecycle collapses onto the three states this ticket can produce. */
