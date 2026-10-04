@@ -8,6 +8,8 @@ import {
 } from '../../prisma/bookings.repository.js';
 import {
   PAYMENTS_REPOSITORY,
+  type PaymentRecord,
+  type PaymentStatus,
   type PaymentsRepository,
 } from '../../prisma/payments.repository.js';
 import type { IntentData, IntentRequest, PaymentDto } from './dto/payment.dto.js';
@@ -141,9 +143,14 @@ export class PaymentsService {
       this.logger.warn(`[payments] succeeded intent ${intent.id} matches no booking`);
       return;
     }
-    const booking = await this.bookings.transitionStatus(payment.bookingId, 'PENDING', 'CONFIRMED');
-    if (!booking) {
-      this.logger.log(`[payments] duplicate succeeded event for booking ${payment.bookingId}`);
+    const flipped = await this.bookings.transitionStatus(payment.bookingId, 'PENDING', 'CONFIRMED');
+    if (!flipped) {
+      // The flip already happened. That is either an ordinary redelivery or the retry of
+      // a partial write (the flip landed, the payment row did not) — and it is the second
+      // case that makes a bare "duplicate event" return wrong: a CONFIRMED booking stuck
+      // reading `requires_payment` with no receipt has no retry left to heal it. So the
+      // payment row is reconciled rather than assumed.
+      await this.reconcile(payment, 'succeeded', await this.stripe.receiptUrl(intent), 'CONFIRMED');
       return;
     }
     await this.payments.upsert({
@@ -154,7 +161,7 @@ export class PaymentsService {
       status: 'succeeded',
       receiptUrl: await this.stripe.receiptUrl(intent),
     });
-    this.logger.log(`[payments] booking ${booking.reference} CONFIRMED by intent ${intent.id}`);
+    this.logger.log(`[payments] booking ${flipped.reference} CONFIRMED by intent ${intent.id}`);
   }
 
   private async onPaymentFailed(intent: Stripe.PaymentIntent): Promise<void> {
@@ -165,9 +172,11 @@ export class PaymentsService {
     }
     // Only a PENDING hold is released. A late failure for an already-CONFIRMED stay
     // must not cancel it — the money moved, and the failure is Stripe's stale news.
-    const booking = await this.bookings.transitionStatus(payment.bookingId, 'PENDING', 'CANCELLED');
-    if (!booking) {
-      this.logger.log(`[payments] failed intent ${intent.id} arrived after confirmation`);
+    const flipped = await this.bookings.transitionStatus(payment.bookingId, 'PENDING', 'CANCELLED');
+    if (!flipped) {
+      // Same partial-write hazard as the success arm, mirrored: a redelivered failure must
+      // still land on the payment row, or the released hold keeps reading `succeeded`.
+      await this.reconcile(payment, 'failed', payment.receiptUrl, 'CANCELLED');
       return;
     }
     await this.payments.upsert({
@@ -177,7 +186,37 @@ export class PaymentsService {
       currency: payment.currency,
       status: 'failed',
     });
-    this.logger.log(`[payments] booking ${booking.reference} CANCELLED by failed intent ${intent.id}`);
+    this.logger.log(`[payments] booking ${flipped.reference} CANCELLED by failed intent ${intent.id}`);
+  }
+
+  /**
+   * Writes the payment row for an event whose booking flip had already happened.
+   *
+   * `settledOn` is the booking state this event's outcome implies: a `succeeded` event
+   * needs the stay kept, a `failed` one the hold released. A booking sitting anywhere else
+   * was moved by something other than this event, so nothing is written — reconciling
+   * across such a gap would claim a stay that was not kept, or reopen a released hold.
+   */
+  private async reconcile(
+    payment: PaymentRecord,
+    status: PaymentStatus,
+    receiptUrl: string | null,
+    settledOn: 'CONFIRMED' | 'CANCELLED',
+  ): Promise<void> {
+    const booking = await this.bookings.findById(payment.bookingId);
+    if (!booking || booking.status !== settledOn) {
+      this.logger.log(`[payments] ${status} event for booking ${payment.bookingId} arrived after ${booking?.status ?? 'a missing booking'}`);
+      return;
+    }
+    await this.payments.upsert({
+      bookingId: payment.bookingId,
+      stripePaymentIntentId: payment.stripePaymentIntentId,
+      amountCents: payment.amountCents,
+      currency: payment.currency,
+      status,
+      receiptUrl,
+    });
+    this.logger.log(`[payments] payment row for booking ${payment.bookingId} reconciled to ${status}`);
   }
 
   private async requireOwnedBooking(callerId: string, bookingId: string): Promise<BookingRecord> {

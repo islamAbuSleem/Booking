@@ -52,6 +52,8 @@ const PASSWORD = 'correct-password-1';
 /** A webhook payload carries `latest_charge` as a bare id, never an expanded charge. */
 const CHARGE_ID = 'ch_test_receipt';
 const RECEIPT_URL = 'https://receipt.test/1';
+/** A stay whose flip landed but whose payment row did not — the partial write. */
+const HEAL_ID = '99999999-9999-4999-8999-999999999999';
 
 function booking(id: string, overrides: Partial<BookingRecord> = {}): BookingRecord {
   return {
@@ -286,8 +288,21 @@ describe('Payments API (e2e)', () => {
         [PENDING_ID, booking(PENDING_ID)],
         [CONFIRMED_ID, booking(CONFIRMED_ID, { status: 'CONFIRMED' })],
         [WEBHOOK_ID, booking(WEBHOOK_ID)],
+        [HEAL_ID, booking(HEAL_ID, { status: 'CONFIRMED' })],
       ]),
     );
+    // The state a crashed write leaves behind: the booking is CONFIRMED, the payment row
+    // is still waiting to be paid. Nothing but a redelivery can heal this.
+    payments.rows.set(HEAL_ID, {
+      id: '10000000-0000-4000-8000-00000000dead',
+      bookingId: HEAL_ID,
+      stripePaymentIntentId: 'pi_heal',
+      amountCents: 60_000,
+      currency: 'USD',
+      status: 'requires_payment',
+      receiptUrl: null,
+      createdAt: new Date('2026-05-01T10:00:00.000Z'),
+    });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(PrismaService)
@@ -359,7 +374,7 @@ describe('Payments API (e2e)', () => {
       // Stripe dedupes instead of charging twice.
       expect(stripe.keys.slice(before)).toEqual(['payments-intent:GB-5555', 'payments-intent:GB-5555']);
       // And the local row was upserted, not appended.
-      expect(payments.rows.size).toBe(1);
+      expect([...payments.rows.values()].filter(row => row.bookingId === PENDING_ID)).toHaveLength(1);
     });
 
     it('400s a booking that is not pending with INVALID_PAYMENT_STATE', async () => {
@@ -492,6 +507,20 @@ describe('Payments API (e2e)', () => {
 
       expect(response.body).toEqual({ success: true, data: { received: true } });
       expect(bookings.flips).toHaveLength(flips);
+    });
+
+    it('heals a payment row left behind by a partial write', async () => {
+      // The booking is already CONFIRMED, so the conditional flip finds nothing in `from`
+      // and writes nothing. Treating that as "duplicate, ignore" would strand a paid stay
+      // reading `requires_payment` with no receipt and no retry left.
+      const payload = succeededPayload('pi_heal');
+      await postWebhook(payload, sign(payload)).expect(200);
+
+      const read = await request(app.getHttpServer())
+        .get(`/api/payments/${HEAL_ID}`)
+        .set('Cookie', adaCookie)
+        .expect(200);
+      expect(read.body.data).toMatchObject({ status: 'succeeded', receiptUrl: RECEIPT_URL });
     });
 
     it('cancels the hold on payment failure and records it', async () => {
