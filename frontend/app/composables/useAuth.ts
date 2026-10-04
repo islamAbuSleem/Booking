@@ -44,6 +44,23 @@ function isUnauthenticated(error: unknown): boolean {
 }
 
 /**
+ * Sign-out is a goal state, not a success signal: what matters is "no session", and two
+ * different answers satisfy it.
+ *
+ *   - `UNAUTHORIZED` — the cookie was already gone.
+ *   - `BAD_RESPONSE` — the API's logout is a bodyless 204, and `apiFetch` only tolerates an
+ *     empty body for DELETE, so a successful sign-out reaches us as an unreadable response.
+ *     The request did exactly what we asked; clearing the session is the right reading.
+ *
+ * A real failure — a 500, a transport error — is still rethrown, so the caller learns the
+ * cookie may still be valid rather than showing a signed-out header over a live session.
+ */
+function isSignedOut(error: unknown): boolean {
+  return isUnauthenticated(error)
+    || (error instanceof ApiRequestError && error.code === 'BAD_RESPONSE')
+}
+
+/**
  * Where the visitor was heading before an OAuth detour.
  *
  * The API's callback remembers only the *origin* it started on (`oauth_origin` carries a
@@ -117,8 +134,8 @@ export function useAuth() {
   }
 
   /**
-   * Clears the cookie server-side. A 401 is treated as already-signed-out rather than an
-   * error: the goal state is "no session", and a cookie that was already gone satisfies it.
+   * Clears the cookie server-side. Both "there is no session" answers clear the local
+   * value; see `isSignedOut` for why a bodyless 204 counts.
    */
   async function logout(): Promise<void> {
     pending.value = true
@@ -127,7 +144,7 @@ export function useAuth() {
       current.value = null
     }
     catch (error) {
-      if (isUnauthenticated(error)) current.value = null
+      if (isSignedOut(error)) current.value = null
       else throw error
     }
     finally {
