@@ -94,6 +94,27 @@ onUnmounted(() => {
   pollCancelled = true
 })
 
+const BOOKING_SESSION_KEY = 'pendingBookingId'
+
+onMounted(async () => {
+  const savedBookingId = sessionStorage.getItem(BOOKING_SESSION_KEY)
+  if (savedBookingId) {
+    try {
+      const booking = await fetchBooking(savedBookingId)
+      if (booking.status === 'CONFIRMED') {
+        payment.value = { kind: 'done', booking }
+      }
+      else {
+        payment.value = { kind: 'failed', message: t('booking.paymentFailed'), booking, intent: null }
+      }
+    }
+    catch {
+      // ignore and start fresh
+    }
+    sessionStorage.removeItem(BOOKING_SESSION_KEY)
+  }
+})
+
 const rooms = computed(() => hotel.value?.rooms ?? [])
 const selectedRoom = computed(() => rooms.value.find(room => room.id === roomId.value))
 
@@ -281,9 +302,18 @@ async function startPayment(): Promise<void> {
         guestPhone: guestPhone.value.trim(),
       })
     }
+    else {
+      const refreshed = await fetchBooking(booking.id)
+      if (refreshed.status !== 'PENDING') {
+        payment.value = { kind: 'idle' }
+        return
+      }
+      booking = refreshed
+    }
     const intent = await createPaymentIntent(booking.id)
     if (pollCancelled) return
     payment.value = { kind: 'card', booking, intent }
+    sessionStorage.setItem(BOOKING_SESSION_KEY, booking.id)
   }
   catch (error: unknown) {
     if (isApiError(error) && error.code === 'UNAUTHORIZED') {

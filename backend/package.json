@@ -10,6 +10,7 @@
     "build": "prisma generate && nest build",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "db:migrate:deploy": "sh scripts/deploy.sh",
     "deploy": "nest deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"prisma/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\" \"prisma/**/*.ts\"",
