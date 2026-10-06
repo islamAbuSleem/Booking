@@ -52,6 +52,8 @@ export interface BookingRecord {
    */
   currency: string;
   createdAt: Date;
+  /** When the PENDING hold expires. Null for non-PENDING bookings. */
+  holdExpiresAt: Date | null;
 }
 
 /**

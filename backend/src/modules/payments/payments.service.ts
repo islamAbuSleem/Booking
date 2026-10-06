@@ -54,6 +54,13 @@ export class PaymentsService {
         'Only pending bookings can take a payment',
       );
     }
+    if (booking.holdExpiresAt && booking.holdExpiresAt <= new Date()) {
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'HOLD_EXPIRED',
+        'The booking hold has expired',
+      );
+    }
 
     const intent = await this.stripe.createIntent({
       amountCents: booking.totalCents,

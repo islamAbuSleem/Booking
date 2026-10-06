@@ -80,6 +80,7 @@ const BOOKING_SELECT = {
   totalCents: true,
   currency: true,
   createdAt: true,
+  holdExpiresAt: true,
   room: { select: { name: true, hotelId: true } },
 } satisfies Prisma.BookingSelect;
 
@@ -396,6 +397,7 @@ function toBookingRecord(row: BookingRow): BookingRecord {
     totalCents: row.totalCents,
     currency: row.currency,
     createdAt: row.createdAt,
+    holdExpiresAt: row.holdExpiresAt,
   };
 }
 
