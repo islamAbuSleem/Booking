@@ -12,7 +12,7 @@
  * fixes nothing by retyping, and a half-built listing is resumed from the edit page.
  */
 import { AMENITIES } from '~/utils/mock'
-import { attachUpload, createHotel, createRoom, isApiError } from '~/utils/api'
+import { attachUpload, createHotel, createRoom, fetchMyHotel, isApiError } from '~/utils/api'
 import type { ApiCreateRoom } from '~/utils/api'
 import { usd, wholeNumber } from '~/utils/format'
 
@@ -190,16 +190,19 @@ async function submit(): Promise<void> {
     }
 
     const staged = stagedPhotos.value
+    const existing = hotelId ? await fetchMyHotel(hotelId).catch(() => null) : null
+    const existingRoomNames = new Set((existing?.rooms ?? []).map(room => room.name))
+    const existingImageUrls = new Set((existing?.images ?? []).map(img => img.url))
     await Promise.all([
       ...staged.map((photo, index) => {
         const uploaded = photo.uploaded
         if (!uploaded) return Promise.resolve()
-        // Attach order is creation order: the first done photo carries the cover flag.
+        if (existingImageUrls.has(uploaded.url)) return Promise.resolve()
         return attachUpload({
           hotelId,
           url: uploaded.url,
           publicId: uploaded.publicId,
-          isCover: index === 0,
+          isCover: index === 0 && (existing?.images ?? []).length === 0,
         })
       }),
       ...rooms.value.map((room, index) => {
@@ -213,6 +216,7 @@ async function submit(): Promise<void> {
           prices: [{ currency: 'USD', priceCents: Math.round(room.priceDollars * 100) }],
           images: [],
         }
+        if (existingRoomNames.has(body.name)) return Promise.resolve()
         return createRoom(hotelId, body)
       }),
     ])
