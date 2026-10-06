@@ -78,10 +78,19 @@ export class PrismaPaymentsRepository implements PaymentsRepository {
       // `bookingId` rules out a second row — or there is no row and this is a create.
       const existing = await this.findByBooking(data.bookingId);
       if (existing) return existing;
-      return toRecord(await this.prisma.payment.create({
-        data: { ...data, receiptUrl: data.receiptUrl ?? null },
-        select: PAYMENT_SELECT,
-      }));
+      try {
+        return toRecord(await this.prisma.payment.create({
+          data: { ...data, receiptUrl: data.receiptUrl ?? null },
+          select: PAYMENT_SELECT,
+        }));
+      }
+      catch (error: unknown) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          const winner = await this.findByBooking(data.bookingId);
+          if (winner) return winner;
+        }
+        throw error;
+      }
     }
 
     const row = await this.prisma.payment.findUnique({
