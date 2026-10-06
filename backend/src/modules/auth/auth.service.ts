@@ -193,13 +193,13 @@ export class AuthService {
         );
       }
 
+      this.ensureActive(byEmail);
       const linked = await this.users.update(byEmail.id, {
         oauthProvider: profile.provider,
         oauthAccountId: profile.providerId,
         ...(byEmail.avatarUrl ? {} : { avatarUrl: profile.avatarUrl }),
       });
       this.logger.log(`[auth] oauth linked ${linked.id}`);
-      this.ensureActive(linked);
       const token = await this.signToken(linked.id, linked.email, linked.role);
       return { user: toPublicUser(linked), token };
     }
