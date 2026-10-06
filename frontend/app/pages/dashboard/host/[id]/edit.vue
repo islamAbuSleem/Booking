@@ -160,6 +160,7 @@ const saved = ref(false)
 const saving = ref(false)
 const saveError = ref('')
 const initialised = ref(false)
+const originalStatus = ref<'PENDING' | 'PUBLISHED' | 'REJECTED' | 'SUSPENDED'>('PENDING')
 
 /**
  * Server ids for this listing's blackouts, remembered as the page learns them.
@@ -197,6 +198,7 @@ watch(
       room.blackoutDates.map(entry => ({ id: entry.id, roomId: room.id, from: entry.startsOn, to: entry.endsOn })),
     )
     rememberBlackouts(current.rooms)
+    originalStatus.value = current.status
     initialised.value = true
   },
   { immediate: true },
@@ -261,8 +263,9 @@ async function save(): Promise<void> {
         name: hotelName.value.trim(),
         description: hotelDescription.value.trim(),
         city: hotelCity.value.trim(),
-        // Only a real change — see `savedStatus`.
-        ...(hotelStatus.value === savedStatus.value ? {} : { status: hotelStatus.value }),
+        ...(hotelStatus.value !== originalStatus.value && hotelStatus.value !== 'PUBLISHED'
+          ? { status: hotelStatus.value }
+          : {}),
       }),
       ...rooms.value.map(room =>
         updateRoom(room.id, { name: room.name.trim(), maxGuests: room.maxGuests }),
