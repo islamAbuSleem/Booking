@@ -198,6 +198,17 @@ export class PrismaHostRepository implements HostRepository {
     return this.toDetail(row);
   }
 
+  async findBySlug(slug: string): Promise<HostHotelDetail | null> {
+    const row = await this.prisma.hotel.findFirst({
+      where: { slug },
+      select: HOTEL_DETAIL_SELECT,
+    });
+
+    if (!row) return null;
+
+    return this.toDetail(row);
+  }
+
   async create(data: CreateHotelData): Promise<HostHotelDetail> {
     const { amenityIds, ...hotel } = data;
     const created = await this.prisma.hotel.create({
