@@ -64,7 +64,7 @@ export class AdminService {
     id: string,
     status: AdminUserStatus,
   ): Promise<AdminUserItem> {
-    if (id === adminId && status === 'SUSPENDED') {
+    if (id.toLowerCase() === adminId.toLowerCase() && status === 'SUSPENDED') {
       throw new ApiError(
         HttpStatus.BAD_REQUEST,
         'ADMIN_SELF_SUSPEND',
