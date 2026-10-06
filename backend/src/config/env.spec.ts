@@ -111,8 +111,26 @@ describe('parseEnv', () => {
     expect(env.GOOGLE_CALLBACK_URL).toBe(
       'http://localhost:3000/api/auth/google/callback',
     );
-    expect(env.GITHUB_CALLBACK_URL).toBe(
+expect(env.GITHUB_CALLBACK_URL).toBe(
       'http://localhost:3000/api/auth/github/callback',
     );
+  });
+
+  it('leaves the Stripe key optional so tests build without credentials', () => {
+    expect(parseEnv({ DATABASE_URL: 'x', JWT_SECRET }).STRIPE_SECRET_KEY).toBeUndefined();
+  });
+
+  it('refuses a live Stripe key at boot (D7)', () => {
+    for (const live of ['sk_live_abc', 'rk_live_abc']) {
+      expect(() => parseEnv({ DATABASE_URL: 'x', JWT_SECRET, STRIPE_SECRET_KEY: live }))
+        .toThrow(/test key/);
+    }
+  });
+
+  it('accepts a test Stripe key, secret or restricted', () => {
+    expect(parseEnv({ DATABASE_URL: 'x', JWT_SECRET, STRIPE_SECRET_KEY: 'sk_test_abc' })
+      .STRIPE_SECRET_KEY).toBe('sk_test_abc');
+    expect(parseEnv({ DATABASE_URL: 'x', JWT_SECRET, STRIPE_SECRET_KEY: 'rk_test_abc' })
+      .STRIPE_SECRET_KEY).toBe('rk_test_abc');
   });
 });

@@ -142,11 +142,13 @@ const hotelCity = ref('')
 const hotelDescription = ref('')
 const hotelStatus = ref<HotelStatus>('PENDING')
 /**
- * The status the server last reported. `status` is only sent when the host actually moved
- * it: an untouched field sent anyway makes every save of a live listing a 403
- * (`Hosts can only suspend their own listing`), and because the listing PATCH shares a
+ * The status the server last reported, and `null` until the page has read it. `status` is
+ * only sent when the host actually moved it: the route refuses any host write carrying
+ * `PUBLISHED` (publishing is the admin's decision), so an untouched field sent anyway makes
+ * every save of an approved listing a 403 — and because the listing PATCH shares a
  * `Promise.all` with the room and blackout writes, those siblings succeed and the batch
- * fails anyway.
+ * fails anyway. A `null` sentinel would report every pending listing as already 'PENDING'
+ * and silently skip the one save a host actually needs to make.
  */
 const savedStatus = ref<HotelStatus | null>(null)
 const rooms = ref<RoomEdit[]>([])
@@ -154,17 +156,26 @@ const blackouts = ref<Blackout[]>([])
 const newFrom = ref('')
 const newTo = ref('')
 const blackoutError = ref('')
-/**
- * Server ids for the hotel-scoped ranges this page created. The detail payload does not
- * return them (`roomId: null` rows are not part of `RoomDetail.blackoutDates`), so they are
- * the only record that those rows exist — without them every later save would create the same
- * range again and a removed one could never be deleted.
- */
-const postedBlackoutIds = ref<Set<string>>(new Set())
 const saved = ref(false)
 const saving = ref(false)
 const saveError = ref('')
 const initialised = ref(false)
+
+/**
+ * Server ids for this listing's blackouts, remembered as the page learns them.
+ *
+ * The detail payload nests blackouts under rooms, so a hotel-scoped range (`roomId: null`)
+ * is never in it — reading `previousIds` off the payload alone meant such a range had no
+ * id to delete by, and removing it from the list sent nothing, leaving it silently
+ * blocking those dates. Remembering the ids the server hands back covers both scopes.
+ */
+const knownBlackoutIds = new Set<string>()
+
+function rememberBlackouts(rows: ApiHostHotelDetail['rooms']): void {
+  for (const room of rows) {
+    for (const entry of room.blackoutDates) knownBlackoutIds.add(entry.id)
+  }
+}
 
 /** Seed the form once — from the API detail, or from the fixture in fallback mode. */
 watch(
@@ -185,6 +196,7 @@ watch(
     blackouts.value = current.rooms.flatMap(room =>
       room.blackoutDates.map(entry => ({ id: entry.id, roomId: room.id, from: entry.startsOn, to: entry.endsOn })),
     )
+    rememberBlackouts(current.rooms)
     initialised.value = true
   },
   { immediate: true },
@@ -219,10 +231,10 @@ function removeBlackout(entry: Blackout): void {
 
 /**
  * Persists everything in one batch — the listing, every room, and the blackout diff —
- * then re-reads the server so the form shows what stuck. New blackout ranges POST,
- * ranges removed from the list DELETE by their server id. A failure keeps the form
- * filled and names the problem; nothing is half-applied silently because the refresh
- * only runs after every write resolves.
+ * then re-reads the server so the form shows what stuck. New blackout ranges POST and
+ * their returned ids are kept on the local entries; ranges removed from the list DELETE
+ * by their server id. A failure keeps the form filled and names the problem; nothing is
+ * half-applied silently because the refresh only runs after every write resolves.
  */
 async function save(): Promise<void> {
   if (saving.value || !hotel.value) return
@@ -234,43 +246,51 @@ async function save(): Promise<void> {
       return
     }
     const current = hotel.value
-    // Hotel-scoped blackouts (`roomId: null`) are never in the detail payload, so the rooms'
-    // lists alone are not every id that exists: the ones this page created are tracked here
-    // or the same range is POSTed again on every save and can never be removed.
-    const previousIds = new Set([
-      ...current.rooms.flatMap(room => room.blackoutDates.map(entry => entry.id)),
-      ...postedBlackoutIds.value,
-    ])
+    // Every id the server is known to hold. The rooms' own lists are not all of them: a
+    // hotel-scoped range (`roomId: null`) appears in neither, so it is tracked as this page
+    // creates it — or the same range is POSTed again on every save and can never be removed.
+    rememberBlackouts(current.rooms)
+    const previousIds = new Set(knownBlackoutIds)
     const keptIds = new Set(
       blackouts.value.flatMap(entry => (entry.id === null ? [] : [entry.id])),
     )
+    const removedIds = [...previousIds].filter(serverId => !keptIds.has(serverId))
+    const unsavedEntries = blackouts.value.filter(entry => entry.id === null)
     await Promise.all([
       updateHotel(current.id, {
         name: hotelName.value.trim(),
         description: hotelDescription.value.trim(),
         city: hotelCity.value.trim(),
+        // Only a real change — see `savedStatus`.
         ...(hotelStatus.value === savedStatus.value ? {} : { status: hotelStatus.value }),
       }),
       ...rooms.value.map(room =>
         updateRoom(room.id, { name: room.name.trim(), maxGuests: room.maxGuests }),
       ),
-      ...[...previousIds].filter(serverId => !keptIds.has(serverId)).map(serverId => deleteBlackout(serverId)),
-      ...blackouts.value
-        .filter(entry => entry.id === null)
-        .map(async (entry) => {
-          // The id comes back on the write, so it is written onto the entry: a range that
-          // already exists is then a keep, not another create.
-          const created = await createBlackout(current.id, {
-            roomId: entry.roomId,
-            startsOn: entry.from,
-            endsOn: entry.to,
-            reason: null,
-          })
-          entry.id = created.id
-          postedBlackoutIds.value.add(created.id)
-        }),
+      ...removedIds.map(serverId => deleteBlackout(serverId)),
     ])
+    // The created ids have to be kept: without them the entry stays `id: null`, the next
+    // save POSTs the same range a second time, and removing the range from the list can
+    // never send a DELETE. Run after the batch so the response can be read back — the
+    // listing and rooms do not depend on it, so nothing is half-applied by waiting.
+    const created = await Promise.all(
+      unsavedEntries.map(entry =>
+        createBlackout(current.id, { roomId: entry.roomId, startsOn: entry.from, endsOn: entry.to, reason: null }),
+      ),
+    )
+    created.forEach((blackout, index) => {
+      const entry = unsavedEntries[index]
+      if (!entry) return
+      entry.id = blackout.id
+      // Not in the rooms payload when `roomId` is null, so it is recorded here instead.
+      knownBlackoutIds.add(blackout.id)
+    })
+    for (const id of removedIds) knownBlackoutIds.delete(id)
     await refresh()
+    if (hotel.value) rememberBlackouts(hotel.value.rooms)
+    // The list is re-seeded only once, so the status the server now holds has to be
+    // recorded here — otherwise the next save re-sends the same `status` as a change.
+    savedStatus.value = hotelStatus.value
     saved.value = true
   }
   catch (error: unknown) {

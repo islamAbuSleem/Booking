@@ -20,8 +20,17 @@ export const createReviewSchema = z.object({
   body: z.string().min(1).max(5000),
 });
 
+/**
+ * Deepest page the public list will serve. `page` feeds an OFFSET, so an unbounded value
+ * makes Postgres walk the whole index on an unauthenticated request — `?page=1000000000`
+ * costs the same as reading every review, and returns nothing for it. At the maximum
+ * `pageSize` this caps the worst case at 50 000 rows scanned, which no single hotel's
+ * review list ever reaches.
+ */
+const MAX_PAGE = 1000;
+
 export const reviewListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: z.coerce.number().int().min(1).max(MAX_PAGE).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
 });
 

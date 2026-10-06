@@ -42,6 +42,17 @@ export interface StripeClient {
    * mocking the verifier.
    */
   verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event>;
+  /**
+   * The guest-facing receipt link for a succeeded intent, or null when there is none.
+   *
+   * Lives on this side of the boundary because the pinned API version no longer returns a
+   * `charges` list on the PaymentIntent — the only charge handle an event carries is
+   * `latest_charge`, which is a bare id on a webhook payload. Resolving it is SDK work.
+   *
+   * Never throws: a receipt is a nice-to-have, and failing the read must not turn a
+   * settled payment into a webhook Stripe retries forever.
+   */
+  receiptUrl(intent: Stripe.PaymentIntent): Promise<string | null>;
 }
 
 /**
@@ -57,6 +68,15 @@ export class StripePaymentClient implements StripeClient {
   // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`.
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
+  /**
+   * The SDK, with the retry policy context/library-docs.md prescribes: one network blip
+   * must not fail payment creation outright. Safe here because every call carries an
+   * idempotency key or is a pure read.
+   */
+  private stripe(secret: string): Stripe {
+    return new Stripe(secret, { maxNetworkRetries: 2 });
+  }
+
   async createIntent(input: CreateIntentInput): Promise<CreatedIntent> {
     const secret = this.config.get<string>('STRIPE_SECRET_KEY');
     if (!secret) {
@@ -67,7 +87,7 @@ export class StripePaymentClient implements StripeClient {
       );
     }
 
-    const stripe = new Stripe(secret);
+    const stripe = this.stripe(secret);
     let intent: Stripe.PaymentIntent;
     try {
       intent = await stripe.paymentIntents.create(
@@ -110,6 +130,27 @@ export class StripePaymentClient implements StripeClient {
       clientSecret: intent.client_secret,
       status: mapStatus(intent.status),
     };
+  }
+
+  async receiptUrl(intent: Stripe.PaymentIntent): Promise<string | null> {
+    const secret = this.config.get<string>('STRIPE_SECRET_KEY');
+    const latest = intent.latest_charge;
+    // No key, or a payment method that settles without a charge at all.
+    if (!secret || !latest) return null;
+    try {
+      // An expanded `latest_charge` carries the receipt already; a webhook payload
+      // carries only the id, so that is one read against the charges resource.
+      const charge = typeof latest === 'string'
+        ? await this.stripe(secret).charges.retrieve(latest)
+        : latest;
+      const url = charge.receipt_url;
+      return typeof url === 'string' && url.length > 0 ? url : null;
+    } catch {
+      // Logged, not thrown: the payment row is still correct without a receipt, and a
+      // 500 here would make Stripe redeliver a settlement that already happened.
+      this.logger.warn(`[payments] could not read the receipt for intent ${intent.id}`);
+      return null;
+    }
   }
 
   async verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event> {
@@ -179,6 +220,26 @@ export function stripeFailure(error: unknown): StripeFailure {
       status: HttpStatus.SERVICE_UNAVAILABLE,
       code: 'STRIPE_NOT_CONFIGURED',
       message: 'Payments are not configured on this deployment',
+    };
+  }
+
+  if (error instanceof Stripe.errors.StripeRateLimitError) {
+    // The one failure a retry fixes, so it must not read as a settled 502: the client
+    // branches on the status to back off rather than tell the guest the payment failed.
+    return {
+      status: HttpStatus.TOO_MANY_REQUESTS,
+      code: 'RATE_LIMITED',
+      message: 'The payment provider is busy. Try again in a moment',
+    };
+  }
+
+  if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+    // Stripe refused the request on its own terms — an amount under the currency minimum,
+    // an unknown currency. That is this booking's problem, not the server's.
+    return {
+      status: HttpStatus.BAD_REQUEST,
+      code: 'BAD_REQUEST',
+      message: 'The payment provider rejected this amount',
     };
   }
 

@@ -76,7 +76,7 @@
 ### Phase 3 — Advanced
 - [x] T26 Stripe payment intent
 - [x] T27 Stripe webhook
-- [ ] T28 Checkout UI
+- [x] T28 Checkout UI
 - [ ] T29 Rate limiting
 - [ ] T30 i18n scaffolding
 
@@ -573,6 +573,16 @@
   events 200-and-ignore, and the payment row is found by intent id rather than trusted
   metadata. E2E suites that boot the app must pass `{ rawBody: true }` to
   `createNestApplication` or every signature fails — main.ts does, tests did not.
+- **D72 — T28 confirms the intent but believes only the server.** The page chain is
+  create-booking → create-intent → Elements `confirmCardPayment` → poll the booking
+  record; the banner renders solely from a server-read CONFIRMED. Any stay edit voids
+  the intent (a stale `clientSecret` must never charge yesterday's amount), a failed
+  submit retries the same intent rather than minting a second booking, and 401 sends
+  the visitor to login with a return address. The mock `HB-xxxx` confirmation is gone:
+  without a backend there is nothing to confirm, so transport failure is an error
+  state. PENDING already displayed as "Awaiting payment" (`STATUS_LABEL_KEY`), so no
+  badge change was needed. `NUXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` gates the card step;
+  secret keys never leave the API.
 
 ## Notes
 

@@ -70,12 +70,28 @@ function isSafeInternalPath(value: unknown): value is string {
 
 export function useAuth() {
   const current = useState<AuthUser | null>('auth:user', () => null)
-  const pending = useState<boolean>('auth:pending', () => false)
+  // An in-flight *count*, not a flag. `register`, `login` and `logout` share one
+  // composable, and a single boolean let whichever settled first re-enable the submit
+  // button while another request was still running — a duplicate submit — or let an
+  // in-flight logout disable the login form. `pending` stays a boolean for every caller.
+  const inFlight = useState<number>('auth:pending', () => 0)
+  const pending = computed(() => inFlight.value > 0)
 
   const isSignedIn = computed(() => current.value !== null)
   const role = computed<AuthRole | null>(() => current.value?.role ?? null)
   const isHost = computed(() => role.value === 'HOST' || role.value === 'ADMIN')
   const isAdmin = computed(() => role.value === 'ADMIN')
+
+  /** Runs `work` with the shared in-flight count held up, whatever it settles to. */
+  async function tracked<T>(work: () => Promise<T>): Promise<T> {
+    inFlight.value += 1
+    try {
+      return await work()
+    }
+    finally {
+      inFlight.value -= 1
+    }
+  }
 
   /**
    * Re-reads the session from the API. Called once per SSR request and once on client
@@ -97,60 +113,58 @@ export function useAuth() {
   }
 
   async function register(input: RegisterInput): Promise<AuthUser> {
-    pending.value = true
-    try {
+    return tracked(async () => {
       const session = await apiFetch<AuthSessionData>('/api/auth/register', {
         method: 'POST',
         body: { ...input },
       })
       current.value = session.user
       return session.user
-    }
-    finally {
-      pending.value = false
-    }
+    })
   }
 
   async function login(input: LoginInput): Promise<AuthUser> {
-    pending.value = true
-    try {
+    return tracked(async () => {
       const session = await apiFetch<AuthSessionData>('/api/auth/login', {
         method: 'POST',
         body: { ...input },
       })
       current.value = session.user
       return session.user
-    }
-    finally {
-      pending.value = false
-    }
+    })
   }
 
   /**
-   * Clears the cookie server-side. A 401 is treated as already-signed-out rather than an
-   * error: the goal state is "no session", and a cookie that was already gone satisfies it.
+   * Clears the cookie server-side. The 204 empty body is a documented success
+   * (`tolerateEmptyBody`), not a broken response — without that the call threw
+   * `BAD_RESPONSE` on every logout, so the caller's redirect after `await logout()` never
+   * ran and the shell kept rendering signed in.
    *
-   * The 204 empty body is a documented success (`tolerateEmptyBody`), not a broken
-   * response — without that the call threw `BAD_RESPONSE` on every logout, so the caller’s
-   * redirect after `await logout()` never ran and the shell kept rendering signed in.
+   * Sign-out is a goal state, not a success signal: what matters is "no session", and
+   * several different answers satisfy it.
+   *
+   *   - `UNAUTHORIZED` — the cookie was already gone.
+   *   - `ACCOUNT_SUSPENDED` — the guard 403s logout itself, so tolerating it is the only
+   *     way a suspended guest can ever reach the sign-in form. Signing out is not "acting".
+   *   - No answer at all — no backend, or something that is not this API. There is no
+   *     server-side answer to respect, so the local session is dropped rather than left
+   *     showing links every later call will 401 on.
+   *
+   * A confirmed failure from this API (a 500) is still rethrown, so the caller learns the
+   * cookie may still be valid rather than showing a signed-out header over a live session.
    */
   async function logout(): Promise<void> {
-    pending.value = true
-    try {
-      await apiFetch<undefined>('/api/auth/logout', { method: 'POST', tolerateEmptyBody: true })
-      current.value = null
-    }
-    catch (error) {
-      // Only a confirmed failure from this API is the caller’s to handle. When nothing
-      // answered at all — no backend, or something that is not this API — there is no
-      // server-side answer to respect, so the local session is dropped rather than left
-      // showing links every later call will 401 on.
-      if (isApiFailure(error) && !isUnauthenticated(error)) throw error
-      current.value = null
-    }
-    finally {
-      pending.value = false
-    }
+    return tracked(async () => {
+      try {
+        await apiFetch<undefined>('/api/auth/logout', { method: 'POST', tolerateEmptyBody: true })
+        current.value = null
+      }
+      catch (error) {
+        // Only a confirmed failure from this API is the caller's to handle.
+        if (isApiFailure(error) && !isUnauthenticated(error) && !isSuspended(error)) throw error
+        current.value = null
+      }
+    })
   }
 
   /**

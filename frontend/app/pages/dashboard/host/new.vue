@@ -12,7 +12,7 @@
  * fixes nothing by retyping, and a half-built listing is resumed from the edit page.
  */
 import { AMENITIES } from '~/utils/mock'
-import { attachUpload, createHotel, createRoom, isApiError } from '~/utils/api'
+import { attachUpload, createHotel, createRoom, fetchMyHotel, isApiError } from '~/utils/api'
 import type { ApiCreateRoom } from '~/utils/api'
 import { usd, wholeNumber } from '~/utils/format'
 
@@ -156,9 +156,10 @@ function finish(): void {
  * retry a network call is the failure mode the UX rules forbid, and a listing that
  * was created but not finished is resumed from its edit page, not rebuilt.
  *
- * The id is captured the moment `createHotel` resolves, before the second batch. Dropping
- * it on a later failure meant the visitor stayed on the last step with no way back to the
- * listing, and pressing "Finish listing" again built a second one.
+ * The hotel's id is recorded the moment `createHotel` resolves, before the work under it
+ * starts. Leaving it until the end meant a single failed upload or room left `createdId`
+ * empty, so "Finish listing" stayed enabled and the next click created a *second* listing —
+ * with no id anywhere on screen for the host to resume the first one from.
  */
 async function submit(): Promise<void> {
   if (submitting.value) return
@@ -189,16 +190,19 @@ async function submit(): Promise<void> {
     }
 
     const staged = stagedPhotos.value
+    const existing = hotelId ? await fetchMyHotel(hotelId).catch(() => null) : null
+    const existingRoomNames = new Set((existing?.rooms ?? []).map(room => room.name))
+    const existingImageUrls = new Set((existing?.images ?? []).map(img => img.url))
     await Promise.all([
       ...staged.map((photo, index) => {
         const uploaded = photo.uploaded
         if (!uploaded) return Promise.resolve()
-        // Attach order is creation order: the first done photo carries the cover flag.
+        if (existingImageUrls.has(uploaded.url)) return Promise.resolve()
         return attachUpload({
           hotelId,
           url: uploaded.url,
           publicId: uploaded.publicId,
-          isCover: index === 0,
+          isCover: index === 0 && (existing?.images ?? []).length === 0,
         })
       }),
       ...rooms.value.map((room, index) => {
@@ -212,6 +216,7 @@ async function submit(): Promise<void> {
           prices: [{ currency: 'USD', priceCents: Math.round(room.priceDollars * 100) }],
           images: [],
         }
+        if (existingRoomNames.has(body.name)) return Promise.resolve()
         return createRoom(hotelId, body)
       }),
     ])
@@ -535,20 +540,19 @@ useSeoMeta({
         >
           <p>{{ submitError }}</p>
           <!--
-            The listing already exists, so the way out is its edit page rather than another
-            "Finish listing" press. Shown only once there is an id to link to.
+            The listing already exists whenever there is an id, so the host is given the way
+            out this comment promises: its edit page rather than another "Finish listing"
+            press, which is the duplicate-listing click. Shown only once there is an id to
+            link to. The link itself carries the 44px touch target, so it is a real target
+            on a phone rather than a line of text.
           -->
-          <p
+          <NuxtLink
             v-if="createdId"
-            class="mt-3"
+            :to="`/dashboard/host/${createdId}/edit`"
+            class="text-link mt-3 inline-flex h-11 items-center text-sm underline-offset-4 hover:underline"
           >
-            <NuxtLink
-              :to="`/dashboard/host/${createdId}/edit`"
-              class="text-link underline-offset-4 hover:underline"
-            >
-              {{ $t('host.editTitle') }}
-            </NuxtLink>
-          </p>
+            {{ $t('host.editTitle') }}
+          </NuxtLink>
         </BaseAlert>
 
         <div class="mt-6 flex flex-wrap gap-3">

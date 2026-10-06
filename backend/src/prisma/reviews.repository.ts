@@ -10,6 +10,21 @@
 
 export const REVIEWS_REPOSITORY = Symbol('REVIEWS_REPOSITORY');
 
+/**
+ * The unique `bookingId` refused the insert.
+ *
+ * A domain error rather than an `ApiError` on purpose: the repository *reports* the
+ * duplicate and the reviews service *names* it, which keeps the wire code out of the
+ * persistence contract and gives the read-then-write check and the race below one answer
+ * instead of two.
+ */
+export class DuplicateReviewError extends Error {
+  constructor() {
+    super('A review already exists for this booking');
+    this.name = 'DuplicateReviewError';
+  }
+}
+
 export type ReviewStatus = 'VISIBLE' | 'HIDDEN';
 
 export interface ReviewRecord {

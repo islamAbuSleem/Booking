@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
+import { isPrismaKnownError } from '../common/errors/prisma-error.js';
 import {
+  DuplicateReviewError,
   type CreateReviewData,
   type ReviewListPage,
   type ReviewRecord,
@@ -54,11 +56,23 @@ export class PrismaReviewsRepository implements ReviewsRepository {
   }
 
   async create(data: CreateReviewData): Promise<ReviewRecord> {
-    const row = await this.prisma.review.create({
-      data: { ...data, status: 'VISIBLE' },
-      select: REVIEW_SELECT,
-    });
-    return toRecord(row);
+    try {
+      const row = await this.prisma.review.create({
+        data: { ...data, status: 'VISIBLE' },
+        select: REVIEW_SELECT,
+      });
+      return toRecord(row);
+    } catch (error: unknown) {
+      // `bookingId` is the only unique constraint on this table, so a P2002 here is the
+      // duplicate and nothing else. Two concurrent POSTs — a double-clicked review form —
+      // both clear the service's read-then-write check, and without this the loser's insert
+      // is rendered by `translatePrismaError` as a bare CONFLICT, losing the
+      // `ALREADY_REVIEWED` the OpenAPI documents and the client branches on.
+      if (isPrismaKnownError(error) && error.code === 'P2002') {
+        throw new DuplicateReviewError();
+      }
+      throw error;
+    }
   }
 
   async listByHotel(hotelId: string, page: number, pageSize: number): Promise<ReviewListPage> {

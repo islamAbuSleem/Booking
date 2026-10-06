@@ -318,6 +318,14 @@ describe('Reviews API (e2e)', () => {
       expect(typeof response.body.data.average).toBe('number');
       expect(response.body.data.items[0]).toMatchObject({ hotelId: HOTEL_ID });
     });
+
+    it('rejects a page deep enough to turn the OFFSET into a table walk', async () => {
+      // `page` is unbounded in the query schema, and it feeds a `skip`. An unauthenticated
+      // caller asking for page 1e9 makes Postgres scan the whole index for nothing.
+      await request(app.getHttpServer())
+        .get(`/api/hotels/${HOTEL_ID}/reviews?page=1000000000`)
+        .expect(400);
+    });
   });
 
   describe('GET /api/bookings/:id/reviewable', () => {

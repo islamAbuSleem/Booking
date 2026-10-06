@@ -3,6 +3,7 @@ import type {
   BookingRecord,
   BookingRepository,
 } from '../../prisma/bookings.repository.js';
+import { DuplicateReviewError } from '../../prisma/reviews.repository.js';
 import type {
   ReviewRecord,
   ReviewsRepository,
@@ -74,6 +75,7 @@ function setup(world: Partial<World> = {}) {
     findHotelSnapshots: () => Promise.resolve([]),
     findRoomPriceCurrency: () => Promise.resolve(null),
     updateStatus: () => Promise.resolve(null),
+    transitionStatus: () => Promise.resolve(null),
   };
   const reviewsRepo: ReviewsRepository = {
     resolveHotelId: (idOrSlug: string) => Promise.resolve(world.hotels?.has(idOrSlug) ? idOrSlug : null),
@@ -109,6 +111,25 @@ describe('ReviewsService', () => {
 
     await expect(service.create(BO_ID, HOTEL_ID, INPUT)).rejects.toMatchObject({
       response: { code: 'NOT_BOOKING_OWNER' },
+    });
+  });
+
+  it('409s ALREADY_REVIEWED when a concurrent write wins the race', async () => {
+    // The read above saw no review, so the insert is attempted — and the unique
+    // `bookingId` refuses it. That has to be the same named 409 as the check-then-write
+    // miss, not a generic CONFLICT the client cannot branch on.
+    const service = new ReviewsService(
+      {
+        findById: (id: string) => Promise.resolve(booking({ id })),
+      } as unknown as BookingRepository,
+      {
+        findByBooking: () => Promise.resolve(null),
+        create: () => Promise.reject(new DuplicateReviewError()),
+      } as unknown as ReviewsRepository,
+    );
+
+    await expect(service.create(ADA_ID, HOTEL_ID, INPUT)).rejects.toMatchObject({
+      response: { code: 'ALREADY_REVIEWED' },
     });
   });
 

@@ -66,6 +66,9 @@ async function submit(): Promise<void> {
     await router.push(redirectTarget.value)
   }
   catch (error: unknown) {
+    // The API owns the "that email is taken" answer; the client only maps it to prose.
+    // Branched on the code so a 500 or a transport failure is not reported as a duplicate
+    // email — the mirror of the same bug on /login, and `failureMessage` does exactly that.
     formError.value = failureMessage(error)
   }
   // The form keeps its values on failure — retyping a password to fix a duplicate email

@@ -66,6 +66,11 @@ async function submit(): Promise<void> {
     await router.push(redirectTarget.value)
   }
   catch (error: unknown) {
+    // Branch on the code, never on the message (context/code-standards.md). Only a
+    // credential answer says the password is wrong: reading every `ApiRequestError` that
+    // way reported a 500, a 429 and a dead backend as a bad password, telling the guest
+    // their credentials were at fault when the service was. `failureMessage` names each
+    // code the API can actually return and falls back to the generic message otherwise.
     formError.value = failureMessage(error)
   }
   // A failed submit keeps the form filled: the values above are never cleared, so the

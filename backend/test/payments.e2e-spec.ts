@@ -49,6 +49,11 @@ const CONFIRMED_ID = '66666666-6666-4666-8666-666666666666';
 /** A second hold, reserved for the webhook tests so intent tests never touch it. */
 const WEBHOOK_ID = '77777777-7777-4777-8777-777777777777';
 const PASSWORD = 'correct-password-1';
+/** A webhook payload carries `latest_charge` as a bare id, never an expanded charge. */
+const CHARGE_ID = 'ch_test_receipt';
+const RECEIPT_URL = 'https://receipt.test/1';
+/** A stay whose flip landed but whose payment row did not — the partial write. */
+const HEAL_ID = '99999999-9999-4999-8999-999999999999';
 
 function booking(id: string, overrides: Partial<BookingRecord> = {}): BookingRecord {
   return {
@@ -87,6 +92,12 @@ const WEBHOOK_SECRET = 'whsec_test_only_never_deploy';
 class RecordingStripe implements StripeClient {
   readonly keys: string[] = [];
   private readonly byKey = new Map<string, CreatedIntent>();
+  /** Stands in for the `charges` resource the real client reads `latest_charge` from. */
+  private readonly charges = new Map<string, string>();
+
+  seedCharge(id: string, receiptUrl: string): void {
+    this.charges.set(id, receiptUrl);
+  }
 
   async createIntent(input: CreateIntentInput): Promise<CreatedIntent> {
     this.keys.push(input.idempotencyKey);
@@ -99,6 +110,13 @@ class RecordingStripe implements StripeClient {
     };
     this.byKey.set(input.idempotencyKey, intent);
     return intent;
+  }
+
+  async receiptUrl(intent: Stripe.PaymentIntent): Promise<string | null> {
+    const latest = intent.latest_charge;
+    if (!latest) return null;
+    const id = typeof latest === 'string' ? latest : latest.id;
+    return this.charges.get(id) ?? null;
   }
 
   async verifyWebhook(rawBody: string | Buffer, signature: string): Promise<Stripe.Event> {
@@ -263,14 +281,28 @@ describe('Payments API (e2e)', () => {
     const ada = await seededUser(passwords, ADA_ID, 'ada@example.com');
     const bo = await seededUser(passwords, BO_ID, 'bo@example.com');
     stripe = new RecordingStripe();
+    stripe.seedCharge(CHARGE_ID, RECEIPT_URL);
     payments = new StubPayments();
     bookings = new StubBookings(
       new Map([
         [PENDING_ID, booking(PENDING_ID)],
         [CONFIRMED_ID, booking(CONFIRMED_ID, { status: 'CONFIRMED' })],
         [WEBHOOK_ID, booking(WEBHOOK_ID)],
+        [HEAL_ID, booking(HEAL_ID, { status: 'CONFIRMED' })],
       ]),
     );
+    // The state a crashed write leaves behind: the booking is CONFIRMED, the payment row
+    // is still waiting to be paid. Nothing but a redelivery can heal this.
+    payments.rows.set(HEAL_ID, {
+      id: '10000000-0000-4000-8000-00000000dead',
+      bookingId: HEAL_ID,
+      stripePaymentIntentId: 'pi_heal',
+      amountCents: 60_000,
+      currency: 'USD',
+      status: 'requires_payment',
+      receiptUrl: null,
+      createdAt: new Date('2026-05-01T10:00:00.000Z'),
+    });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(PrismaService)
@@ -342,7 +374,7 @@ describe('Payments API (e2e)', () => {
       // Stripe dedupes instead of charging twice.
       expect(stripe.keys.slice(before)).toEqual(['payments-intent:GB-5555', 'payments-intent:GB-5555']);
       // And the local row was upserted, not appended.
-      expect(payments.rows.size).toBe(1);
+      expect([...payments.rows.values()].filter(row => row.bookingId === PENDING_ID)).toHaveLength(1);
     });
 
     it('400s a booking that is not pending with INVALID_PAYMENT_STATE', async () => {
@@ -427,7 +459,7 @@ describe('Payments API (e2e)', () => {
           object: {
             id: intentId,
             object: 'payment_intent',
-            charges: { data: [{ receipt_url: 'https://receipt.test/1' }] },
+            latest_charge: CHARGE_ID,
           },
         },
       });
@@ -451,7 +483,7 @@ describe('Payments API (e2e)', () => {
         .get(`/api/payments/${WEBHOOK_ID}`)
         .set('Cookie', adaCookie)
         .expect(200);
-      expect(read.body.data).toMatchObject({ status: 'succeeded', receiptUrl: 'https://receipt.test/1' });
+      expect(read.body.data).toMatchObject({ status: 'succeeded', receiptUrl: RECEIPT_URL });
 
       const trip = await request(app.getHttpServer())
         .get(`/api/bookings/${WEBHOOK_ID}`)
@@ -475,6 +507,20 @@ describe('Payments API (e2e)', () => {
 
       expect(response.body).toEqual({ success: true, data: { received: true } });
       expect(bookings.flips).toHaveLength(flips);
+    });
+
+    it('heals a payment row left behind by a partial write', async () => {
+      // The booking is already CONFIRMED, so the conditional flip finds nothing in `from`
+      // and writes nothing. Treating that as "duplicate, ignore" would strand a paid stay
+      // reading `requires_payment` with no receipt and no retry left.
+      const payload = succeededPayload('pi_heal');
+      await postWebhook(payload, sign(payload)).expect(200);
+
+      const read = await request(app.getHttpServer())
+        .get(`/api/payments/${HEAL_ID}`)
+        .set('Cookie', adaCookie)
+        .expect(200);
+      expect(read.body.data).toMatchObject({ status: 'succeeded', receiptUrl: RECEIPT_URL });
     });
 
     it('cancels the hold on payment failure and records it', async () => {
