@@ -362,7 +362,7 @@ describe('Host API (e2e)', () => {
         .expect(403);
       expect(response.body).toEqual({
         success: false,
-        error: { code: 'FORBIDDEN', message: 'Hosts can only suspend their own listing' },
+error: { code: 'FORBIDDEN', message: 'Hosts can only suspend their own listing' },
       });
     });
 
