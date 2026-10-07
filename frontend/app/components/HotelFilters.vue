@@ -9,6 +9,7 @@
  */
 import { AMENITIES } from '~/utils/mock'
 import { localToday } from '~/utils/date'
+import { wholeNumber } from '~/utils/format'
 import {
   DEFAULT_HOTEL_FILTERS,
   HOTEL_STAR_OPTIONS,
@@ -187,7 +188,7 @@ function toggleStar(star: number): void {
             :checked="filters.stars.includes(option)"
             @change="toggleStar(option)"
           >
-          <span class="tabular text-sm">{{ $t('hotels.starsOption', { count: option }) }}</span>
+          <span class="tabular text-sm">{{ $t('hotels.starsOption', { count: wholeNumber(option) }) }}</span>
         </label>
       </div>
     </fieldset>
@@ -200,7 +201,7 @@ function toggleStar(star: number): void {
         class="text-fg-muted text-sm"
         role="status"
       >
-        {{ resultCount === 1 ? $t('hotels.showResultsOne') : $t('hotels.showResults', { count: resultCount }) }}
+        {{ resultCount === 1 ? $t('hotels.showResultsOne') : $t('hotels.showResults', { count: wholeNumber(resultCount) }) }}
       </p>
       <BaseButton
         variant="secondary"

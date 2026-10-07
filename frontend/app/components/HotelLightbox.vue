@@ -11,6 +11,7 @@
  * Navigation wraps. There is no first or last, so a user never lands on a dead arrow.
  */
 import type { ApiHotelImage } from '~/utils/api'
+import { wholeNumber } from '~/utils/format'
 
 const open = defineModel<boolean>('open', { required: true })
 
@@ -98,7 +99,7 @@ function select(index: number): void {
           class="tabular text-fg-muted text-sm"
           aria-live="polite"
         >
-          {{ $t('detail.photoPosition', { current: current + 1, total }) }}
+          {{ $t('detail.photoPosition', { current: wholeNumber(current + 1), total: wholeNumber(total) }) }}
         </p>
 
         <button

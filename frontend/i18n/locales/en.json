@@ -13,7 +13,9 @@
     "edit": "Edit",
     "save": "Save changes",
     "remove": "Remove",
-    "unexpectedError": "Something went wrong. Please try again."
+    "unexpectedError": "Something went wrong. Please try again.",
+    "pagination": "Pagination",
+    "pageNumber": "Page {entry}"
   },
   "nav": {
     "stays": "Stays",

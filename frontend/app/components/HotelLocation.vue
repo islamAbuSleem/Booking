@@ -11,6 +11,7 @@
  * this file alone, and nothing above it has to move.
  */
 import type { ApiHotelDetail } from '~/utils/api'
+import { formatCoordinate } from '~/utils/format'
 
 const props = defineProps<{ hotel: ApiHotelDetail }>()
 
@@ -73,7 +74,7 @@ const directionsUrl = computed(
           {{ $t('detail.coordinatesLabel') }}
         </p>
         <p class="font-mono mt-1 text-sm">
-          {{ hotel.lat.toFixed(4) }}, {{ hotel.lng.toFixed(4) }}
+          {{ formatCoordinate(hotel.lat) }}, {{ formatCoordinate(hotel.lng) }}
         </p>
       </div>
     </div>

@@ -57,7 +57,7 @@ const inventory = computed(() =>
         </p>
 
         <p class="text-fg-muted text-sm">
-          {{ $t('hotel.sleeps', { count: room.maxGuests }) }}
+          {{ $t('hotel.sleeps', { count: wholeNumber(room.maxGuests) }) }}
         </p>
 
         <div class="mt-auto flex flex-wrap items-end justify-between gap-4 pt-4">

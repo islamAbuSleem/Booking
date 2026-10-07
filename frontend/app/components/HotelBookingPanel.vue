@@ -8,7 +8,7 @@
  * the editorial feel (D24).
  */
 import type { ApiHotelDetail } from '~/utils/api'
-import { usd } from '~/utils/format'
+import { formatRating, usd, wholeNumber } from '~/utils/format'
 
 const props = defineProps<{ hotel: ApiHotelDetail }>()
 
@@ -52,12 +52,12 @@ const cancellation = computed(() => t('detail.cancellation'))
       </h1>
 
       <p class="mt-3 flex flex-wrap items-baseline gap-x-2 text-sm">
-        <span class="tabular text-lg font-semibold">{{ average === null ? '—' : average.toFixed(1) }}</span>
+        <span class="tabular text-lg font-semibold">{{ average === null ? '—' : formatRating(average) }}</span>
         <span v-if="band">{{ band }}</span>
         <span class="text-fg-subtle">
           {{ hotel.rating.totalReviews === 1
             ? $t('detail.reviewsCountOne')
-            : $t('detail.reviewsCount', { count: hotel.rating.totalReviews }) }}
+            : $t('detail.reviewsCount', { count: wholeNumber(hotel.rating.totalReviews) }) }}
         </span>
       </p>
 

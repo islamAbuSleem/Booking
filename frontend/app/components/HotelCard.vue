@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AMENITY_BY_ID } from '~/utils/mock'
-import { usd } from '~/utils/format'
+import { formatRating, usd, wholeNumber } from '~/utils/format'
 import { isUuid } from '~/utils/validation'
 import type { ApiHotelCard } from '~/utils/api'
 
@@ -26,7 +26,7 @@ const priceLabel = computed(() =>
 )
 
 const ratingLabel = computed(() =>
-  props.hotel.rating.average === null ? '—' : props.hotel.rating.average.toFixed(1),
+  props.hotel.rating.average === null ? '—' : formatRating(props.hotel.rating.average),
 )
 
 /**
@@ -96,7 +96,7 @@ const canFavorite = computed(() => isUuid(props.hotel.id))
             v-if="overflowCount > 0"
             class="text-fg-subtle"
           >
-            {{ $t('hotel.amenitiesMore', { count: overflowCount }) }}
+            {{ $t('hotel.amenitiesMore', { count: wholeNumber(overflowCount) }) }}
           </li>
         </ul>
 
@@ -104,7 +104,7 @@ const canFavorite = computed(() => isUuid(props.hotel.id))
           <p class="flex items-baseline gap-1.5 text-sm">
             <span class="tabular text-lg font-semibold">{{ ratingLabel }}</span>
             <span class="text-fg-subtle">
-              {{ $t('hotel.reviews', { count: hotel.rating.totalReviews }) }}
+              {{ $t('hotel.reviews', { count: wholeNumber(hotel.rating.totalReviews) }) }}
             </span>
           </p>
 

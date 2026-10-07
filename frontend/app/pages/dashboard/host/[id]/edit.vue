@@ -474,7 +474,7 @@ useSeoMeta({
                   <button
                     type="button"
                     class="text-danger px-2 py-1 text-sm underline-offset-4 hover:underline"
-                    :aria-label="$t('host.removeBlackout', { from: entry.from, to: entry.to })"
+                    :aria-label="$t('host.removeBlackout', { from: formatStayDate(entry.from), to: formatStayDate(entry.to) })"
                     @click="removeBlackout(entry)"
                   >
                     {{ $t('common.remove') }}

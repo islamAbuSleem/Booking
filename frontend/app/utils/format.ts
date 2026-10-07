@@ -20,6 +20,18 @@ const payableFormatters = new Map<string, Intl.NumberFormat>()
 
 const plainNumber = new Intl.NumberFormat('en-US')
 
+/** One decimal, for 1–5 ratings. `toFixed` hardcodes the decimal point; this does not. */
+const ratingFormat = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+})
+
+/** Four decimals, for map coordinates. */
+const coordinateFormat = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+})
+
 const stayDate = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
   month: 'short',
@@ -69,6 +81,16 @@ export function usdCents(cents: number): string {
 /** Review counts, guest counts, inventory. Never abbreviated. */
 export function wholeNumber(value: number): string {
   return plainNumber.format(value)
+}
+
+/** A 1–5 rating with one decimal, through Intl rather than `toFixed`. */
+export function formatRating(value: number): string {
+  return ratingFormat.format(value)
+}
+
+/** A map coordinate with four decimals, through Intl rather than `toFixed`. */
+export function formatCoordinate(value: number): string {
+  return coordinateFormat.format(value)
 }
 
 export function formatStayDate(iso: string): string {
