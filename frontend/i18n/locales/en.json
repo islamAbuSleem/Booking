@@ -275,7 +275,13 @@
     "cancelErrorTitle": "The cancellation did not go through",
     "cancelErrorBody": "Booking {reference} is still active. Check your connection and try again.",
     "notFoundTitle": "That booking is not here",
-    "notFoundBody": "The link is broken, or the booking was made under a different account."
+    "notFoundBody": "The link is broken, or the booking was made under a different account.",
+    "policyHeading": "Cancellation policy",
+    "quoteLine": "{percent}% of {total} = {refund}",
+    "policyTierDays": "{percent}% back {days} or more days before check-in",
+    "policyTierDay": "{percent}% back 1 day or more before check-in",
+    "policyWindowHours": "No refund within {hours} hours of check-in",
+    "policyWindowHour": "No refund within 1 hour of check-in"
   },
   "favorites": {
     "saveLabel": "Save {name} to favorites",
@@ -402,7 +408,19 @@
     "roomInventoryRequired": "How many rooms of this type can be sold at once?",
     "creatingListing": "Creating listing…",
     "roomPriceLocked": "Nightly prices are set per currency and can’t be changed here yet",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "policyHeading": "Cancellation policy",
+    "policyHint": "Tiered refund rules: days before check-in against the percent of the total refunded. The no-refund window wins over every tier.",
+    "policyDays": "Days before check-in",
+    "policyPercent": "Refund %",
+    "policyWindow": "No refund within (hours)",
+    "policyAddTier": "Add tier",
+    "policyRemoveTier": "Remove tier",
+    "policySave": "Save policy",
+    "policySaving": "Saving…",
+    "policySaved": "Policy saved",
+    "policyError": "The policy did not save. Nothing changed — try again.",
+    "policyVersion": "Version {version}"
   },
   "admin": {
     "title": "Moderation",

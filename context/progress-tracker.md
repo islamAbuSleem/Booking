@@ -90,7 +90,7 @@
 ### Phase 5 — Deferred features
 - [x] T35 Messaging: threads and messages
 - [x] T36 Messaging: live delivery
-- [ ] T37 Cancellation policy engine
+- [x] T37 Cancellation policy engine
 - [ ] T38 Stripe refunds
 - [ ] T39 Multi-currency
 - [ ] T40 Transactional email
@@ -701,8 +701,17 @@
     the gateway; the global `JwtAuthGuard` skips non-HTTP contexts so it never runs on
     the socket, and `@SkipEnvelope()` keeps the global envelope off gateway acks.
     Membership re-checked server-side before every join; the HTTP path fans out after
-    each write, and the frontend reconnects with a banner, refetching missed messages
+    each write, and the frontend     reconnects with a banner, refetching missed messages
     over HTTP (`useThreadSocket`, polling as fallback).
+  - **D81 — T37 cancellation policy engine.** `cancellation_policies` (one row per
+    hotel, tiers as ordered JSONB, version bumps per PUT; offline-written additive
+    migration). Refund computed once by the API from now-vs-check-in through a pure
+    function (no clock reads, timestamp passed in): no-refund window wins, boundaries
+    inclusive. Routes: public `GET /api/hotels/:id/cancellation-policy` (default at
+    version 0), owner-scoped `PUT /api/host/hotels/:id/cancellation-policy` (ownership
+    asserted first), `POST /api/bookings/:id/cancellation-quote` (CONFIRMED only, else
+    400 with the reason). Frontend: policy editor on the host edit page, plain-language
+    table + live quote on the booking detail page.
   - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo

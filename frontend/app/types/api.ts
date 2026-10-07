@@ -230,6 +230,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bookings/{id}/cancellation-quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote the refund for cancelling a booking
+         * @description The one computation, by the API, from the whole elapsed time between now and check-in: the tier the cancellation lands in decides the percent of the booking’s own total, in its own currency. Only CONFIRMED bookings quote — anything else is a 400 with the reason, mirroring the cancel guard.
+         */
+        post: operations["BookingsController_cancellationQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/favorites": {
         parameters: {
             query?: never;
@@ -390,6 +410,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hotels/{id}/cancellation-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The hotel’s cancellation policy
+         * @description The stored policy, or the API default when the hotel has none — never "no policy". Resolves by uuid or by slug, like the detail route, so the guest-facing table and the booking quote read the same row.
+         */
+        get: operations["HotelsController_findCancellationPolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sitemap/urls": {
         parameters: {
             query?: never;
@@ -460,6 +500,26 @@ export interface paths {
          * @description Updates hotel fields. A host can suspend their own listing, but only an admin can publish it.
          */
         patch: operations["HostController_updateHotel"];
+        trace?: never;
+    };
+    "/api/host/hotels/{id}/cancellation-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set my hotel’s cancellation policy
+         * @description Stores the tiered refund rules and the no-refund window, bumping the policy version. Ownership is asserted first: a hotel that is not this host’s is a 403 NOT_HOTEL_OWNER, never a 404.
+         */
+        put: operations["HostController_setCancellationPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/host/hotels/{id}/rooms": {
@@ -1817,6 +1877,51 @@ export interface components {
             success: true;
             data: components["schemas"]["ThreadReadData"];
         };
+        UpdatePolicy: {
+            /** @description Ordered highest-`daysBefore` first. Stored sorted that way. */
+            tiers: components["schemas"]["UpdatePolicy-__schema0"][];
+            /** @description Inside this many hours of check-in the refund is 0, whatever the tiers say. */
+            noRefundWithinHours: number;
+        };
+        "UpdatePolicy-__schema0": {
+            /** @description Whole days before check-in this tier starts at, inclusive. */
+            daysBefore: number;
+            /** @description Percent of the booking total refunded from this tier on. */
+            refundPercent: number;
+        };
+        CancellationPolicy: {
+            /** Format: uuid */
+            hotelId: string;
+            tiers: {
+                /** @description Whole days before check-in this tier starts at, inclusive. */
+                daysBefore: number;
+                /** @description Percent of the booking total refunded from this tier on. */
+                refundPercent: number;
+            }[];
+            noRefundWithinHours: number;
+            /** @description Bumps on every PUT. 0 means the API default, not a stored row. */
+            version: number;
+        };
+        CancellationPolicyEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CancellationPolicy"];
+        };
+        CancellationQuote: {
+            /** @description 0-100, from the tier the cancellation lands in. */
+            refundPercent: number;
+            /** @description Integer cents of the booking total at that percent. */
+            refundCents: number;
+            /** @description The booking’s own currency, never re-denominated. */
+            currency: string;
+            /** @description The policy version this quote priced against. */
+            policyVersion: number;
+        };
+        CancellationQuoteEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CancellationQuote"];
+        };
     };
     responses: never;
     parameters: never;
@@ -2266,6 +2371,65 @@ export interface operations {
             };
         };
     };
+    BookingsController_cancellationQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking to price a cancellation for, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The percent, the integer-cent refund, and the policy version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationQuoteEnvelope"];
+                };
+            };
+            /** @description The booking is not CONFIRMED (INVALID_CANCEL_STATE). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     FavoritesController_add: {
         parameters: {
             query?: never;
@@ -2637,6 +2801,35 @@ export interface operations {
             };
         };
     };
+    HotelsController_findCancellationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy, with its version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationPolicyEnvelope"];
+                };
+            };
+            /** @description No such hotel. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     SitemapController_urls: {
         parameters: {
             query?: never;
@@ -2899,6 +3092,60 @@ export interface operations {
             };
             /** @description Hotel not found or not owned by this host. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_setCancellationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePolicy"];
+            };
+        };
+        responses: {
+            /** @description The stored policy, with its new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationPolicyEnvelope"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
