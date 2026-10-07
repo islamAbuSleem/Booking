@@ -4,6 +4,7 @@ import {
   ADMIN_REPOSITORY,
   type AdminHotelItem,
   type AdminHotelStatus,
+  type AdminListPage,
   type AdminRepository,
   type AdminReviewItem,
   type AdminReviewStatus,
@@ -35,9 +36,14 @@ export class AdminService {
     return this.admin.stats();
   }
 
-  async listings(adminId: string, status?: AdminHotelStatus): Promise<AdminHotelItem[]> {
-    this.logger.log(`[admin] ${adminId} listed hotels status=${status ?? 'any'}`);
-    return this.admin.listHotels(status);
+  async listings(
+    adminId: string,
+    status?: AdminHotelStatus,
+    page = 1,
+    pageSize = 20,
+  ): Promise<AdminListPage<AdminHotelItem>> {
+    this.logger.log(`[admin] ${adminId} listed hotels status=${status ?? 'any'} page=${page}`);
+    return this.admin.listHotels(status, page, pageSize);
   }
 
   async setListingStatus(
@@ -54,9 +60,11 @@ export class AdminService {
     adminId: string,
     query?: string,
     role?: 'GUEST' | 'HOST' | 'ADMIN',
-  ): Promise<AdminUserItem[]> {
-    this.logger.log(`[admin] ${adminId} listed users query=${query ?? ''} role=${role ?? 'any'}`);
-    return this.admin.listUsers(query, role);
+    page = 1,
+    pageSize = 20,
+  ): Promise<AdminListPage<AdminUserItem>> {
+    this.logger.log(`[admin] ${adminId} listed users query=${query ?? ''} role=${role ?? 'any'} page=${page}`);
+    return this.admin.listUsers(query, role, page, pageSize);
   }
 
   async setUserStatus(
@@ -64,7 +72,7 @@ export class AdminService {
     id: string,
     status: AdminUserStatus,
   ): Promise<AdminUserItem> {
-    if (id.toLowerCase() === adminId.toLowerCase() && status === 'SUSPENDED') {
+    if (id === adminId && status === 'SUSPENDED') {
       throw new ApiError(
         HttpStatus.BAD_REQUEST,
         'ADMIN_SELF_SUSPEND',
@@ -76,9 +84,14 @@ export class AdminService {
     return user;
   }
 
-  async reviews(adminId: string, status?: AdminReviewStatus): Promise<AdminReviewItem[]> {
-    this.logger.log(`[admin] ${adminId} listed reviews status=${status ?? 'any'}`);
-    return this.admin.listReviews(status);
+  async reviews(
+    adminId: string,
+    status?: AdminReviewStatus,
+    page = 1,
+    pageSize = 20,
+  ): Promise<AdminListPage<AdminReviewItem>> {
+    this.logger.log(`[admin] ${adminId} listed reviews status=${status ?? 'any'} page=${page}`);
+    return this.admin.listReviews(status, page, pageSize);
   }
 
   async setReviewStatus(

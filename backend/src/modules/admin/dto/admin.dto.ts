@@ -10,6 +10,8 @@ import { envelopeSchema } from '../../../common/envelope.js';
 
 export const adminListingsQuerySchema = z.object({
   status: z.enum(['PENDING', 'PUBLISHED', 'REJECTED', 'SUSPENDED']).optional(),
+  page: z.coerce.number().int().positive().default(1).optional(),
+  pageSize: z.coerce.number().int().positive().max(100).default(20).optional(),
 });
 
 export const adminListingStatusSchema = z.object({
@@ -19,6 +21,8 @@ export const adminListingStatusSchema = z.object({
 export const adminUsersQuerySchema = z.object({
   query: z.string().max(200).optional(),
   role: z.enum(['GUEST', 'HOST', 'ADMIN']).optional(),
+  page: z.coerce.number().int().positive().default(1).optional(),
+  pageSize: z.coerce.number().int().positive().max(100).default(20).optional(),
 });
 
 export const adminUserStatusSchema = z.object({
@@ -27,6 +31,8 @@ export const adminUserStatusSchema = z.object({
 
 export const adminReviewsQuerySchema = z.object({
   status: z.enum(['VISIBLE', 'HIDDEN']).optional(),
+  page: z.coerce.number().int().positive().default(1).optional(),
+  pageSize: z.coerce.number().int().positive().max(100).default(20).optional(),
 });
 
 export const adminReviewStatusSchema = z.object({
@@ -86,9 +92,18 @@ const adminStatsSchema = z.object({
   reviewsHidden: z.int(),
 });
 
-const adminHotelListDataSchema = z.object({ items: z.array(adminHotelSchema) });
-const adminUserListDataSchema = z.object({ items: z.array(adminUserSchema) });
-const adminReviewListDataSchema = z.object({ items: z.array(adminReviewSchema) });
+const adminHotelListDataSchema = z.object({
+  items: z.array(adminHotelSchema),
+  total: z.int(),
+});
+const adminUserListDataSchema = z.object({
+  items: z.array(adminUserSchema),
+  total: z.int(),
+});
+const adminReviewListDataSchema = z.object({
+  items: z.array(adminReviewSchema),
+  total: z.int(),
+});
 
 export const DTO_SCHEMAS = {
   AdminListingsQuery: adminListingsQuerySchema,

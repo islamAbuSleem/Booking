@@ -60,12 +60,17 @@ export interface AdminStats {
   reviewsHidden: number;
 }
 
+export interface AdminListPage<T> {
+  items: T[];
+  total: number;
+}
+
 export interface AdminRepository {
   stats(): Promise<AdminStats>;
-  listHotels(status?: AdminHotelStatus): Promise<AdminHotelItem[]>;
+  listHotels(status?: AdminHotelStatus, page?: number, pageSize?: number): Promise<AdminListPage<AdminHotelItem>>;
   updateHotelStatus(id: string, status: AdminHotelStatus): Promise<AdminHotelItem>;
-  listUsers(query?: string, role?: 'GUEST' | 'HOST' | 'ADMIN'): Promise<AdminUserItem[]>;
+  listUsers(query?: string, role?: 'GUEST' | 'HOST' | 'ADMIN', page?: number, pageSize?: number): Promise<AdminListPage<AdminUserItem>>;
   updateUserStatus(id: string, status: AdminUserStatus): Promise<AdminUserItem>;
-  listReviews(status?: AdminReviewStatus): Promise<AdminReviewItem[]>;
+  listReviews(status?: AdminReviewStatus, page?: number, pageSize?: number): Promise<AdminListPage<AdminReviewItem>>;
   updateReviewStatus(id: string, status: AdminReviewStatus): Promise<AdminReviewItem>;
 }

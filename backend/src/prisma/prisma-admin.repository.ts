@@ -3,6 +3,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import {
   type AdminHotelItem,
   type AdminHotelStatus,
+  type AdminListPage,
   type AdminRepository,
   type AdminReviewItem,
   type AdminReviewStatus,
@@ -11,6 +12,10 @@ import {
   type AdminUserStatus,
 } from './admin.repository.js';
 import { PrismaService } from './prisma.service.js';
+
+function escapeLike(value: string): string {
+  return value.replace(/[%_]/g, '\\$&');
+}
 
 const HOTEL_SELECT = {
   id: true,
@@ -38,18 +43,9 @@ const REVIEW_SELECT = {
 /**
  * T25 — Prisma implementation of `AdminRepository`.
  *
- * Moderation reads are bounded rather than paginated: the console serves a team, not the
- * public, so there is no paging UI to drive — but "short queue" is not a guarantee, and an
- * unbounded `findMany` on `users` loads every row and every `contains` search compiles to
- * an `ILIKE '%term%'` no index can serve. The seam if they ever outgrow this cap is these
- * list methods — nothing above them changes.
+ * Lists are paginated (page/pageSize). Moderation reads default to the first page
+ * with a sensible page size if no pagination params are provided.
  */
-
-/**
- * Rows one console screen may pull. Generous enough that no realistic queue is truncated,
- * and bounded so a full-table load is never one refresh away.
- */
-const MODERATION_ROW_CAP = 500;
 @Injectable()
 export class PrismaAdminRepository implements AdminRepository {
   // Explicit `@Inject`: tsx/esbuild never emits `design:paramtypes`, so an
@@ -95,24 +91,36 @@ export class PrismaAdminRepository implements AdminRepository {
     };
   }
 
-  async listHotels(status?: AdminHotelStatus): Promise<AdminHotelItem[]> {
-    const rows = await this.prisma.hotel.findMany({
-      where: status ? { status } : {},
-      select: HOTEL_SELECT,
-      orderBy: { createdAt: 'desc' },
-      take: MODERATION_ROW_CAP,
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      city: row.city,
-      country: row.country,
-      status: row.status,
-      host: row.host,
-      roomsCount: row._count.rooms,
-      createdAt: row.createdAt.toISOString(),
-    }));
+  async listHotels(
+    status?: AdminHotelStatus,
+    page = 1,
+    pageSize = 20,
+  ): Promise<AdminListPage<AdminHotelItem>> {
+    const where = status ? { status } : {};
+    const [rows, total] = await Promise.all([
+      this.prisma.hotel.findMany({
+        where,
+        select: HOTEL_SELECT,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.hotel.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        city: row.city,
+        country: row.country,
+        status: row.status,
+        host: row.host,
+        roomsCount: row._count.rooms,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      total,
+    };
   }
 
   async updateHotelStatus(id: string, status: AdminHotelStatus): Promise<AdminHotelItem> {
@@ -134,32 +142,46 @@ export class PrismaAdminRepository implements AdminRepository {
     };
   }
 
-  async listUsers(query?: string, role?: 'GUEST' | 'HOST' | 'ADMIN'): Promise<AdminUserItem[]> {
+  async listUsers(
+    query?: string,
+    role?: 'GUEST' | 'HOST' | 'ADMIN',
+    page = 1,
+    pageSize = 20,
+  ): Promise<AdminListPage<AdminUserItem>> {
     const term = query?.trim();
-    const rows = await this.prisma.user.findMany({
-      where: {
-        ...(role ? { role } : {}),
-        ...(term
-          ? {
-              OR: [
-                { email: { contains: term, mode: 'insensitive' } },
-                { name: { contains: term, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      select: { id: true, email: true, name: true, role: true, status: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-      take: MODERATION_ROW_CAP,
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      email: row.email,
-      name: row.name,
-      role: row.role,
-      status: row.status,
-      createdAt: row.createdAt.toISOString(),
-    }));
+    const safeTerm = term ? escapeLike(term) : undefined;
+    const where = {
+      ...(role ? { role } : {}),
+      ...(safeTerm
+        ? {
+            OR: [
+              { email: { contains: safeTerm, mode: 'insensitive' as const } },
+              { name: { contains: safeTerm, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: { id: true, email: true, name: true, role: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        role: row.role,
+        status: row.status,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      total,
+    };
   }
 
   async updateUserStatus(id: string, status: AdminUserStatus): Promise<AdminUserItem> {
@@ -178,23 +200,35 @@ export class PrismaAdminRepository implements AdminRepository {
     };
   }
 
-  async listReviews(status?: AdminReviewStatus): Promise<AdminReviewItem[]> {
-    const rows = await this.prisma.review.findMany({
-      where: status ? { status } : {},
-      select: REVIEW_SELECT,
-      orderBy: { createdAt: 'desc' },
-      take: MODERATION_ROW_CAP,
-    });
-    return rows.map((row) => ({
-      id: row.id,
-      hotel: row.hotel,
-      author: row.author,
-      rating: row.rating,
-      title: row.title,
-      body: row.body,
-      status: row.status,
-      createdAt: row.createdAt.toISOString(),
-    }));
+  async listReviews(
+    status?: AdminReviewStatus,
+    page = 1,
+    pageSize = 20,
+  ): Promise<AdminListPage<AdminReviewItem>> {
+    const where = status ? { status } : {};
+    const [rows, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        select: REVIEW_SELECT,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.review.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        hotel: row.hotel,
+        author: row.author,
+        rating: row.rating,
+        title: row.title,
+        body: row.body,
+        status: row.status,
+        createdAt: row.createdAt.toISOString(),
+      })),
+      total,
+    };
   }
 
   async updateReviewStatus(id: string, status: AdminReviewStatus): Promise<AdminReviewItem> {

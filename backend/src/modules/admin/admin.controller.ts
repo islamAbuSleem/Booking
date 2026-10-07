@@ -106,8 +106,8 @@ export class AdminController {
   listings(
     @CurrentUser('id') adminId: string,
     @Query(zodPipe(adminListingsQuerySchema)) query: AdminListingsQuery,
-  ): Promise<{ items: AdminHotelDto[] }> {
-    return this.admin.listings(adminId, query.status).then((items) => ({ items }));
+  ): Promise<{ items: AdminHotelDto[]; total: number }> {
+    return this.admin.listings(adminId, query.status, query.page, query.pageSize);
   }
 
   @Patch('listings/:id/status')
@@ -183,8 +183,8 @@ export class AdminController {
   users(
     @CurrentUser('id') adminId: string,
     @Query(zodPipe(adminUsersQuerySchema)) query: AdminUsersQuery,
-  ): Promise<{ items: AdminUserDto[] }> {
-    return this.admin.users(adminId, query.query, query.role).then((items) => ({ items }));
+  ): Promise<{ items: AdminUserDto[]; total: number }> {
+    return this.admin.users(adminId, query.query, query.role, query.page, query.pageSize);
   }
 
   @Patch('users/:id/status')
@@ -262,8 +262,8 @@ export class AdminController {
   reviews(
     @CurrentUser('id') adminId: string,
     @Query(zodPipe(adminReviewsQuerySchema)) query: AdminReviewsQuery,
-  ): Promise<{ items: AdminReviewDto[] }> {
-    return this.admin.reviews(adminId, query.status).then((items) => ({ items }));
+  ): Promise<{ items: AdminReviewDto[]; total: number }> {
+    return this.admin.reviews(adminId, query.status, query.page, query.pageSize);
   }
 
   @Patch('reviews/:id/status')
