@@ -51,6 +51,15 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // T36 — the Socket.IO gateway authenticates its own handshake (same JWT cookie,
+    // verified in the gateway): for a non-HTTP context `getRequest()` hands back the
+    // socket, whose `.headers` is undefined, so this guard must not run there at all.
+    // The `typeof` check keeps older unit specs (whose mock context has no `getType`)
+    // on the HTTP path.
+    const contextType =
+      typeof context.getType === 'function' ? context.getType() : 'http';
+    if (contextType !== 'http') return true;
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),

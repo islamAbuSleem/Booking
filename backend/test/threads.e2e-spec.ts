@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { io, type Socket as ClientSocket } from 'socket.io-client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/bootstrap.js';
@@ -395,6 +396,119 @@ describe('Threads API (e2e)', () => {
           message: 'This conversation is not yours',
         },
       });
+    });
+  });
+
+  describe('live delivery (Socket.IO)', () => {
+    let url: string;
+
+    beforeAll(async () => {
+      await app.listen(0);
+      const address = app.getHttpServer().address() as { port: number };
+      url = `http://127.0.0.1:${address.port}`;
+    });
+
+    function connect(cookie: string | null): ClientSocket {
+      return io(url, {
+        transports: ['websocket'],
+        ...(cookie ? { extraHeaders: { cookie } } : {}),
+      });
+    }
+
+    function join(
+      client: ClientSocket,
+      threadId: string,
+    ): Promise<unknown> {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('join ack timed out')), 5000);
+        client.emit('thread:join', { threadId }, (answer: unknown) => {
+          clearTimeout(timer);
+          resolve(answer);
+        });
+      });
+    }
+
+    it('refuses a join on a thread the socket is not part of', async () => {
+      // The ticket's verify line, over a real socket: host B's join on host A's
+      // thread is refused and subscribes to nothing.
+      const created = await request(app.getHttpServer())
+        .post('/api/threads')
+        .set('Cookie', guestCookie)
+        .send({ bookingId: BOOKING_ID, body: 'Hi' })
+        .expect(201);
+      const threadId = created.body.data.id as string;
+
+      const stranger = connect(strangerCookie);
+      try {
+        const answer = await join(stranger, threadId);
+        expect(answer).toEqual({ error: { code: 'NOT_THREAD_PARTICIPANT' } });
+      } finally {
+        stranger.disconnect();
+      }
+    });
+
+    it('lets a participant join and fans out message:new to the room', async () => {
+      const created = await request(app.getHttpServer())
+        .post('/api/threads')
+        .set('Cookie', guestCookie)
+        .send({ bookingId: BOOKING_ID, body: 'Hi' })
+        .expect(201);
+      const threadId = created.body.data.id as string;
+
+      const guest = connect(guestCookie);
+      const host = connect(hostCookie);
+      try {
+        expect(await join(guest, threadId)).toEqual({
+          ok: true,
+          room: `thread:${threadId}`,
+        });
+        expect(await join(host, threadId)).toEqual({
+          ok: true,
+          room: `thread:${threadId}`,
+        });
+
+        const received = new Promise<unknown>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('message:new timed out')), 5000);
+          host.on('message:new', (message: unknown) => {
+            clearTimeout(timer);
+            resolve(message);
+          });
+        });
+        await request(app.getHttpServer())
+          .post(`/api/threads/${threadId}/messages`)
+          .set('Cookie', guestCookie)
+          .send({ body: 'Hello over the socket!' })
+          .expect(201);
+
+        expect(await received).toMatchObject({
+          threadId,
+          senderId: GUEST_ID,
+          body: 'Hello over the socket!',
+        });
+      } finally {
+        guest.disconnect();
+        host.disconnect();
+      }
+    });
+
+    it('disconnects a socket with no session before it can join anything', async () => {
+      const anonymous = connect(null);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('disconnect timed out')), 5000);
+          anonymous.on('disconnect', () => {
+            clearTimeout(timer);
+            resolve();
+          });
+          anonymous.on('connect_error', () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+        expect(anonymous.connected).toBe(false);
+      } finally {
+        anonymous.disconnect();
+      }
     });
   });
 });

@@ -37,6 +37,7 @@ import {
   type ThreadReadData,
 } from './dto/thread.dto.js';
 import { ThreadsService } from './threads.service.js';
+import { ThreadsGateway } from './threads.gateway.js';
 
 /**
  * T35 — the messaging routes. Thin on purpose: parse, delegate.
@@ -52,6 +53,7 @@ export class ThreadsController {
   // (see PrismaService), so inference would break the OpenAPI preview.
   constructor(
     @Inject(ThreadsService) private readonly threads: ThreadsService,
+    @Inject(ThreadsGateway) private readonly gateway: ThreadsGateway,
   ) {}
 
   @Post()
@@ -200,12 +202,16 @@ export class ThreadsController {
     description: 'No such thread.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
-  send(
+  async send(
     @CurrentUser('id') callerId: string,
     @Param(zodPipe(threadIdParam)) params: ThreadIdParam,
     @Body(zodPipe(sendMessageSchema)) body: SendMessage,
   ): Promise<MessageDto> {
-    return this.threads.sendMessage(callerId, params.id, body);
+    const message = await this.threads.sendMessage(callerId, params.id, body);
+    // Live first, polling as the fallback: a socket that missed this refetches it
+    // over HTTP via `?before=` on reconnect.
+    this.gateway.emitNewMessage(message.threadId, message);
+    return message;
   }
 
   @Post(':id/read')
@@ -245,10 +251,12 @@ export class ThreadsController {
     description: 'No such thread.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
-  markRead(
+  async markRead(
     @CurrentUser('id') callerId: string,
     @Param(zodPipe(threadIdParam)) params: ThreadIdParam,
   ): Promise<ThreadReadData> {
-    return this.threads.markRead(callerId, params.id);
+    const cleared = await this.threads.markRead(callerId, params.id);
+    this.gateway.emitRead(params.id, callerId);
+    return cleared;
   }
 }
