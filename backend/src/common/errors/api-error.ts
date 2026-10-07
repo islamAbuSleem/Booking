@@ -89,6 +89,8 @@ export const ERROR_CODES = [
   // (CONFIRMED, COMPLETED, CANCELLED) is a 400 — the money for those states is settled
   // or gone, and an intent now would charge for nothing.
   'INVALID_PAYMENT_STATE',
+  // `HOLD_EXPIRED`: the booking hold has expired, payment cannot proceed.
+  'HOLD_EXPIRED',
   // `PAYMENT_NOT_FOUND`: no intent has been created for the booking yet.
   'PAYMENT_NOT_FOUND',
   // `STRIPE_NOT_CONFIGURED`: the route ran without `STRIPE_SECRET_KEY` (503). Keys are

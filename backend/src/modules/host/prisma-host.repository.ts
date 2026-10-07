@@ -198,6 +198,17 @@ export class PrismaHostRepository implements HostRepository {
     return this.toDetail(row);
   }
 
+  async findBySlug(slug: string): Promise<HostHotelDetail | null> {
+    const row = await this.prisma.hotel.findFirst({
+      where: { slug },
+      select: HOTEL_DETAIL_SELECT,
+    });
+
+    if (!row) return null;
+
+    return this.toDetail(row);
+  }
+
   async create(data: CreateHotelData): Promise<HostHotelDetail> {
     const { amenityIds, ...hotel } = data;
     const created = await this.prisma.hotel.create({
@@ -261,42 +272,53 @@ export class PrismaHostRepository implements HostRepository {
   }
 
   async createRoom(data: CreateRoomData): Promise<RoomDetail> {
-    const room = await this.prisma.room.create({
-      data: {
-        hotelId: data.hotelId,
-        name: data.name,
-        description: data.description,
-        bedType: data.bedType,
-        maxGuests: data.maxGuests,
-        totalInventory: data.totalInventory,
-        sortOrder: data.sortOrder,
-        prices: { create: data.prices },
-        images: { create: data.images.map((img) => ({ ...img, hotelId: data.hotelId })) },
-        blackoutDates: { create: [] },
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        bedType: true,
-        maxGuests: true,
-        totalInventory: true,
-        sortOrder: true,
-        prices: { select: { currency: true, priceCents: true } },
-        images: {
-          select: {
-            id: true,
-            url: true,
-            altText: true,
-            aspect: true,
-            width: true,
-            height: true,
-            sortOrder: true,
-            isCover: true,
-          },
+    const room = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.room.create({
+        data: {
+          hotelId: data.hotelId,
+          name: data.name,
+          description: data.description,
+          bedType: data.bedType,
+          maxGuests: data.maxGuests,
+          totalInventory: data.totalInventory,
+          sortOrder: data.sortOrder,
+          prices: { create: data.prices },
+          blackoutDates: { create: [] },
         },
-        blackoutDates: { select: { id: true, startsOn: true, endsOn: true, reason: true } },
-      },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          bedType: true,
+          maxGuests: true,
+          totalInventory: true,
+          sortOrder: true,
+          prices: { select: { currency: true, priceCents: true } },
+          images: {
+            select: {
+              id: true,
+              url: true,
+              altText: true,
+              aspect: true,
+              width: true,
+              height: true,
+              sortOrder: true,
+              isCover: true,
+            },
+          },
+          blackoutDates: { select: { id: true, startsOn: true, endsOn: true, reason: true } },
+        },
+      });
+      if (data.images.length > 0) {
+        await tx.hotelImage.createMany({
+          data: data.images.map((img) => ({
+            ...img,
+            hotelId: data.hotelId,
+            roomId: created.id,
+          })),
+        });
+      }
+      return created;
     });
 
     return this.toRoomDetail(room);

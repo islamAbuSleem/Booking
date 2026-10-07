@@ -73,6 +73,34 @@ export class HostController {
     return this.host.listMyHotels(hostId);
   }
 
+  // --- Bookings (must come before :id to avoid route shadowing) ---
+
+  @Get('bookings')
+  @ApiOperation({
+    summary: 'List incoming bookings for my hotels',
+    description: 'Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'A page of bookings with hotel, room, guest and price snapshot.',
+    schema: { $ref: contractRef('HostBookingListEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Not a host or admin.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async listMyBookings(
+    @CurrentUser('id') hostId: string,
+  ): Promise<HostBookingListDataDto> {
+    return this.host.listMyBookings(hostId);
+  }
+
   // --- Hotel CRUD ---
 
   @Post()
@@ -512,5 +540,4 @@ export class HostController {
   ): Promise<void> {
     await this.host.deleteBlackout(blackoutId, hostId);
   }
-
-  }
+}

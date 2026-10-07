@@ -91,6 +91,10 @@ export class HostService {
     const hotel = await this.repo.findByIdAndHost(id, hostId);
     if (!hotel) this.notOwner();
 
+// Publishing is the admin's moderation decision (T25), never a host write: a host can
+    // suspend their own listing but cannot put it back on the public shelf from here.
+    // There is deliberately no admin bypass — an admin publishes through the moderation
+    // endpoints, so this route has exactly one rule for every caller.
     if (data.status !== undefined && data.status !== HOST_SETTABLE_STATUS) {
       throw forbidden(
         'FORBIDDEN',

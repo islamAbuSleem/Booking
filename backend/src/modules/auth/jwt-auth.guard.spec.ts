@@ -125,6 +125,7 @@ describe('JwtAuthGuard', () => {
       avatarUrl: null,
       passwordHash: null,
       role: 'GUEST' as const,
+      status: 'ACTIVE' as const,
       oauthProvider: 'google',
       oauthAccountId: 'g-1',
       createdAt: new Date(),

@@ -13,11 +13,15 @@ export class StubHostRepository implements HostRepository {
   }
 
   async findByIdAndHost(_id: string, _hostId: string): Promise<HostHotelDetail | null> {
-    return null;
-  }
+return null;
+    }
 
   async slugExists(_slug: string): Promise<boolean> {
     return false;
+  }
+
+  async findBySlug(_slug: string): Promise<HostHotelDetail | null> {
+    return null;
   }
 
   async create(_data: unknown): Promise<HostHotelDetail> {

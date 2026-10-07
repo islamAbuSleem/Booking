@@ -54,6 +54,13 @@ export class PaymentsService {
         'Only pending bookings can take a payment',
       );
     }
+    if (booking.holdExpiresAt && booking.holdExpiresAt <= new Date()) {
+      throw new ApiError(
+        HttpStatus.BAD_REQUEST,
+        'HOLD_EXPIRED',
+        'The booking hold has expired',
+      );
+    }
 
     const intent = await this.stripe.createIntent({
       amountCents: booking.totalCents,
@@ -143,6 +150,15 @@ export class PaymentsService {
       this.logger.warn(`[payments] succeeded intent ${intent.id} matches no booking`);
       return;
     }
+// Upsert first so retried webhooks don't lose the succeeded state.
+    await this.payments.upsert({
+      bookingId: payment.bookingId,
+      stripePaymentIntentId: intent.id,
+      amountCents: payment.amountCents,
+      currency: payment.currency,
+      status: 'succeeded',
+      receiptUrl: await this.stripe.receiptUrl(intent),
+    });
     const flipped = await this.bookings.transitionStatus(payment.bookingId, 'PENDING', 'CONFIRMED');
     if (!flipped) {
       // The flip already happened. That is either an ordinary redelivery or the retry of
@@ -153,14 +169,6 @@ export class PaymentsService {
       await this.reconcile(payment, 'succeeded', await this.stripe.receiptUrl(intent), 'CONFIRMED');
       return;
     }
-    await this.payments.upsert({
-      bookingId: payment.bookingId,
-      stripePaymentIntentId: intent.id,
-      amountCents: payment.amountCents,
-      currency: payment.currency,
-      status: 'succeeded',
-      receiptUrl: await this.stripe.receiptUrl(intent),
-    });
     this.logger.log(`[payments] booking ${flipped.reference} CONFIRMED by intent ${intent.id}`);
   }
 
