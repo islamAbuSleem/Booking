@@ -55,7 +55,7 @@ const initials = computed(() =>
         </p>
         <p
           v-if="review.authorLocation"
-          class="text-fg-subtle text-label uppercase"
+          class="text-fg-muted text-label uppercase"
         >
           {{ review.authorLocation }}
         </p>
@@ -74,7 +74,7 @@ const initials = computed(() =>
       {{ review.body }}
     </p>
 
-    <p class="text-fg-subtle tabular text-sm">
+    <p class="text-fg-muted tabular text-sm">
       {{ formatStayDate(review.stayedOn) }}
     </p>
   </BaseCard>

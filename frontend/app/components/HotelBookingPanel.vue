@@ -54,7 +54,7 @@ const cancellation = computed(() => t('detail.cancellation'))
       <p class="mt-3 flex flex-wrap items-baseline gap-x-2 text-sm">
         <span class="tabular text-lg font-semibold">{{ average === null ? '—' : formatRating(average) }}</span>
         <span v-if="band">{{ band }}</span>
-        <span class="text-fg-subtle">
+        <span class="text-fg-muted">
           {{ hotel.rating.totalReviews === 1
             ? $t('detail.reviewsCountOne')
             : $t('detail.reviewsCount', { count: wholeNumber(hotel.rating.totalReviews) }) }}
@@ -70,7 +70,7 @@ const cancellation = computed(() => t('detail.cancellation'))
       <p class="flex flex-wrap items-baseline gap-2">
         <span class="text-fg-muted text-sm">{{ $t('hotel.from') }}</span>
         <span class="tabular font-display text-price-lg">{{ nightlyCents === null ? '—' : usd(nightlyCents) }}</span>
-        <span class="text-fg-subtle text-sm">{{ $t('hotel.perNight') }}</span>
+        <span class="text-fg-muted text-sm">{{ $t('hotel.perNight') }}</span>
       </p>
 
       <BaseButton
@@ -107,10 +107,10 @@ const cancellation = computed(() => t('detail.cancellation'))
       class="border-rule bg-surface fixed inset-x-0 bottom-0 z-20 flex items-center gap-4 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden"
     >
       <p class="flex shrink-0 flex-col">
-        <span class="text-fg-subtle text-label uppercase">{{ $t('hotel.from') }}</span>
+        <span class="text-fg-muted text-label uppercase">{{ $t('hotel.from') }}</span>
         <span class="flex items-baseline gap-1">
           <span class="tabular text-price">{{ nightlyCents === null ? '—' : usd(nightlyCents) }}</span>
-          <span class="text-fg-subtle text-sm">{{ $t('hotel.perNight') }}</span>
+          <span class="text-fg-muted text-sm">{{ $t('hotel.perNight') }}</span>
         </span>
       </p>
       <BaseButton

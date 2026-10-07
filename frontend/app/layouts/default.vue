@@ -32,7 +32,7 @@ async function onLogout(): Promise<void> {
           class="flex flex-col leading-none"
         >
           <span class="font-display text-xl">{{ $t('common.brand') }}</span>
-          <span class="text-fg-subtle text-label mt-1">{{ $t('common.brandSince') }}</span>
+          <span class="text-fg-muted text-label mt-1">{{ $t('common.brandSince') }}</span>
         </NuxtLink>
 
         <nav
@@ -100,7 +100,7 @@ async function onLogout(): Promise<void> {
         <div class="font-display text-lg">
           {{ $t('common.brand') }}
         </div>
-        <p class="text-fg-subtle mt-2 text-sm">
+        <p class="text-fg-inv mt-2 text-sm">
           {{ $t('common.brandSince') }} · {{ route.path }}
         </p>
       </div>
