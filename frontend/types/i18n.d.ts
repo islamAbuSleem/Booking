@@ -35,6 +35,8 @@ declare module 'vue-i18n' {
       loginSubtitle: string
       email: string
       password: string
+      passwordHint: string
+      fullName: string
       rememberMe: string
       forgotPassword: string
       signIn: string
@@ -45,6 +47,13 @@ declare module 'vue-i18n' {
       registerTitle: string
       registerSubtitle: string
       name: string
+      hostIntent: string
+      hostIntentHint: string
+      creatingAccount: string
+      createAccountButton: string
+      emailExists: string
+      haveAccount: string
+      registerDescription: string
     }
     hotels: {
       heading: string
@@ -70,8 +79,16 @@ declare module 'vue-i18n' {
       summaryGuests: string
     }
     search: {
+      destination: string
+      destinationPlaceholder: string
       guestsOne: string
       guests: string
+      guestsMany: string
+      checkIn: string
+      checkOut: string
+      invalidRange: string
+      submit: string
+      freeCancellationNote: string
     }
   }
 }
