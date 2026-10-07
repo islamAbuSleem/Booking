@@ -98,6 +98,9 @@ model User {
   bookings  Booking[]  @relation("GuestBookings")
   reviews   Review[]
   favorites Favorite[]
+  threadGuest Thread[] @relation("ThreadGuest")
+  threadHost  Thread[] @relation("ThreadHost")
+  sentMessages Message[] @relation("MessageSender")
 
   // Email stays unique across providers so one person is one account; the OAuth tuple
   // is the lookup key for the provider callbacks. Postgres allows repeated NULLs in a
@@ -328,6 +331,7 @@ model Booking {
   room    Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
   payment Payment?
   review  Review?
+  threads Thread[]
 
   @@index([guestId, status])
   @@index([roomId, checkIn, checkOut])
@@ -394,4 +398,52 @@ model Favorite {
   @@id([userId, hotelId])
   @@index([hotelId])
   @@map("favorites")
+}
+
+/// T35 — one conversation per (booking, guest, host). The thread is created on the
+/// first message and reused thereafter, so the triple is a unique key, not just an
+/// index. Unread state is two counters, one per participant: marking a thread read
+/// clears only the reader's counter, so the other side's badge is untouched.
+model Thread {
+  id        String @id @default(uuid()) @db.Uuid
+  bookingId String @map("booking_id") @db.Uuid
+  guestId   String @map("guest_id") @db.Uuid
+  hostId    String @map("host_id") @db.Uuid
+
+  guestUnread Int @default(0) @map("guest_unread")
+  hostUnread  Int @default(0) @map("host_unread")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking  Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  guest    User      @relation("ThreadGuest", fields: [guestId], references: [id], onDelete: Cascade)
+  host     User      @relation("ThreadHost", fields: [hostId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([bookingId, guestId, hostId], map: "threads_booking_guest_host_key")
+  @@index([guestId])
+  @@index([hostId])
+  @@map("threads")
+}
+
+/// T35 — a single message in a thread. `body` is capped at 5000 chars by the Zod
+/// contract; the column is TEXT because Postgres cannot express that bound as cheaply
+/// as the validator. `readAt` is the read receipt: set when the *other* participant
+/// marks the thread read, never by the sender.
+model Message {
+  id       String @id @default(uuid()) @db.Uuid
+  threadId String @map("thread_id") @db.Uuid
+  senderId String @map("sender_id") @db.Uuid
+
+  body String @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("messages")
 }

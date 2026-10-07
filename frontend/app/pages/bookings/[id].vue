@@ -9,7 +9,7 @@
  * Cancel goes through the real endpoint and degrades to the local store the
  * same way the read does.
  */
-import { cancelBooking, createReview, fetchBooking, fetchReviewable, isApiError, isApiFailure } from '~/utils/api'
+import { cancelBooking, createReview, createThread, fetchBooking, fetchReviewable, isApiError, isApiFailure } from '~/utils/api'
 import type { ApiBooking } from '~/utils/api'
 import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
 import { useBookings } from '~/composables/useBookings'
@@ -177,6 +177,34 @@ const cancelOpen = ref(false)
 const cancelBusy = ref(false)
 const cancelled = ref(false)
 const cancelFailed = ref(false)
+
+/**
+ * T35 — "Message host". Opens (or reuses) the booking's thread with a greeting,
+ * then lands on it. A failed open keeps the guest here with an inline error:
+ * the booking page is not the place for a dead end.
+ */
+const messageBusy = ref(false)
+const messageFailed = ref(false)
+
+async function messageHost(): Promise<void> {
+  const record = booking.value
+  if (!record || messageBusy.value) return
+  messageBusy.value = true
+  messageFailed.value = false
+  try {
+    const thread = await createThread({
+      bookingId: record.id,
+      body: t('messages.firstMessage', { reference: record.reference }),
+    })
+    await navigateTo(`/messages/${thread.id}`)
+  }
+  catch {
+    messageFailed.value = true
+  }
+  finally {
+    messageBusy.value = false
+  }
+}
 
 /**
  * The real cancel first. On success the response *is* the new state, so the
@@ -409,15 +437,35 @@ useSeoMeta({
             </p>
           </section>
 
-          <div v-if="cancellable">
+          <div class="flex flex-wrap items-center gap-3">
+            <div v-if="cancellable">
+              <BaseButton
+                variant="secondary"
+                size="md"
+                @click="cancelOpen = true"
+              >
+                {{ $t('bookings.cancelBooking') }}
+              </BaseButton>
+            </div>
+
+            <!-- T35: opens (or reuses) the booking's thread, then lands on it. -->
             <BaseButton
               variant="secondary"
               size="md"
-              @click="cancelOpen = true"
+              :loading="messageBusy"
+              :disabled="messageBusy"
+              @click="messageHost()"
             >
-              {{ $t('bookings.cancelBooking') }}
+              {{ $t('messages.messageHost') }}
             </BaseButton>
           </div>
+          <p
+            v-if="messageFailed"
+            class="text-danger mt-2 text-sm"
+            role="alert"
+          >
+            {{ $t('messages.sendError') }}
+          </p>
 
           <!-- T24: the review form, once per completed stay. Fixtures are read-only. -->
           <section

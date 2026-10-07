@@ -1,5 +1,5 @@
-/**
- * API client — the only place that talks to the booking API.
+﻿/**
+ * API client â€” the only place that talks to the booking API.
  *
  * Every request goes through `apiFetch`, which unwraps the
  * `{ success: true, data } / { success: false, error }` envelope once and
@@ -13,7 +13,7 @@
  * A transport failure (`code === 'NETWORK_ERROR'`) or a 2xx from a foreign
  * response on a port the API is not on means there is no backend to talk to.
  * Pages treat those as the mock-fallback signal via `isApiFailure`; a real
- * failure — an envelope error (validation, 404, …) or an HTTP error status — is
+ * failure â€” an envelope error (validation, 404, â€¦) or an HTTP error status â€” is
  * rethrown so the error state renders instead.
  */
 import type { components } from '~/types/api'
@@ -57,6 +57,12 @@ export type ApiAdminStats = components['schemas']['AdminStats']
 export type ApiAdminHotelStatus = ApiAdminHotel['status']
 export type ApiAdminUserStatus = ApiAdminUser['status']
 export type ApiAdminReviewStatus = ApiAdminReview['status']
+export type ApiThread = components['schemas']['Thread']
+export type ApiThreadListData = components['schemas']['ThreadListData']
+export type ApiThreadMessage = components['schemas']['Message']
+export type ApiThreadMessageListData = components['schemas']['MessageListData']
+export type ApiCreateThread = components['schemas']['CreateThread']
+export type ApiSendMessage = components['schemas']['SendMessage']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -85,13 +91,13 @@ export function isTransportError(error: unknown): boolean {
 const LOCAL_FAILURES = new Set(['NETWORK_ERROR', 'BAD_RESPONSE'])
 
 /**
- * The API answered and the answer is a real failure — an envelope error, or an
+ * The API answered and the answer is a real failure â€” an envelope error, or an
  * HTTP error status whose body was not an envelope (`HTTP_502` from a proxy, a
  * 500 from a crashed process). Both mean the service is there and unhappy, so
  * they drive the error / not-found state and are never hidden behind fixtures:
  * a guest must never be shown fixture rooms while a real search is broken.
  *
- * Only a transport failure (`NETWORK_ERROR` — nothing listening) or a 2xx from
+ * Only a transport failure (`NETWORK_ERROR` â€” nothing listening) or a 2xx from
  * a foreign service (`BAD_RESPONSE`) means there is no backend here, and those
  * are the mock-fallback signal.
  */
@@ -154,7 +160,7 @@ function normalizeTransportError(error: unknown): ApiRequestError {
 interface ApiRequestOptions {
   query?: Record<string, string | number>
   /**
-   * `POST` for the writes that carry a body — the quote (which changes nothing, the
+   * `POST` for the writes that carry a body â€” the quote (which changes nothing, the
    * server prices a stay and answers 200), the favourites insert, and the upload
    * sign/attach. `DELETE` is a path-only call that answers 204 with no body at all.
    * `PATCH` for the updates that carry a partial body.
@@ -163,7 +169,7 @@ interface ApiRequestOptions {
   /**
    * Flat key/value bodies stay a `Record` so `$fetch` omits `undefined` optionals and
    * the API applies its own defaults. Bodies with nested arrays (room prices, room
-   * images) cannot be expressed that way, so they travel as `json` instead — one or
+   * images) cannot be expressed that way, so they travel as `json` instead â€” one or
    * the other, never both.
    */
   body?: Record<string, string | number | boolean | undefined>
@@ -235,8 +241,8 @@ export function toApiSort(sort: HotelSort): ApiSort {
 }
 
 /**
- * UI filter state → API query params. `stars` has no API param in the T16
- * contract, so it is intentionally absent here — the list page applies it
+ * UI filter state â†’ API query params. `stars` has no API param in the T16
+ * contract, so it is intentionally absent here â€” the list page applies it
  * client-side and the report flags the gap.
  */
 export function toHotelListParams(
@@ -264,13 +270,13 @@ export async function fetchHotels(params: Record<string, string | number>): Prom
   return apiFetch<ApiHotelListData>('/api/hotels', { query: params })
 }
 
-/** Accepts a uuid or a slug — the frontend links to `/hotels/{slug}`. */
+/** Accepts a uuid or a slug â€” the frontend links to `/hotels/{slug}`. */
 export async function fetchHotelDetail(id: string): Promise<ApiHotelDetail> {
   return apiFetch<ApiHotelDetail>(`/api/hotels/${encodeURIComponent(id)}`)
 }
 
 /**
- * `POST /api/bookings/quote` — the T18 body. `currency` is the property's own quoted
+ * `POST /api/bookings/quote` â€” the T18 body. `currency` is the property's own quoted
  * currency, read from the detail payload rather than asserted here, so the site never
  * asks for a currency it has not shown prices in.
  *
@@ -289,7 +295,7 @@ export async function fetchQuote(request: QuoteRequest): Promise<ApiQuoteData> {
 }
 
 /**
- * T19. `hotelId` is the **uuid**, not the slug — `GET /hotels/:id` accepts either, so a
+ * T19. `hotelId` is the **uuid**, not the slug â€” `GET /hotels/:id` accepts either, so a
  * detail page keyed on `slug` will cheerfully send the wrong one and collect a 404.
  * A duplicate is a `FAVORITE_EXISTS` 409, not a second 201; reconciling that is the
  * caller's job because it owns the toggle, not the transport.
@@ -304,8 +310,8 @@ export async function unfavorite(hotelId: string): Promise<void> {
 }
 
 /**
- * T20. `GET /api/bookings` — the caller's own trips, newest first. An anonymous session
- * (no auth yet — T23) answers 401 `UNAUTHORIZED`, which the pages treat as "nothing
+ * T20. `GET /api/bookings` â€” the caller's own trips, newest first. An anonymous session
+ * (no auth yet â€” T23) answers 401 `UNAUTHORIZED`, which the pages treat as "nothing
  * answered" and degrade to the fixtures rather than an error state.
  */
 export async function fetchMyBookings(): Promise<ApiBookingListData> {
@@ -322,10 +328,10 @@ export async function fetchBooking(id: string): Promise<ApiBooking> {
 }
 
 /**
- * T20. `POST /api/bookings/:id/cancel` — no body, so it is a `POST` option without
+ * T20. `POST /api/bookings/:id/cancel` â€” no body, so it is a `POST` option without
  * `body`, unlike the quote and the favourites write. Guarded to `CONFIRMED` on the
  * server (D55); the 200 body carries the booking in its new `CANCELLED` state, which
- * is the source of truth for the flip — any other state answers 409
+ * is the source of truth for the flip â€” any other state answers 409
  * `INVALID_CANCEL_STATE` and the caller must not claim a cancellation.
  */
 export async function cancelBooking(id: string): Promise<ApiBooking> {
@@ -333,7 +339,7 @@ export async function cancelBooking(id: string): Promise<ApiBooking> {
 }
 
 /**
- * T22. The host's own listings. Scoped server-side to the caller — a 403
+ * T22. The host's own listings. Scoped server-side to the caller â€” a 403
  * `NOT_HOTEL_OWNER` is the answer for someone else's id, and the list never contains
  * it in the first place. Anonymous callers 401, which pages treat as the mock-fallback
  * signal exactly like the bookings pages do.
@@ -388,7 +394,7 @@ export async function deleteBlackout(blackoutId: string): Promise<void> {
   await apiFetch<undefined>(`/api/host/hotels/blackouts/${encodeURIComponent(blackoutId)}`, { method: 'DELETE' })
 }
 
-/** Every booking on the caller's rooms, newest first — the "incoming" table. */
+/** Every booking on the caller's rooms, newest first â€” the "incoming" table. */
 export async function fetchHostBookings(): Promise<ApiHostBookingListData> {
   return apiFetch<ApiHostBookingListData>('/api/host/hotels/bookings')
 }
@@ -403,21 +409,21 @@ export async function fetchHotelReviews(hotelIdOrSlug: string, page = 1, pageSiz
   })
 }
 
-/** T24. One review per completed stay — a second write for the same booking 409s. */
+/** T24. One review per completed stay â€” a second write for the same booking 409s. */
 export async function createReview(hotelId: string, body: ApiCreateReview): Promise<ApiReview> {
   return apiFetch<ApiReview>(`/api/hotels/${encodeURIComponent(hotelId)}/reviews`, { method: 'POST', json: body })
 }
 
 /**
  * T24. Whether the caller may review this booking right now. A negative answer is data
- * (`canReview: false` + reason), not an error — the form branches on it.
+ * (`canReview: false` + reason), not an error â€” the form branches on it.
  */
 export async function fetchReviewable(bookingId: string): Promise<ApiReviewable> {
   return apiFetch<ApiReviewable>(`/api/bookings/${encodeURIComponent(bookingId)}/reviewable`)
 }
 
 /**
- * T20 + T28. Creates the PENDING booking — the hold that T26/T27 confirm. The money
+ * T20 + T28. Creates the PENDING booking â€” the hold that T26/T27 confirm. The money
  * snapshot is server-computed from the quote inputs; contact fields are validated but
  * not persisted. A signed-out caller 401s (the page sends them to login); nothing
  * answered (transport failure) is the only case with no booking at all.
@@ -438,7 +444,7 @@ export async function createBooking(request: CreateBookingRequest): Promise<ApiB
 
 /**
  * T26 + T28. Mints (or replays, idempotently) the PaymentIntent for a PENDING booking.
- * The amount answers in the payload — the page never prices anything itself.
+ * The amount answers in the payload â€” the page never prices anything itself.
  */
 export async function createPaymentIntent(bookingId: string): Promise<ApiIntentData> {
   return apiFetch<ApiIntentData>('/api/payments/intent', { method: 'POST', body: { bookingId } })
@@ -451,7 +457,7 @@ export async function fetchPayment(bookingId: string): Promise<ApiPayment> {
 
 /**
  * T25. The moderation console reads. Every one is admin-only: a host gets 403
- * `ADMIN_REQUIRED`, which pages treat as a real error (never fixtures — fixtures must
+ * `ADMIN_REQUIRED`, which pages treat as a real error (never fixtures â€” fixtures must
  * not stand in for access control).
  */
 export async function fetchAdminStats(): Promise<ApiAdminStats> {
@@ -494,38 +500,68 @@ export async function setAdminReviewStatus(id: string, status: ApiAdminReviewSta
 }
 
 /**
- * T21. `POST /api/uploads/sign` — the folder-scoped upload config. Only the API secret
+ * T21. `POST /api/uploads/sign` â€” the folder-scoped upload config. Only the API secret
  * stays server-side; the `apiKey` and `signature` are handed to the browser on purpose.
  *
  * This is the one call in the upload flow that goes through `apiFetch`. The Cloudinary
  * POST that follows is a third-party host, so it uses a raw `XMLHttpRequest` in
- * `usePhotoUploads` instead — see the comment there.
+ * `usePhotoUploads` instead â€” see the comment there.
  */
 export async function fetchUploadSign(): Promise<ApiUploadSign> {
   return apiFetch<ApiUploadSign>('/api/uploads/sign', { method: 'POST' })
 }
 
 /**
- * T21. `POST /api/uploads/attach` — persists the `hotel_images` row for an asset that
+ * T21. `POST /api/uploads/attach` â€” persists the `hotel_images` row for an asset that
  * already uploaded to Cloudinary. T22 calls this: the wizard has no `hotelId` until it
  * creates the listing, so T21 stages the Cloudinary result instead of calling this.
  *
  * A `publicId` outside the caller's `booking/hotels/{hostId}/` folder is 403
  * `UPLOAD_FOREIGN`; a `(hotelId, url)` pair already attached is 409.
  */
-export async function attachUpload(request: ApiAttachUpload): Promise<ApiHotelImage> {
+export async function attachUpload(request: ApiAttachUpload):
+Promise<ApiHotelImage> {
   return apiFetch<ApiHotelImage>('/api/uploads/attach', { method: 'POST', body: { ...request } })
 }
 
 /**
- * T21. `DELETE /api/uploads/:publicId` — destroys the asset and removes its row.
+ * T21. `DELETE /api/uploads/:publicId` â€” destroys the asset and removes its row.
  *
  * The `publicId` is a Cloudinary path full of slashes (`booking/hotels/{hostId}/lobby`),
  * so it has to travel as one `%2F`-encoded segment. Interpolating it raw would make
  * `/api/uploads/` match with an empty param and the path segments route as separate
- * ones — a 404 that reads like a missing asset. `encodeURIComponent` is what a real HTTP
+ * ones â€” a 404 that reads like a missing asset. `encodeURIComponent` is what a real HTTP
  * client does, and Express decodes it back before the handler sees it.
  */
 export async function deleteUpload(publicId: string): Promise<void> {
   await apiFetch<undefined>(`/api/uploads/${encodeURIComponent(publicId)}`, { method: 'DELETE' })
+}
+
+/**
+ * T35. `POST /api/threads` — open (or reuse) the conversation about a booking.
+ * The body carries a `bookingId` only; the parties resolve server-side.
+ */
+export async function createThread(request: ApiCreateThread): Promise<ApiThread> {
+  return apiFetch<ApiThread>('/api/threads', { method: 'POST', body: { ...request } })
+}
+
+/** T35. `GET /api/threads` — the caller''s conversations, newest first. */
+export async function fetchThreads(): Promise<ApiThreadListData> {
+  return apiFetch<ApiThreadListData>('/api/threads')
+}
+
+/** T35. `GET /api/threads/:id/messages` — one page, oldest first. */
+export async function fetchThreadMessages(threadId: string, before?: string): Promise<ApiThreadMessageListData> {
+  const query = before ? `?before=${encodeURIComponent(before)}` : ''
+  return apiFetch<ApiThreadMessageListData>(`/api/threads/${encodeURIComponent(threadId)}/messages${query}`)
+}
+
+/** T35. `POST /api/threads/:id/messages` — append and bump the peer''s counter. */
+export async function sendThreadMessage(threadId: string, body: ApiSendMessage): Promise<ApiThreadMessage> {
+  return apiFetch<ApiThreadMessage>(`/api/threads/${encodeURIComponent(threadId)}/messages`, { method: 'POST', body: { ...body } })
+}
+
+/** T35. `POST /api/threads/:id/read` — clear only the reader''s counter. */
+export async function markThreadRead(threadId: string): Promise<void> {
+  await apiFetch<unknown>(`/api/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' })
 }
