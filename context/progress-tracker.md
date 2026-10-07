@@ -81,7 +81,7 @@
 - [x] T30 i18n scaffolding
 
 ### Phase 4 — Polish
-- [ ] T31 SEO
+- [x] T31 SEO
 - [ ] T32 Accessibility audit
 - [ ] T32b Performance baseline and UX pass
 - [ ] T33 Test suite completion

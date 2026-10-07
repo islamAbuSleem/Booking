@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BookingsModule } from '../bookings/bookings.module.js';
 import { HotelsController } from './hotels.controller.js';
 import { HotelsService } from './hotels.service.js';
+import { SitemapController } from './sitemap.controller.js';
 
 /**
  * `BookingsModule` is imported, not reached into: T18 put the availability logic there and
@@ -10,7 +11,7 @@ import { HotelsService } from './hotels.service.js';
  */
 @Module({
   imports: [BookingsModule],
-  controllers: [HotelsController],
+  controllers: [HotelsController, SitemapController],
   providers: [HotelsService],
   exports: [HotelsService],
 })

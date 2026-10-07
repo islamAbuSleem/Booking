@@ -4,6 +4,8 @@ import { fetchHotels, isApiFailure } from '~/utils/api'
 import type { ApiHotelCard } from '~/utils/api'
 import { mockHotelToCard } from '~/utils/hotelAdapters'
 
+const requestUrl = useRequestURL()
+
 useSeoMeta({
   title: () => $t('common.brand'),
   description: () => $t('home.subtitle'),
@@ -11,6 +13,9 @@ useSeoMeta({
   ogDescription: () => $t('home.subtitle'),
   ogType: 'website',
 })
+
+// The home page has no query state, so its own origin root is the canonical URL.
+useHead({ link: [{ rel: 'canonical', href: `${requestUrl.origin}/` }] })
 
 const HOME_PAGE_SIZE = 6
 

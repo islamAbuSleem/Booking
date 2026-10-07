@@ -106,9 +106,19 @@ const healthDataSchema = z.object({
   db: z.enum(['up', 'down']),
 });
 
+const sitemapUrlSchema = z.object({
+  slug: z.string().describe('Stable, URL-safe. The detail route accepts this.'),
+  updatedAt: z.string().describe('ISO 8601 lastmod for the sitemap entry.'),
+});
+
+const sitemapUrlsDataSchema = z.object({
+  items: z.array(sitemapUrlSchema),
+});
+
 export const hotelListEnvelopeSchema = envelopeSchema(hotelListDataSchema);
 export const hotelDetailEnvelopeSchema = envelopeSchema(hotelDetailSchema);
 export const healthEnvelopeSchema = envelopeSchema(healthDataSchema);
+export const sitemapUrlsEnvelopeSchema = envelopeSchema(sitemapUrlsDataSchema);
 
 export type HotelCardDto = z.infer<typeof hotelCardSchema>;
 export type HotelDetailDto = z.infer<typeof hotelDetailSchema>;
@@ -116,6 +126,8 @@ export type HotelDetailDto = z.infer<typeof hotelDetailSchema>;
 export type HotelImageDto = z.infer<typeof imageSummarySchema>;
 export type HotelListDataDto = z.infer<typeof hotelListDataSchema>;
 export type HealthDataDto = z.infer<typeof healthDataSchema>;
+export type SitemapUrlDto = z.infer<typeof sitemapUrlSchema>;
+export type SitemapUrlsDataDto = z.infer<typeof sitemapUrlsDataSchema>;
 
 /**
  * Named so the OpenAPI components are stable, readable identifiers. The frontend agent
@@ -134,4 +146,7 @@ export const DTO_SCHEMAS = {
   HotelListEnvelope: hotelListEnvelopeSchema,
   HotelDetailEnvelope: hotelDetailEnvelopeSchema,
   HealthEnvelope: healthEnvelopeSchema,
+  SitemapUrl: sitemapUrlSchema,
+  SitemapUrlsData: sitemapUrlsDataSchema,
+  SitemapUrlsEnvelope: sitemapUrlsEnvelopeSchema,
 } as const satisfies Record<string, z.ZodType>;
