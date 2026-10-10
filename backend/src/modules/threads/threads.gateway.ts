@@ -12,6 +12,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import { ApiError } from '../../common/errors/api-error.js';
 import { SkipEnvelope } from '../../common/envelope.js';
+import { allowedOrigins } from '../auth/oauth-origin.js';
 import { AUTH_COOKIE_NAME } from '../auth/cookie.js';
 import {
   USERS_REPOSITORY,
@@ -44,13 +45,19 @@ interface JoinAnswer {
  * participation rule as the HTTP routes, enforced server-side before every join, so a
  * crafted `threadId` never subscribes to someone else's thread.
  *
- * CORS reflects the request origin with credentials (the cookie is the credential, so
- * the origin gate is the browser's, not the security boundary — the JWT and the
- * membership check are). Reconnection refetches missed messages over HTTP via
+ * CORS allows only the configured frontend origins, with credentials, the same
+ * list the HTTP layer uses: an arbitrary site must not be able to open a
+ * credentialed socket, even though the JWT and the membership check remain the
+ * security boundary. Reconnection refetches missed messages over HTTP via
  * `?before=` rather than trusting a replay buffer; the client owns that, this gateway
  * only guarantees the room only ever carries the member's own threads.
  */
-@WebSocketGateway({ cors: { origin: true, credentials: true } })
+@WebSocketGateway({
+  cors: {
+    origin: allowedOrigins(process.env['FRONTEND_ORIGIN']),
+    credentials: true,
+  },
+})
 @SkipEnvelope()
 @Injectable()
 export class ThreadsGateway
