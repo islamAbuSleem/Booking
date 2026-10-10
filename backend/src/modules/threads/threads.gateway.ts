@@ -166,10 +166,21 @@ export class ThreadsGateway
 /** Minimal `Cookie`-header parse: the guard's `cookie-parser` is HTTP-only. */
 function readCookie(header: string, name: string): string | null {
   for (const part of header.split(';')) {
+    // Split on the first `=` only: a value may legally carry `=` later.
     const index = part.indexOf('=');
     if (index < 0) continue;
-    if (part.slice(0, index).trim() === name) {
-      return decodeURIComponent(part.slice(index + 1).trim());
+    if (part.slice(0, index).trim() !== name) continue;
+    const value = part.slice(index + 1).trim();
+    const unquoted =
+      value.length >= 2 && value.startsWith('"') && value.endsWith('"')
+        ? value.slice(1, -1)
+        : value;
+    try {
+      return decodeURIComponent(unquoted);
+    } catch {
+      // A bad escape is a broken cookie, not a crash: this header can arrive
+      // from any client, and a throw here would take the process down.
+      return null;
     }
   }
   return null;
