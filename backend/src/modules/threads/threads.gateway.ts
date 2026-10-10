@@ -166,7 +166,8 @@ function readCookie(header: string, name: string): string | null {
     const index = part.indexOf('=');
     if (index < 0) continue;
     if (part.slice(0, index).trim() === name) {
-      return decodeURIComponent(part.slice(index + 1).trim());
+      const value = part.slice(index + 1).trim().replace(/^"|"$/g, '');
+      return decodeURIComponent(value);
     }
   }
   return null;
