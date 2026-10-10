@@ -12,6 +12,7 @@ import {
 import type { Server, Socket } from 'socket.io';
 import { ApiError } from '../../common/errors/api-error.js';
 import { SkipEnvelope } from '../../common/envelope.js';
+import { allowedOrigins } from '../auth/oauth-origin.js';
 import { AUTH_COOKIE_NAME } from '../auth/cookie.js';
 import {
   USERS_REPOSITORY,
@@ -44,13 +45,19 @@ interface JoinAnswer {
  * participation rule as the HTTP routes, enforced server-side before every join, so a
  * crafted `threadId` never subscribes to someone else's thread.
  *
- * CORS reflects the request origin with credentials (the cookie is the credential, so
- * the origin gate is the browser's, not the security boundary — the JWT and the
- * membership check are). Reconnection refetches missed messages over HTTP via
+ * CORS allows only the configured frontend origins, with credentials, the same
+ * list the HTTP layer uses: an arbitrary site must not be able to open a
+ * credentialed socket, even though the JWT and the membership check remain the
+ * security boundary. Reconnection refetches missed messages over HTTP via
  * `?before=` rather than trusting a replay buffer; the client owns that, this gateway
  * only guarantees the room only ever carries the member's own threads.
  */
-@WebSocketGateway({ cors: { origin: true, credentials: true } })
+@WebSocketGateway({
+  cors: {
+    origin: allowedOrigins(process.env['FRONTEND_ORIGIN']),
+    credentials: true,
+  },
+})
 @SkipEnvelope()
 @Injectable()
 export class ThreadsGateway
@@ -114,7 +121,10 @@ export class ThreadsGateway
         const body = error.getResponse() as { code?: string };
         return { error: { code: body.code ?? 'FORBIDDEN' } };
       }
-      throw error;
+      // A rethrow out of an event handler reaches nothing: Socket.IO surfaces
+      // it as an unhandled rejection and the process dies. Answer instead.
+      this.logger.error('[threads] join failed', error);
+      return { error: { code: 'INTERNAL_ERROR' } };
     }
   }
 
@@ -163,11 +173,21 @@ export class ThreadsGateway
 /** Minimal `Cookie`-header parse: the guard's `cookie-parser` is HTTP-only. */
 function readCookie(header: string, name: string): string | null {
   for (const part of header.split(';')) {
+    // Split on the first `=` only: a value may legally carry `=` later.
     const index = part.indexOf('=');
     if (index < 0) continue;
-    if (part.slice(0, index).trim() === name) {
-      const value = part.slice(index + 1).trim().replace(/^"|"$/g, '');
-      return decodeURIComponent(value);
+    if (part.slice(0, index).trim() !== name) continue;
+    const value = part.slice(index + 1).trim();
+    const unquoted =
+      value.length >= 2 && value.startsWith('"') && value.endsWith('"')
+        ? value.slice(1, -1)
+        : value;
+    try {
+      return decodeURIComponent(unquoted);
+    } catch {
+      // A bad escape is a broken cookie, not a crash: this header can arrive
+      // from any client, and a throw here would take the process down.
+      return null;
     }
   }
   return null;
