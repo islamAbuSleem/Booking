@@ -17,6 +17,7 @@ import {
 } from '~/utils/api'
 import type { ApiThread, ApiThreadMessage } from '~/utils/api'
 import { useAuth } from '~/composables/useAuth'
+import { useThreadSocket } from '~/composables/useThreadSocket'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -89,7 +90,26 @@ const {
 )
 
 const thread = computed(() => threadPayload.value?.thread ?? null)
-const messages = computed(() => messagesPayload.value?.messages ?? [])
+const fetched = computed(() => messagesPayload.value?.messages ?? [])
+
+/**
+ * T36 — live arrivals the latest HTTP page does not cover yet. Merged below by id,
+ * so a message that arrives over both the socket and the 10s poll renders once.
+ * A successful poll drops the entries it already covers.
+ */
+const live = ref<ApiThreadMessage[]>([])
+
+const messages = computed(() => {
+  const seen = new Set(fetched.value.map(message => message.id))
+  const merged = [...fetched.value]
+  for (const message of live.value) {
+    if (!seen.has(message.id)) {
+      seen.add(message.id)
+      merged.push(message)
+    }
+  }
+  return merged.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+})
 const hasFailed = computed(
   () => threadPayload.value?.failed === true || messagesPayload.value?.failed === true,
 )
@@ -128,9 +148,12 @@ async function send(): Promise<void> {
   sending.value = true
   sendFailed.value = false
   try {
-    await sendThreadMessage(thread.value.id, { body: body.slice(0, MAX_BODY) })
+    const message = await sendThreadMessage(thread.value.id, { body: body.slice(0, MAX_BODY) })
+    // Optimistic, id-keyed: the socket fan-out and the next poll dedupe on render.
+    live.value.push(message)
     draft.value = ''
     await refreshMessages()
+    pruneLive()
     await markRead()
   }
   catch {
@@ -142,11 +165,52 @@ async function send(): Promise<void> {
   }
 }
 
+/** Drops live arrivals the latest fetched page already covers. */
+function pruneLive(): void {
+  const fetchedIds = new Set(fetched.value.map(message => message.id))
+  live.value = live.value.filter(message => !fetchedIds.has(message.id))
+}
+
+/**
+ * T36 — the live connection. Socket arrivals append instantly; the 10s HTTP poll
+ * below keeps running as the fallback, and a reconnect refetches anything the drop
+ * swallowed rather than trusting a replay buffer.
+ */
+const { connected } = useThreadSocket({
+  threadId: threadId.value,
+  onMessage: (message) => {
+    if (message.threadId !== threadId.value) return
+    live.value.push(message)
+    if (myId.value === '' || message.senderId !== myId.value) {
+      void markRead()
+    }
+  },
+  onRead: () => {
+    void refreshMessages().then(() => pruneLive())
+  },
+  onReconnect: () => {
+    void refreshMessages().then(() => {
+      pruneLive()
+      void markRead()
+    })
+  },
+})
+
+/** The banner shows on a drop, not on first load: no backend WS means quiet polling. */
+const everConnected = ref(false)
+watch(connected, (value) => {
+  if (value) everConnected.value = true
+})
+const showReconnect = computed(() => everConnected.value && !connected.value)
+
 let timer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
   void markRead()
   timer = setInterval(() => {
-    void refreshMessages().then(() => markRead())
+    void refreshMessages().then(() => {
+      pruneLive()
+      void markRead()
+    })
   }, POLL_MS)
 })
 onUnmounted(() => {
@@ -178,6 +242,16 @@ useSeoMeta({
       {{ $t('messages.title') }}
     </h1>
     <div class="border-rule mt-4 border-b" />
+
+    <!-- T36: live updates paused. The 10s poll below still delivers. -->
+    <BaseAlert
+      v-if="showReconnect"
+      tone="warning"
+      :title="$t('messages.reconnecting')"
+      class="mt-4"
+    >
+      {{ $t('messages.reconnectHint') }}
+    </BaseAlert>
 
     <div
       class="mt-6"

@@ -95,7 +95,7 @@ export class ThreadsService {
     threadId: string,
     before: string | null,
   ): Promise<MessageListData> {
-    const thread = await this.loadParticipantThread(callerId, threadId);
+    const thread = await this.assertParticipant(callerId, threadId);
     const records = await this.threads.findMessages(
       thread.id,
       before,
@@ -111,7 +111,7 @@ export class ThreadsService {
     threadId: string,
     request: SendMessage,
   ): Promise<MessageDto> {
-    const thread = await this.loadParticipantThread(callerId, threadId);
+    const thread = await this.assertParticipant(callerId, threadId);
     const record = await this.threads.createMessage(
       thread.id,
       callerId,
@@ -125,7 +125,7 @@ export class ThreadsService {
    * is untouched, which is what makes the two unread counts independent.
    */
   async markRead(callerId: string, threadId: string): Promise<ThreadReadData> {
-    const updated = await this.loadParticipantThread(callerId, threadId).then(
+    const updated = await this.assertParticipant(callerId, threadId).then(
       (thread) => this.threads.markThreadRead(thread.id, callerId),
     );
     if (!updated) throw notFound('THREAD_NOT_FOUND', 'Thread not found');
@@ -136,11 +136,11 @@ export class ThreadsService {
    * The participation rule, stated once: a missing thread is a 404, an existing thread
    * that names neither the guest nor the host is a 403 — never a 404, because a 404
    * would let a caller probe whether a thread id they do not own exists.
+   *
+   * Public because the Socket.IO gateway (T36) enforces the same rule before every
+   * room join: a crafted `threadId` must never subscribe to someone else's thread.
    */
-  private async loadParticipantThread(
-    callerId: string,
-    threadId: string,
-  ): Promise<ThreadRecord> {
+  async assertParticipant(callerId: string, threadId: string): Promise<ThreadRecord> {
     const thread = await this.threads.findThreadById(threadId);
     if (!thread) throw notFound('THREAD_NOT_FOUND', 'Thread not found');
     if (callerId !== thread.guestId && callerId !== thread.hostId) {

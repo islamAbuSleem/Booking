@@ -89,7 +89,7 @@
 
 ### Phase 5 — Deferred features
 - [x] T35 Messaging: threads and messages
-- [ ] T36 Messaging: live delivery
+- [x] T36 Messaging: live delivery
 - [ ] T37 Cancellation policy engine
 - [ ] T38 Stripe refunds
 - [ ] T39 Multi-currency
@@ -696,6 +696,13 @@
     gets 403 `NOT_THREAD_PARTICIPANT`. Unread state is two counters cleared per reader.
     Frontend: `/messages`, `/messages/[id]` (composer + read receipts, 10s polling),
     `/dashboard/host/messages`, "Message host" on `/bookings/[id]`, nav entries.
+  - **D80 — T36 live delivery.** `ThreadsGateway` at `/socket.io` (`message:new`,
+    `message:read`, rooms keyed `thread:<id>`). Same JWT cookie as HTTP, verified in
+    the gateway; the global `JwtAuthGuard` skips non-HTTP contexts so it never runs on
+    the socket, and `@SkipEnvelope()` keeps the global envelope off gateway acks.
+    Membership re-checked server-side before every join; the HTTP path fans out after
+    each write, and the frontend reconnects with a banner, refetching missed messages
+    over HTTP (`useThreadSocket`, polling as fallback).
   - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo

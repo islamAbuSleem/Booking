@@ -509,6 +509,8 @@
     "readReceipt": "Read",
     "delivered": "Sent",
     "offlineNote": "You are offline. New messages will appear when you reconnect.",
-    "firstMessage": "Hi! I have a question about booking {reference}."
+    "firstMessage": "Hi! I have a question about booking {reference}.",
+    "reconnecting": "Reconnecting…",
+    "reconnectHint": "Live updates are paused. New messages still arrive on their own."
   }
 }
