@@ -1,7 +1,6 @@
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   ApiError,
-  badRequest,
   notFound,
 } from '../../common/errors/api-error.js';
 import {
@@ -11,7 +10,6 @@ import {
   type ThreadsRepository,
 } from '../../prisma/threads.repository.js';
 import {
-  MAX_MESSAGE_BODY,
   type CreateThread,
   type MessageDto,
   type MessageListData,
@@ -114,11 +112,6 @@ export class ThreadsService {
     request: SendMessage,
   ): Promise<MessageDto> {
     const thread = await this.loadParticipantThread(callerId, threadId);
-    if (request.body.length > MAX_MESSAGE_BODY) {
-      throw badRequest(
-        `Message body must be at most ${MAX_MESSAGE_BODY} characters`,
-      );
-    }
     const record = await this.threads.createMessage(
       thread.id,
       callerId,
