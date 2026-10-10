@@ -701,7 +701,7 @@
     the gateway; the global `JwtAuthGuard` skips non-HTTP contexts so it never runs on
     the socket, and `@SkipEnvelope()` keeps the global envelope off gateway acks.
     Membership re-checked server-side before every join; the HTTP path fans out after
-    each write, and the frontend     reconnects with a banner, refetching missed messages
+    each write, and the frontend reconnects with a banner, refetching missed messages
     over HTTP (`useThreadSocket`, polling as fallback).
   - **D81 — T37 cancellation policy engine.** `cancellation_policies` (one row per
     hotel, tiers as ordered JSONB, version bumps per PUT; offline-written additive
