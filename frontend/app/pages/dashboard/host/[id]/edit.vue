@@ -273,7 +273,11 @@ async function loadPolicy(hotelId: string): Promise<void> {
 }
 
 function addTier(): void {
-  policyTiers.value.push({ daysBefore: 0, refundPercent: 0 })
+  const last = policyTiers.value[policyTiers.value.length - 1]
+  policyTiers.value.push({
+    daysBefore: last?.daysBefore ?? 30,
+    refundPercent: last?.refundPercent ?? 50,
+  })
   policyTiers.value.sort((a, b) => b.daysBefore - a.daysBefore)
 }
 
