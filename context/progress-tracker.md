@@ -85,7 +85,7 @@
 - [x] T32 Accessibility audit
 - [x] T32b Performance baseline and UX pass
 - [x] T33 Test suite completion
-- [ ] T34 Deploy configuration
+- [x] T34 Deploy configuration
 
 ### Phase 5 — Deferred features
 - [ ] T35 Messaging: threads and messages
@@ -685,6 +685,10 @@
     LCP/CLS/INP trace against a throttled mobile profile could not be recorded in this
     environment (the preview server hashes requests); the budgets in
     `context/code-standards.md` remain targets until a trace is run.
+  - **D78 — T34 deploy artifacts.** `backend/Dockerfile` (two-stage Node 22),
+    `frontend/vercel.json`, `context/deploy.md` (Neon runbook + first-deploy checklist:
+    migrate, OAuth callbacks, Stripe webhook URL, Cloudinary, `FRONTEND_ORIGIN`,
+    `NUXT_PUBLIC_API_BASE`). `.env.example` files already contract the two apps.
   - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo
