@@ -26,7 +26,8 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "menu": "Menu",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "messages": "Messages"
   },
   "search": {
     "destination": "Destination",
@@ -183,7 +184,8 @@
   "dashboard": {
     "navProperties": "Properties",
     "navNew": "Add property",
-    "navOverview": "Overview"
+    "navOverview": "Overview",
+    "navMessages": "Messages"
   },
   "booking": {
     "breadcrumb": "Breadcrumb",
@@ -476,5 +478,37 @@
     "notCompletedNote": "You can review this stay once it is completed.",
     "reviewError": "The review could not be submitted. Your words are still here — try again.",
     "fieldsRequired": "Give your review a headline and a few words."
+  },
+  "messages": {
+    "title": "Messages",
+    "metaDescription": "Your conversations with hosts, with unread counts and read receipts.",
+    "loadingThreads": "Loading conversations",
+    "loadingMessages": "Loading messages",
+    "loadError": "Your conversations did not come back",
+    "loadErrorHint": "The list failed to load. Your messages are safe — try again.",
+    "emptyTitle": "No conversations yet",
+    "emptyHint": "When you message a host about a booking, the thread lands here.",
+    "browseStays": "Browse stays",
+    "unread": "{count} unread",
+    "unreadOne": "1 unread",
+    "noUnread": "No unread messages",
+    "openThread": "Open conversation",
+    "lastMessage": "Last message {date}",
+    "noMessages": "No messages yet. Say hello below.",
+    "composerLabel": "Message",
+    "composerPlaceholder": "Write your message…",
+    "send": "Send",
+    "sending": "Sending…",
+    "sendError": "The message did not send. Nothing was lost — try again.",
+    "messageHost": "Message host",
+    "messageHostHint": "Questions about this stay? Write to your host.",
+    "threadNotFound": "Conversation not found",
+    "threadNotFoundHint": "It may have been removed, or the link is wrong.",
+    "backToMessages": "Back to messages",
+    "you": "You",
+    "readReceipt": "Read",
+    "delivered": "Sent",
+    "offlineNote": "You are offline. New messages will appear when you reconnect.",
+    "firstMessage": "Hi! I have a question about booking {reference}."
   }
 }

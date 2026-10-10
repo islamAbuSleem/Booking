@@ -57,6 +57,12 @@ export type ApiAdminStats = components['schemas']['AdminStats']
 export type ApiAdminHotelStatus = ApiAdminHotel['status']
 export type ApiAdminUserStatus = ApiAdminUser['status']
 export type ApiAdminReviewStatus = ApiAdminReview['status']
+export type ApiThread = components['schemas']['Thread']
+export type ApiThreadListData = components['schemas']['ThreadListData']
+export type ApiThreadMessage = components['schemas']['Message']
+export type ApiThreadMessageListData = components['schemas']['MessageListData']
+export type ApiCreateThread = components['schemas']['CreateThread']
+export type ApiSendMessage = components['schemas']['SendMessage']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -513,7 +519,8 @@ export async function fetchUploadSign(): Promise<ApiUploadSign> {
  * A `publicId` outside the caller's `booking/hotels/{hostId}/` folder is 403
  * `UPLOAD_FOREIGN`; a `(hotelId, url)` pair already attached is 409.
  */
-export async function attachUpload(request: ApiAttachUpload): Promise<ApiHotelImage> {
+export async function attachUpload(request: ApiAttachUpload):
+Promise<ApiHotelImage> {
   return apiFetch<ApiHotelImage>('/api/uploads/attach', { method: 'POST', body: { ...request } })
 }
 
@@ -528,4 +535,33 @@ export async function attachUpload(request: ApiAttachUpload): Promise<ApiHotelIm
  */
 export async function deleteUpload(publicId: string): Promise<void> {
   await apiFetch<undefined>(`/api/uploads/${encodeURIComponent(publicId)}`, { method: 'DELETE' })
+}
+
+/**
+ * T35. `POST /api/threads` — open (or reuse) the conversation about a booking.
+ * The body carries a `bookingId` only; the parties resolve server-side.
+ */
+export async function createThread(request: ApiCreateThread): Promise<ApiThread> {
+  return apiFetch<ApiThread>('/api/threads', { method: 'POST', body: { ...request } })
+}
+
+/** T35. `GET /api/threads` — the caller''s conversations, newest first. */
+export async function fetchThreads(): Promise<ApiThreadListData> {
+  return apiFetch<ApiThreadListData>('/api/threads')
+}
+
+/** T35. `GET /api/threads/:id/messages` — one page, oldest first. */
+export async function fetchThreadMessages(threadId: string, before?: string): Promise<ApiThreadMessageListData> {
+  const query = before ? `?before=${encodeURIComponent(before)}` : ''
+  return apiFetch<ApiThreadMessageListData>(`/api/threads/${encodeURIComponent(threadId)}/messages${query}`)
+}
+
+/** T35. `POST /api/threads/:id/messages` — append and bump the peer''s counter. */
+export async function sendThreadMessage(threadId: string, body: ApiSendMessage): Promise<ApiThreadMessage> {
+  return apiFetch<ApiThreadMessage>(`/api/threads/${encodeURIComponent(threadId)}/messages`, { method: 'POST', body: { ...body } })
+}
+
+/** T35. `POST /api/threads/:id/read` — clear only the reader''s counter. */
+export async function markThreadRead(threadId: string): Promise<void> {
+  await apiFetch<unknown>(`/api/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' })
 }

@@ -15,6 +15,7 @@ const nav = computed(() =>
     ? [{ to: '/dashboard/admin', label: t('dashboard.navOverview') }]
     : [
         { to: '/dashboard/host', label: t('dashboard.navProperties') },
+        { to: '/dashboard/host/messages', label: t('dashboard.navMessages') },
         { to: '/dashboard/host/new', label: t('dashboard.navNew') },
       ],
 )

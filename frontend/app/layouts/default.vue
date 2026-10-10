@@ -6,6 +6,7 @@ const nav = computed(() => [
   { to: '/', label: 'nav.stays' },
   { to: '/hotels', label: 'nav.destinations' },
   { to: '/bookings', label: 'nav.trips' },
+  { to: '/messages', label: 'nav.messages' },
   ...(isHost.value ? [{ to: '/dashboard/host', label: 'nav.dashboard' }] : []),
 ])
 

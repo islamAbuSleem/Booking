@@ -390,6 +390,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sitemap/urls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Publishable hotel slugs for the sitemap
+         * @description Slugs and lastmod timestamps for every PUBLISHED hotel. The Nuxt sitemap module reads this at build time; a non-published row never appears because the filter is in SQL, not applied afterwards.
+         */
+        get: operations["SitemapController_urls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/host/hotels": {
         parameters: {
             query?: never;
@@ -581,6 +601,74 @@ export interface paths {
         get: operations["ReviewsController_reviewable"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the caller's conversations
+         * @description Guest side and host side both, newest first. The unread count on each row is the caller's own — never the peer's.
+         */
+        get: operations["ThreadsController_list"];
+        put?: never;
+        /**
+         * Start or reuse a conversation about a booking
+         * @description Creates the thread for the booking on the first message and reuses it thereafter: one thread per (booking, guest, host). The parties come from the booking itself, so the body carries a `bookingId` only — never a guest or host id.
+         */
+        post: operations["ThreadsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/threads/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one page of a conversation
+         * @description Oldest first, up to one page, ending before `before` when given. A thread the caller is not part of is a 403, not a 404.
+         */
+        get: operations["ThreadsController_listMessages"];
+        put?: never;
+        /**
+         * Send a message in a conversation
+         * @description Appends the message and bumps the peer participant’s unread counter. Bodies over 5000 chars are a 400.
+         */
+        post: operations["ThreadsController_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/threads/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a conversation read
+         * @description Clears the reader’s unread counter only — the peer’s badge is untouched. Answers 200 with the cleared count, not 204: the client renders the badge flip from the body.
+         */
+        post: operations["ThreadsController_markRead"];
         delete?: never;
         options?: never;
         head?: never;
@@ -924,6 +1012,20 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["HealthData"];
+        };
+        SitemapUrl: {
+            /** @description Stable, URL-safe. The detail route accepts this. */
+            slug: string;
+            /** @description ISO 8601 lastmod for the sitemap entry. */
+            updatedAt: string;
+        };
+        SitemapUrlsData: {
+            items: components["schemas"]["SitemapUrl"][];
+        };
+        SitemapUrlsEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["SitemapUrlsData"];
         };
         AuthUser: {
             /** Format: uuid */
@@ -1618,6 +1720,102 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["WebhookData"];
+        };
+        CreateThread: {
+            /**
+             * Format: uuid
+             * @description The booking the conversation is about, by uuid.
+             */
+            bookingId: string;
+            /** @description The first message. Creates the thread when none exists for the triple. */
+            body: string;
+        };
+        SendMessage: {
+            /** @description The message text, 1-5000 chars. */
+            body: string;
+        };
+        Thread: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The booking the conversation is about.
+             */
+            bookingId: string;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: uuid */
+            hostId: string;
+            /** @description The caller's unread count in this thread — never the other side's. */
+            unreadCount: number;
+            /** @description ISO 8601 instant of the newest message, or null when empty. */
+            lastMessageAt: components["schemas"]["Thread-__schema0"] | null;
+            /** @description ISO 8601 instant the thread was created. */
+            createdAt: string;
+        };
+        "Thread-__schema0": string;
+        ThreadEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Thread"];
+        };
+        "ThreadEnvelope-__schema0": string;
+        ThreadListData: {
+            items: components["schemas"]["Thread"][];
+            /** @description Always `items.length` until the list is paginated. */
+            total: number;
+        };
+        "ThreadListData-__schema0": string;
+        ThreadListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ThreadListData"];
+        };
+        "ThreadListEnvelope-__schema0": string;
+        Message: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            threadId: string;
+            /**
+             * Format: uuid
+             * @description The author, by user uuid. The client renders own vs peer.
+             */
+            senderId: string;
+            body: string;
+            /** @description ISO 8601 read receipt, or null until the peer marks the thread read. */
+            readAt: components["schemas"]["Message-__schema0"] | null;
+            /** @description ISO 8601 instant the message was sent. */
+            createdAt: string;
+        };
+        "Message-__schema0": string;
+        MessageEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Message"];
+        };
+        "MessageEnvelope-__schema0": string;
+        MessageListData: {
+            /** @description Oldest first, so the client appends. */
+            items: components["schemas"]["Message"][];
+            /** @description Always `items.length` until the list is paginated. */
+            total: number;
+        };
+        "MessageListData-__schema0": string;
+        MessageListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MessageListData"];
+        };
+        "MessageListEnvelope-__schema0": string;
+        ThreadReadData: {
+            /** @description Always 0: the reader's counter after the clear. */
+            unreadCount: number;
+        };
+        ThreadReadEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ThreadReadData"];
         };
     };
     responses: never;
@@ -2439,6 +2637,26 @@ export interface operations {
             };
         };
     };
+    SitemapController_urls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slugs, with ISO 8601 lastmod each. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SitemapUrlsEnvelope"];
+                };
+            };
+        };
+    };
     HostController_listMyHotels: {
         parameters: {
             query?: never;
@@ -3163,6 +3381,258 @@ export interface operations {
                 };
             };
             /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's threads, most recent first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadListEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateThread"];
+            };
+        };
+        responses: {
+            /** @description The thread (new or reused). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadEnvelope"];
+                };
+            };
+            /** @description The body failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest and host. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_listMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The thread, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageListEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The thread exists but the caller is not part of it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such thread. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The thread, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendMessage"];
+            };
+        };
+        responses: {
+            /** @description The message that was appended. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageEnvelope"];
+                };
+            };
+            /** @description The body failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The thread exists but the caller is not part of it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such thread. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The thread, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cleared counter (always 0). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadReadEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The thread exists but the caller is not part of it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such thread. */
             404: {
                 headers: {
                     [name: string]: unknown;

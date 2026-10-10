@@ -2010,6 +2010,320 @@
         ]
       }
     },
+    "/api/threads": {
+      "post": {
+        "description": "Creates the thread for the booking on the first message and reuses it thereafter: one thread per (booking, guest, host). The parties come from the booking itself, so the body carries a `bookingId` only — never a guest or host id.",
+        "operationId": "ThreadsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateThread"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The thread (new or reused).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking belongs to a different guest and host.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Start or reuse a conversation about a booking",
+        "tags": [
+          "Threads"
+        ]
+      },
+      "get": {
+        "description": "Guest side and host side both, newest first. The unread count on each row is the caller's own — never the peer's.",
+        "operationId": "ThreadsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The caller's threads, most recent first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the caller's conversations",
+        "tags": [
+          "Threads"
+        ]
+      }
+    },
+    "/api/threads/{id}/messages": {
+      "get": {
+        "description": "Oldest first, up to one page, ending before `before` when given. A thread the caller is not part of is a 403, not a 404.",
+        "operationId": "ThreadsController_listMessages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The thread, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page, oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageListEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The thread exists but the caller is not part of it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such thread.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read one page of a conversation",
+        "tags": [
+          "Threads"
+        ]
+      },
+      "post": {
+        "description": "Appends the message and bumps the peer participant’s unread counter. Bodies over 5000 chars are a 400.",
+        "operationId": "ThreadsController_send",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The thread, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The message that was appended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body failed validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The thread exists but the caller is not part of it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such thread.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a message in a conversation",
+        "tags": [
+          "Threads"
+        ]
+      }
+    },
+    "/api/threads/{id}/read": {
+      "post": {
+        "description": "Clears the reader’s unread counter only — the peer’s badge is untouched. Answers 200 with the cleared count, not 204: the client renders the badge flip from the body.",
+        "operationId": "ThreadsController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The thread, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cleared counter (always 0).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThreadReadEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The thread exists but the caller is not part of it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such thread.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mark a conversation read",
+        "tags": [
+          "Threads"
+        ]
+      }
+    },
     "/api/admin/stats": {
       "get": {
         "operationId": "AdminController_stats",
@@ -5931,6 +6245,323 @@
           },
           "data": {
             "$ref": "#/components/schemas/WebhookData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CreateThread": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The booking the conversation is about, by uuid."
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "The first message. Creates the thread when none exists for the triple."
+          }
+        },
+        "required": [
+          "bookingId",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "SendMessage": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "The message text, 1-5000 chars."
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "Thread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "bookingId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The booking the conversation is about."
+          },
+          "guestId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "hostId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "unreadCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "The caller's unread count in this thread — never the other side's."
+          },
+          "lastMessageAt": {
+            "nullable": true,
+            "description": "ISO 8601 instant of the newest message, or null when empty.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Thread-__schema0"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 instant the thread was created."
+          }
+        },
+        "required": [
+          "id",
+          "bookingId",
+          "guestId",
+          "hostId",
+          "unreadCount",
+          "lastMessageAt",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Thread-__schema0": {
+        "type": "string"
+      },
+      "ThreadEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Thread"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ThreadEnvelope-__schema0": {
+        "type": "string"
+      },
+      "ThreadListData": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Thread"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `items.length` until the list is paginated."
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "ThreadListData-__schema0": {
+        "type": "string"
+      },
+      "ThreadListEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ThreadListData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ThreadListEnvelope-__schema0": {
+        "type": "string"
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "threadId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "senderId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "The author, by user uuid. The client renders own vs peer."
+          },
+          "body": {
+            "type": "string"
+          },
+          "readAt": {
+            "nullable": true,
+            "description": "ISO 8601 read receipt, or null until the peer marks the thread read.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Message-__schema0"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO 8601 instant the message was sent."
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "senderId",
+          "body",
+          "readAt",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "Message-__schema0": {
+        "type": "string"
+      },
+      "MessageEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/Message"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MessageEnvelope-__schema0": {
+        "type": "string"
+      },
+      "MessageListData": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "description": "Oldest first, so the client appends."
+          },
+          "total": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always `items.length` until the list is paginated."
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "MessageListData-__schema0": {
+        "type": "string"
+      },
+      "MessageListEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/MessageListData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "MessageListEnvelope-__schema0": {
+        "type": "string"
+      },
+      "ThreadReadData": {
+        "type": "object",
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Always 0: the reader's counter after the clear."
+          }
+        },
+        "required": [
+          "unreadCount"
+        ],
+        "additionalProperties": false
+      },
+      "ThreadReadEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ThreadReadData"
           }
         },
         "required": [

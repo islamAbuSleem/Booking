@@ -88,7 +88,7 @@
 - [x] T34 Deploy configuration
 
 ### Phase 5 — Deferred features
-- [ ] T35 Messaging: threads and messages
+- [x] T35 Messaging: threads and messages
 - [ ] T36 Messaging: live delivery
 - [ ] T37 Cancellation policy engine
 - [ ] T38 Stripe refunds
@@ -689,6 +689,13 @@
     `frontend/vercel.json`, `context/deploy.md` (Neon runbook + first-deploy checklist:
     migrate, OAuth callbacks, Stripe webhook URL, Cloudinary, `FRONTEND_ORIGIN`,
     `NUXT_PUBLIC_API_BASE`). `.env.example` files already contract the two apps.
+  - **D79 — T35 messaging.** `threads`/`messages` tables (offline-written additive
+    migration; unique key on the triple makes "one thread per booking/guest/host"
+    structural, racing creates reuse the row). Parties resolve server-side from the
+    booking, so no route reads a participant id from the request; a non-participant
+    gets 403 `NOT_THREAD_PARTICIPANT`. Unread state is two counters cleared per reader.
+    Frontend: `/messages`, `/messages/[id]` (composer + read receipts, 10s polling),
+    `/dashboard/host/messages`, "Message host" on `/bookings/[id]`, nav entries.
   - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo
