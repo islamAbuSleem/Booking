@@ -17,8 +17,8 @@
  * ones seed the list.
  */
 import { HOTEL_BY_ID } from '~/utils/mock'
-import { createBlackout, deleteBlackout, fetchMyHotel, isApiError, isApiFailure, updateHotel, updateRoom } from '~/utils/api'
-import type { ApiHostHotelDetail } from '~/utils/api'
+import { createBlackout, deleteBlackout, fetchMyCancellationPolicy, fetchMyHotel, isApiError, isApiFailure, setCancellationPolicy, updateHotel, updateRoom } from '~/utils/api'
+import type { ApiCancellationPolicy, ApiHostHotelDetail } from '~/utils/api'
 import { formatStayDate, usd } from '~/utils/format'
 
 definePageMeta({ layout: 'dashboard', middleware: 'auth' })
@@ -230,6 +230,95 @@ function addBlackout(): void {
 function removeBlackout(entry: Blackout): void {
   blackouts.value = blackouts.value.filter(candidate => candidate !== entry)
 }
+
+/**
+ * T37 — the cancellation policy editor. Loads the stored row (or the API default)
+ * beside the listing form and saves on its own button: policy writes are
+ * independent of the listing batch below, and a failed save keeps every field.
+ */
+interface PolicyTierEdit {
+  daysBefore: number
+  refundPercent: number
+}
+
+const policyTiers = ref<PolicyTierEdit[]>([])
+const policyWindow = ref(24)
+const policyVersion = ref<number | null>(null)
+const policySaving = ref(false)
+const policySaved = ref(false)
+const policyError = ref('')
+const policyInitialised = ref(false)
+
+async function loadPolicy(hotelId: string): Promise<void> {
+  try {
+    const policy: ApiCancellationPolicy = await fetchMyCancellationPolicy(hotelId)
+    policyTiers.value = policy.tiers.map(tier => ({ daysBefore: tier.daysBefore, refundPercent: tier.refundPercent }))
+    policyWindow.value = policy.noRefundWithinHours
+    policyVersion.value = policy.version
+  }
+  catch {
+    // A policy that cannot load is an empty editor, not a blocked page: the host can
+    // still write a fresh one, which the PUT stores as version 1.
+    if (!policyInitialised.value) {
+      policyTiers.value = [
+        { daysBefore: 30, refundPercent: 100 },
+        { daysBefore: 7, refundPercent: 50 },
+      ]
+      policyWindow.value = 24
+    }
+  }
+  finally {
+    policyInitialised.value = true
+  }
+}
+
+function addTier(): void {
+  const last = policyTiers.value[policyTiers.value.length - 1]
+  policyTiers.value.push({
+    daysBefore: last?.daysBefore ?? 30,
+    refundPercent: last?.refundPercent ?? 50,
+  })
+  policyTiers.value.sort((a, b) => b.daysBefore - a.daysBefore)
+}
+
+function removeTier(index: number): void {
+  policyTiers.value.splice(index, 1)
+}
+
+async function savePolicy(): Promise<void> {
+  const current = hotel.value
+  if (policySaving.value || !current || !isLive.value) return
+  policySaving.value = true
+  policySaved.value = false
+  policyError.value = ''
+  try {
+    const stored = await setCancellationPolicy(current.id, {
+      tiers: policyTiers.value.map(tier => ({
+        daysBefore: Math.max(0, Math.floor(tier.daysBefore)),
+        refundPercent: Math.min(100, Math.max(0, Math.floor(tier.refundPercent))),
+      })),
+      noRefundWithinHours: Math.max(0, Math.floor(policyWindow.value)),
+    })
+    policyVersion.value = stored.version
+    policySaved.value = true
+  }
+  catch {
+    policyError.value = t('host.policyError')
+  }
+  finally {
+    policySaving.value = false
+  }
+}
+
+watch(
+  hotel,
+  (current) => {
+    if (current && isLive.value && !policyInitialised.value) {
+      void loadPolicy(current.id)
+    }
+  },
+  { immediate: true },
+)
 
 /**
  * Persists everything in one batch — the listing, every room, and the blackout diff —
@@ -511,6 +600,97 @@ useSeoMeta({
               >
                 {{ $t('host.addBlackout') }}
               </button>
+            </div>
+          </section>
+
+          <!-- T37: tiered refund rules plus the no-refund window. Saves on its own. -->
+          <section aria-labelledby="edit-policy">
+            <h2
+              id="edit-policy"
+              class="text-fg-muted text-label uppercase"
+            >
+              {{ $t('host.policyHeading') }}
+              <span
+                v-if="policyVersion !== null"
+                class="tabular ml-2"
+              >{{ $t('host.policyVersion', { version: policyVersion }) }}</span>
+            </h2>
+            <div class="border-rule mt-3 border-t pt-6">
+              <p class="text-fg-muted max-w-[68ch] text-sm">
+                {{ $t('host.policyHint') }}
+              </p>
+              <ul class="mt-4 flex flex-col gap-3">
+                <li
+                  v-for="(tier, index) in policyTiers"
+                  :key="index"
+                  class="grid grid-cols-[1fr_1fr_auto] items-end gap-3"
+                >
+                  <BaseInput
+                    :id="`edit-policy-days-${index}`"
+                    v-model.number="tier.daysBefore"
+                    type="number"
+                    :min="0"
+                    :label="$t('host.policyDays')"
+                  />
+                  <BaseInput
+                    :id="`edit-policy-percent-${index}`"
+                    v-model.number="tier.refundPercent"
+                    type="number"
+                    :min="0"
+                    :max="100"
+                    :label="$t('host.policyPercent')"
+                  />
+                  <button
+                    type="button"
+                    class="text-danger h-12 px-2 text-sm underline-offset-4 hover:underline"
+                    :aria-label="$t('host.policyRemoveTier')"
+                    :disabled="policyTiers.length <= 1"
+                    @click="removeTier(index)"
+                  >
+                    {{ $t('common.remove') }}
+                  </button>
+                </li>
+              </ul>
+              <button
+                type="button"
+                class="border-rule-strong text-fg hover:border-fg mt-3 flex h-12 items-center justify-center rounded-sm border px-6 text-sm"
+                @click="addTier"
+              >
+                {{ $t('host.policyAddTier') }}
+              </button>
+              <div class="mt-4 max-w-[240px]">
+                <BaseInput
+                  id="edit-policy-window"
+                  v-model.number="policyWindow"
+                  type="number"
+                  :min="0"
+                  :label="$t('host.policyWindow')"
+                />
+              </div>
+              <p
+                v-if="policyError"
+                role="alert"
+                class="text-danger mt-2 text-sm"
+              >
+                {{ policyError }}
+              </p>
+              <p
+                v-if="policySaved"
+                role="status"
+                class="text-success mt-2 text-sm"
+              >
+                {{ $t('host.policySaved') }}
+              </p>
+              <BaseButton
+                variant="secondary"
+                size="md"
+                class="mt-4"
+                :loading="policySaving"
+                :disabled="policySaving || !isLive"
+                @click="savePolicy"
+              >
+                {{ policySaving ? $t('host.policySaving') : $t('host.policySave') }}
+              </BaseButton>
             </div>
           </section>
 

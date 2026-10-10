@@ -489,6 +489,80 @@
         ]
       }
     },
+    "/api/bookings/{id}/cancellation-quote": {
+      "post": {
+        "description": "The one computation, by the API, from the whole elapsed time between now and check-in: the tier the cancellation lands in decides the percent of the booking’s own total, in its own currency. Only CONFIRMED bookings quote — anything else is a 400 with the reason, mirroring the cancel guard.",
+        "operationId": "BookingsController_cancellationQuote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The booking to price a cancellation for, by uuid.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The percent, the integer-cent refund, and the policy version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationQuoteEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The booking is not CONFIRMED (INVALID_CANCEL_STATE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The booking belongs to a different guest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such booking.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Quote the refund for cancelling a booking",
+        "tags": [
+          "Bookings"
+        ]
+      }
+    },
     "/api/favorites": {
       "post": {
         "description": "Creates the `favorites` row for the caller. The guest is the JWT subject: a `userId` in the body is stripped by the schema, never obeyed. A hotel that is already a favourite is a `FAVORITE_EXISTS` 409 rather than a second 201, because `(userId, hotelId)` is a composite primary key and a duplicate insert is a constraint violation worth surfacing. Clients call this optimistically and roll back on the 409.",
@@ -1042,6 +1116,39 @@
         ]
       }
     },
+    "/api/hotels/{id}/cancellation-policy": {
+      "get": {
+        "description": "The stored policy, or the API default when the hotel has none — never \"no policy\". Resolves by uuid or by slug, like the detail route, so the guest-facing table and the booking quote read the same row.",
+        "operationId": "HotelsController_findCancellationPolicy",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The policy, with its version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationPolicyEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such hotel.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The hotel’s cancellation policy",
+        "tags": [
+          "Hotels"
+        ]
+      }
+    },
     "/api/sitemap/urls": {
       "get": {
         "description": "Slugs and lastmod timestamps for every PUBLISHED hotel. The Nuxt sitemap module reads this at build time; a non-published row never appears because the filter is in SQL, not applied afterwards.",
@@ -1428,6 +1535,152 @@
           }
         ],
         "summary": "Delete my hotel",
+        "tags": [
+          "Host"
+        ]
+      }
+    },
+    "/api/host/hotels/{id}/cancellation-policy": {
+      "get": {
+        "description": "The stored policy, or the API default when the hotel has none. Ownership is asserted first, so the host can read the policy of a listing the public route cannot see — a draft 404s there for everyone but its own host. That 404 is why the edit page reads the policy here, not on the public route.",
+        "operationId": "HostController_getCancellationPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The hotel, by uuid or slug.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The policy, with its version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationPolicyEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a host/admin, or not the owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hotel not found or not owned by this host.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My hotel’s cancellation policy",
+        "tags": [
+          "Host"
+        ]
+      },
+      "put": {
+        "description": "Stores the tiered refund rules and the no-refund window, bumping the policy version. Ownership is asserted first: a hotel that is not this host’s is a 403 NOT_HOTEL_OWNER, never a 404.",
+        "operationId": "HostController_setCancellationPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The hotel, by uuid or slug.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The stored policy, with its new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationPolicyEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a host/admin, or not the owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set my hotel’s cancellation policy",
         "tags": [
           "Host"
         ]
@@ -6562,6 +6815,178 @@
           },
           "data": {
             "$ref": "#/components/schemas/ThreadReadData"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "UpdatePolicy": {
+        "type": "object",
+        "properties": {
+          "tiers": {
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdatePolicy-__schema0"
+            },
+            "description": "Ordered highest-`daysBefore` first. Stored sorted that way."
+          },
+          "noRefundWithinHours": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Inside this many hours of check-in the refund is 0, whatever the tiers say."
+          }
+        },
+        "required": [
+          "tiers",
+          "noRefundWithinHours"
+        ],
+        "additionalProperties": false
+      },
+      "UpdatePolicy-__schema0": {
+        "type": "object",
+        "properties": {
+          "daysBefore": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Whole days before check-in this tier starts at, inclusive."
+          },
+          "refundPercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Percent of the booking total refunded from this tier on."
+          }
+        },
+        "required": [
+          "daysBefore",
+          "refundPercent"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationPolicy": {
+        "type": "object",
+        "properties": {
+          "hotelId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "tiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "daysBefore": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991,
+                  "description": "Whole days before check-in this tier starts at, inclusive."
+                },
+                "refundPercent": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Percent of the booking total refunded from this tier on."
+                }
+              },
+              "required": [
+                "daysBefore",
+                "refundPercent"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "noRefundWithinHours": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "version": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Bumps on every PUT. 0 means the API default, not a stored row."
+          }
+        },
+        "required": [
+          "hotelId",
+          "tiers",
+          "noRefundWithinHours",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationPolicyEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/CancellationPolicy"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationQuote": {
+        "type": "object",
+        "properties": {
+          "refundPercent": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "0-100, from the tier the cancellation lands in."
+          },
+          "refundCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Integer cents of the booking total at that percent."
+          },
+          "currency": {
+            "type": "string",
+            "description": "The booking’s own currency, never re-denominated."
+          },
+          "policyVersion": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "The policy version this quote priced against."
+          }
+        },
+        "required": [
+          "refundPercent",
+          "refundCents",
+          "currency",
+          "policyVersion"
+        ],
+        "additionalProperties": false
+      },
+      "CancellationQuoteEnvelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/CancellationQuote"
           }
         },
         "required": [

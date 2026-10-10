@@ -63,6 +63,9 @@ export type ApiThreadMessage = components['schemas']['Message']
 export type ApiThreadMessageListData = components['schemas']['MessageListData']
 export type ApiCreateThread = components['schemas']['CreateThread']
 export type ApiSendMessage = components['schemas']['SendMessage']
+export type ApiCancellationPolicy = components['schemas']['CancellationPolicy']
+export type ApiUpdatePolicy = components['schemas']['UpdatePolicy']
+export type ApiCancellationQuote = components['schemas']['CancellationQuote']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -165,7 +168,7 @@ interface ApiRequestOptions {
    * sign/attach. `DELETE` is a path-only call that answers 204 with no body at all.
    * `PATCH` for the updates that carry a partial body.
    */
-  method?: 'POST' | 'DELETE' | 'PATCH'
+  method?: 'POST' | 'DELETE' | 'PATCH' | 'PUT'
   /**
    * Flat key/value bodies stay a `Record` so `$fetch` omits `undefined` optionals and
    * the API applies its own defaults. Bodies with nested arrays (room prices, room
@@ -351,6 +354,14 @@ export async function fetchMyHotels(): Promise<ApiHostHotelListData> {
 /** Accepts a uuid or a slug, like the public detail route. */
 export async function fetchMyHotel(id: string): Promise<ApiHostHotelDetail> {
   return apiFetch<ApiHostHotelDetail>(`/api/host/hotels/${encodeURIComponent(id)}`)
+}
+
+/**
+ * T37. The host's read of their own listing's policy. The public route 404s a draft
+ * for everyone but its owner, so the host edit page reads the policy here.
+ */
+export async function fetchMyCancellationPolicy(id: string): Promise<ApiCancellationPolicy> {
+  return apiFetch<ApiCancellationPolicy>(`/api/host/hotels/${encodeURIComponent(id)}/cancellation-policy`)
 }
 
 /** Creates the listing `PENDING`. The slug comes back on the detail for the edit link. */
@@ -564,4 +575,19 @@ export async function sendThreadMessage(threadId: string, body: ApiSendMessage):
 /** T35. `POST /api/threads/:id/read` — clear only the reader''s counter. */
 export async function markThreadRead(threadId: string): Promise<void> {
   await apiFetch<unknown>(`/api/threads/${encodeURIComponent(threadId)}/read`, { method: 'POST' })
+}
+
+/** T37. `GET /api/hotels/:id/cancellation-policy` — stored row or API default. */
+export async function fetchCancellationPolicy(hotelIdOrSlug: string): Promise<ApiCancellationPolicy> {
+  return apiFetch<ApiCancellationPolicy>(`/api/hotels/${encodeURIComponent(hotelIdOrSlug)}/cancellation-policy`)
+}
+
+/** T37. `PUT /api/host/hotels/:id/cancellation-policy` — owner-scoped write. */
+export async function setCancellationPolicy(hotelId: string, body: ApiUpdatePolicy): Promise<ApiCancellationPolicy> {
+  return apiFetch<ApiCancellationPolicy>(`/api/host/hotels/${encodeURIComponent(hotelId)}/cancellation-policy`, { method: 'PUT', json: body })
+}
+
+/** T37. `POST /api/bookings/:id/cancellation-quote` — the one computation. */
+export async function fetchCancellationQuote(bookingId: string): Promise<ApiCancellationQuote> {
+  return apiFetch<ApiCancellationQuote>(`/api/bookings/${encodeURIComponent(bookingId)}/cancellation-quote`, { method: 'POST' })
 }

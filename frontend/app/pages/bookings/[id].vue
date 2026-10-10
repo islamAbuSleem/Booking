@@ -9,11 +9,11 @@
  * Cancel goes through the real endpoint and degrades to the local store the
  * same way the read does.
  */
-import { cancelBooking, createReview, createThread, fetchBooking, fetchReviewable, isApiError, isApiFailure } from '~/utils/api'
-import type { ApiBooking } from '~/utils/api'
+import { cancelBooking, createReview, createThread, fetchBooking, fetchCancellationPolicy, fetchCancellationQuote, fetchReviewable, isApiError, isApiFailure } from '~/utils/api'
+import type { ApiBooking, ApiCancellationPolicy, ApiCancellationQuote } from '~/utils/api'
 import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
 import { useBookings } from '~/composables/useBookings'
-import { formatStayDate, wholeNumber } from '~/utils/format'
+import { formatStayDate, payableCents, wholeNumber } from '~/utils/format'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -71,6 +71,45 @@ const {
 
 const booking = computed(() => payload.value?.booking ?? null)
 const guestName = computed(() => payload.value?.guestName ?? null)
+const isLiveBooking = computed(() => payload.value?.live === true && booking.value !== null)
+
+/**
+ * T37: the plain-language policy table. Asked only for a live booking — a fixture
+ * trip has no server policy to read. A failed read hides the section, never the page:
+ * the policy is context for the cancel decision, not the decision itself.
+ */
+const { data: policy } = await useAsyncData<ApiCancellationPolicy | null>(
+  () => `booking:${id.value}:policy`,
+  async (): Promise<ApiCancellationPolicy | null> => {
+    const record = booking.value
+    if (!isLiveBooking.value || !record) return null
+    try {
+      return await fetchCancellationPolicy(record.hotel.id)
+    }
+    catch {
+      return null
+    }
+  },
+)
+
+/**
+ * T37: the live quote beside the cancel button. Asked only for a live CONFIRMED
+ * booking — anything else cannot be cancelled, so asking would be a wasted round
+ * trip. A failed quote hides the line, never the button.
+ */
+const { data: quote } = await useAsyncData<ApiCancellationQuote | null>(
+  () => `booking:${id.value}:quote`,
+  async (): Promise<ApiCancellationQuote | null> => {
+    const record = booking.value
+    if (!isLiveBooking.value || !record || record.status !== 'CONFIRMED') return null
+    try {
+      return await fetchCancellationQuote(record.id)
+    }
+    catch {
+      return null
+    }
+  },
+)
 
 /** A missing id or a 404/403 answer is a not-found, not an exception — say so in the status line. */
 if (!booking.value && status.value !== 'error') {
@@ -466,6 +505,45 @@ useSeoMeta({
           >
             {{ $t('messages.sendError') }}
           </p>
+
+          <!-- T37: the same policy the host wrote, as a plain-language table. -->
+          <section
+            v-if="policy"
+            aria-labelledby="booking-policy"
+            class="border-rule bg-surface rounded-none border p-6"
+          >
+            <h2
+              id="booking-policy"
+              class="text-fg-muted text-label uppercase"
+            >
+              {{ $t('bookings.policyHeading') }}
+            </h2>
+            <ul class="mt-3 flex flex-col gap-1 text-sm">
+              <li
+                v-for="tier in policy.tiers"
+                :key="tier.daysBefore"
+              >
+                {{
+                  tier.daysBefore === 1
+                    ? $t('bookings.policyTierDay', { percent: wholeNumber(tier.refundPercent) })
+                    : $t('bookings.policyTierDays', { percent: wholeNumber(tier.refundPercent), days: wholeNumber(tier.daysBefore) })
+                }}
+              </li>
+              <li>
+                {{
+                  policy.noRefundWithinHours === 1
+                    ? $t('bookings.policyWindowHour')
+                    : $t('bookings.policyWindowHours', { hours: wholeNumber(policy.noRefundWithinHours) })
+                }}
+              </li>
+            </ul>
+            <p
+              v-if="quote"
+              class="tabular mt-3 text-sm font-medium"
+            >
+              {{ $t('bookings.quoteLine', { percent: wholeNumber(quote.refundPercent), total: payableCents(booking.totalCents, booking.currency), refund: payableCents(quote.refundCents, quote.currency) }) }}
+            </p>
+          </section>
 
           <!-- T24: the review form, once per completed stay. Fixtures are read-only. -->
           <section

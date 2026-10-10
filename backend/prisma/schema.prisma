@@ -19,6 +19,8 @@
 // added by their own tickets; an unused table is a migration to carry forever. The one
 // exception is `currencies`, which exists now so every room gets a real USD price row
 // against a known currency.
+//
+// T35 added `threads` and `messages`; T37 adds `cancellation_policies` below.
 
 generator client {
   provider = "prisma-client"
@@ -141,6 +143,7 @@ model Hotel {
   reviews       Review[]
   favorites     Favorite[]
   blackoutDates BlackoutDate[]
+  cancellationPolicy CancellationPolicy?
 
   @@index([status, city])
   @@index([hostId])
@@ -446,4 +449,24 @@ model Message {
 
   @@index([threadId, createdAt])
   @@map("messages")
+}
+
+/// T37 — one cancellation policy per hotel. `tiers` is an ordered JSON list of
+/// `{ daysBefore, refundPercent }` (highest `daysBefore` first); `version` bumps on
+/// every PUT so a quote can pin the policy it priced against. Hotels without a row
+/// fall back to the API default, never to "no policy".
+model CancellationPolicy {
+  hotelId String @map("hotel_id") @db.Uuid
+
+  tiers               Json
+  noRefundWithinHours Int  @map("no_refund_within_hours")
+  version             Int  @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+
+  @@id([hotelId])
+  @@map("cancellation_policies")
 }
