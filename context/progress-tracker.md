@@ -84,7 +84,7 @@
 - [x] T31 SEO
 - [x] T32 Accessibility audit
 - [x] T32b Performance baseline and UX pass
-- [ ] T33 Test suite completion
+- [x] T33 Test suite completion
 - [ ] T34 Deploy configuration
 
 ### Phase 5 — Deferred features
