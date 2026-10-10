@@ -472,58 +472,6 @@ function confirm(w: World, id: string): void {
   w.bookings.set(id, { ...record, status: 'CONFIRMED' });
 }
 
-describe('BookingsService.cancel', () => {
-  it('flips a CONFIRMED booking to CANCELLED and returns the new state', async () => {
-    // Case 11a.
-    const w = world();
-    const svc = service(w);
-    const created = await svc.create(CALLER, request());
-    confirm(w, created.id);
-
-    const dto = await svc.cancel(CALLER, created.id);
-
-    expect(dto.status).toBe('CANCELLED');
-    expect(w.bookings.get(created.id)?.status).toBe('CANCELLED');
-  });
-
-  it('409s INVALID_CANCEL_STATE on a PENDING booking: the hold is not cancelable yet', async () => {
-    // Case 11b. T26/T27 confirm the PENDING hold before it can be cancelled.
-    const w = world();
-    const svc = service(w);
-    const created = await svc.create(CALLER, request());
-
-    await expect(svc.cancel(CALLER, created.id)).rejects.toMatchObject({
-      status: 409,
-      response: { code: 'INVALID_CANCEL_STATE' },
-    });
-    expect(w.bookings.get(created.id)?.status).toBe('PENDING');
-  });
-
-  it('403s when the booking belongs to someone else, before the state check', async () => {
-    // Case 11c.
-    const w = world();
-    const svc = service(w);
-    const created = await svc.create(SOMEONE_ELSE, request());
-    confirm(w, created.id);
-
-    await expect(svc.cancel(CALLER, created.id)).rejects.toMatchObject({
-      status: 403,
-      response: { code: 'NOT_BOOKING_OWNER' },
-    });
-  });
-
-  it('404s cancelling a booking that does not exist', async () => {
-    const svc = service();
-
-    await expect(
-      svc.cancel(CALLER, '00000000-0000-4000-8000-000000000000'),
-    ).rejects.toMatchObject({
-      status: 404,
-      response: { code: 'BOOKING_NOT_FOUND' },
-    });
-  });
-});
-
 describe('the error contract', () => {
   it('answers only with ApiError and a stable machine code, never an exception', async () => {
     const svc = service();

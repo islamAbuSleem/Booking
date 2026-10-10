@@ -167,48 +167,11 @@ export class BookingsService {
     return { items, total: items.length };
   }
 
-  /** `GET /api/bookings/:id` — 404 when missing, 403 when it belongs to a different guest. */
+  /**
+   * `GET /api/bookings/:id` — 404 when missing, 403 when it belongs to a different guest. */
   async get(callerId: string, bookingId: string): Promise<BookingDto> {
     const record = await this.loadOwnedBooking(callerId, bookingId);
     return this.toDto(record);
-  }
-
-  /**
-   * `POST /api/bookings/:id/cancel`. Guarded to `CONFIRMED` only: a `PENDING` booking is
-   * an unpaid hold, and cancelling it out from under T26's payment intent would strand
-   * the money, so a fresh `PENDING` booking cannot be cancelled until T26 confirms it.
-   * A refund is out of scope (T38); this only flips the status.
-   */
-  async cancel(callerId: string, bookingId: string): Promise<BookingDto> {
-    const record = await this.loadOwnedBooking(callerId, bookingId);
-    if (record.status !== 'CONFIRMED') {
-      throw new ApiError(
-        HttpStatus.CONFLICT,
-        'INVALID_CANCEL_STATE',
-        'Only a confirmed booking can be cancelled',
-      );
-    }
-
-    const updated = await this.bookings.updateStatus(
-      bookingId,
-      callerId,
-      'CONFIRMED',
-      'CANCELLED',
-    );
-    if (!updated) {
-      // Nothing matched, so the row moved between the read and the write. Re-read to
-      // tell the two apart: gone is a 404, a state change is the same 409 as above.
-      const current = await this.bookings.findById(bookingId);
-      if (!current) throw notFound('BOOKING_NOT_FOUND', 'Booking not found');
-      throw new ApiError(
-        HttpStatus.CONFLICT,
-        'INVALID_CANCEL_STATE',
-        'Only a confirmed booking can be cancelled',
-      );
-    }
-
-    this.logger.log(`[bookings] cancelled ${record.reference}`);
-    return this.toDto(updated);
   }
 
   /**
@@ -230,6 +193,17 @@ export class BookingsService {
       );
     }
     return record;
+  }
+
+  /**
+   * The `BookingDto` for a row this module already holds, hotel snapshot included.
+   *
+   * Public because the T38 cancel route answers with the booking in its new state and
+   * the refund module has no route into the snapshot read — so the shape is built here,
+   * by the module that owns it, rather than half-built upstream.
+   */
+  async describe(record: BookingRecord): Promise<BookingDto> {
+    return this.toDto(record);
   }
 
   private async toDto(record: BookingRecord): Promise<BookingDto> {

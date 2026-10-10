@@ -26,7 +26,8 @@
     "signIn": "Sign in",
     "signOut": "Sign out",
     "menu": "Menu",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "messages": "Messages"
   },
   "search": {
     "destination": "Destination",
@@ -183,7 +184,8 @@
   "dashboard": {
     "navProperties": "Properties",
     "navNew": "Add property",
-    "navOverview": "Overview"
+    "navOverview": "Overview",
+    "navMessages": "Messages"
   },
   "booking": {
     "breadcrumb": "Breadcrumb",
@@ -273,7 +275,21 @@
     "cancelErrorTitle": "The cancellation did not go through",
     "cancelErrorBody": "Booking {reference} is still active. Check your connection and try again.",
     "notFoundTitle": "That booking is not here",
-    "notFoundBody": "The link is broken, or the booking was made under a different account."
+    "notFoundBody": "The link is broken, or the booking was made under a different account.",
+    "policyHeading": "Cancellation policy",
+    "quoteLine": "{percent}% of {total} = {refund}",
+    "policyTierDays": "{percent}% back {days} or more days before check-in",
+    "policyTierDay": "{percent}% back 1 day or more before check-in",
+    "policyWindowHours": "No refund within {hours} hours of check-in",
+    "policyWindowHour": "No refund within 1 hour of check-in",
+    "refund": {
+      "pending": "Your refund is being processed.",
+      "succeeded": "Your refund has been issued.",
+      "failed": "Your refund could not be issued.",
+      "retry": "Retry refund",
+      "retrying": "Retrying...",
+      "retryFailed": "The retry did not go through. Try again."
+    }
   },
   "favorites": {
     "saveLabel": "Save {name} to favorites",
@@ -400,7 +416,19 @@
     "roomInventoryRequired": "How many rooms of this type can be sold at once?",
     "creatingListing": "Creating listing…",
     "roomPriceLocked": "Nightly prices are set per currency and can’t be changed here yet",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "policyHeading": "Cancellation policy",
+    "policyHint": "Tiered refund rules: days before check-in against the percent of the total refunded. The no-refund window wins over every tier.",
+    "policyDays": "Days before check-in",
+    "policyPercent": "Refund %",
+    "policyWindow": "No refund within (hours)",
+    "policyAddTier": "Add tier",
+    "policyRemoveTier": "Remove tier",
+    "policySave": "Save policy",
+    "policySaving": "Saving…",
+    "policySaved": "Policy saved",
+    "policyError": "The policy did not save. Nothing changed — try again.",
+    "policyVersion": "Version {version}"
   },
   "admin": {
     "title": "Moderation",
@@ -476,5 +504,39 @@
     "notCompletedNote": "You can review this stay once it is completed.",
     "reviewError": "The review could not be submitted. Your words are still here — try again.",
     "fieldsRequired": "Give your review a headline and a few words."
+  },
+  "messages": {
+    "title": "Messages",
+    "metaDescription": "Your conversations with hosts, with unread counts and read receipts.",
+    "loadingThreads": "Loading conversations",
+    "loadingMessages": "Loading messages",
+    "loadError": "Your conversations did not come back",
+    "loadErrorHint": "The list failed to load. Your messages are safe — try again.",
+    "emptyTitle": "No conversations yet",
+    "emptyHint": "When you message a host about a booking, the thread lands here.",
+    "browseStays": "Browse stays",
+    "unread": "{count} unread",
+    "unreadOne": "1 unread",
+    "noUnread": "No unread messages",
+    "openThread": "Open conversation",
+    "lastMessage": "Last message {date}",
+    "noMessages": "No messages yet. Say hello below.",
+    "composerLabel": "Message",
+    "composerPlaceholder": "Write your message…",
+    "send": "Send",
+    "sending": "Sending…",
+    "sendError": "The message did not send. Nothing was lost — try again.",
+    "messageHost": "Message host",
+    "messageHostHint": "Questions about this stay? Write to your host.",
+    "threadNotFound": "Conversation not found",
+    "threadNotFoundHint": "It may have been removed, or the link is wrong.",
+    "backToMessages": "Back to messages",
+    "you": "You",
+    "readReceipt": "Read",
+    "delivered": "Sent",
+    "offlineNote": "You are offline. New messages will appear when you reconnect.",
+    "firstMessage": "Hi! I have a question about booking {reference}.",
+    "reconnecting": "Reconnecting…",
+    "reconnectHint": "Live updates are paused. New messages still arrive on their own."
   }
 }

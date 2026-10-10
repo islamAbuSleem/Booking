@@ -9,11 +9,11 @@
  * Cancel goes through the real endpoint and degrades to the local store the
  * same way the read does.
  */
-import { cancelBooking, createReview, fetchBooking, fetchReviewable, isApiError, isApiFailure } from '~/utils/api'
-import type { ApiBooking } from '~/utils/api'
+import { cancelBooking, createReview, createThread, fetchBooking, fetchCancellationPolicy, fetchCancellationQuote, fetchReviewable, isApiError, isApiFailure, retryRefund } from '~/utils/api'
+import type { ApiBooking, ApiCancellationPolicy, ApiCancellationQuote } from '~/utils/api'
 import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
 import { useBookings } from '~/composables/useBookings'
-import { formatStayDate, wholeNumber } from '~/utils/format'
+import { formatStayDate, payableCents, wholeNumber } from '~/utils/format'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -71,6 +71,45 @@ const {
 
 const booking = computed(() => payload.value?.booking ?? null)
 const guestName = computed(() => payload.value?.guestName ?? null)
+const isLiveBooking = computed(() => payload.value?.live === true && booking.value !== null)
+
+/**
+ * T37: the plain-language policy table. Asked only for a live booking — a fixture
+ * trip has no server policy to read. A failed read hides the section, never the page:
+ * the policy is context for the cancel decision, not the decision itself.
+ */
+const { data: policy } = await useAsyncData<ApiCancellationPolicy | null>(
+  () => `booking:${id.value}:policy`,
+  async (): Promise<ApiCancellationPolicy | null> => {
+    const record = booking.value
+    if (!isLiveBooking.value || !record) return null
+    try {
+      return await fetchCancellationPolicy(record.hotel.id)
+    }
+    catch {
+      return null
+    }
+  },
+)
+
+/**
+ * T37: the live quote beside the cancel button. Asked only for a live CONFIRMED
+ * booking — anything else cannot be cancelled, so asking would be a wasted round
+ * trip. A failed quote hides the line, never the button.
+ */
+const { data: quote } = await useAsyncData<ApiCancellationQuote | null>(
+  () => `booking:${id.value}:quote`,
+  async (): Promise<ApiCancellationQuote | null> => {
+    const record = booking.value
+    if (!isLiveBooking.value || !record || record.status !== 'CONFIRMED') return null
+    try {
+      return await fetchCancellationQuote(record.id)
+    }
+    catch {
+      return null
+    }
+  },
+)
 
 /** A missing id or a 404/403 answer is a not-found, not an exception — say so in the status line. */
 if (!booking.value && status.value !== 'error') {
@@ -179,28 +218,85 @@ const cancelled = ref(false)
 const cancelFailed = ref(false)
 
 /**
- * The real cancel first. On success the response *is* the new state, so the
- * page renders the flip from it. A real envelope error (409
- * `INVALID_CANCEL_STATE`, a 403, a 404) means the trip was not cancelled —
- * the claim is not made. Only when nothing answered does the fixture store
- * own the flip, and `UNAUTHORIZED` counts as nothing answered: it is exactly
- * what the read above degrades on, so the two can never disagree.
+ * T38 — the refund attempt the cancellation produced. Null means "no refund row" (a
+ * stay that was never paid, or the fixture world); the three statuses are what the
+ * API's ledger says, not a guess. A `failed` one is retryable, which is the whole point
+ * of D11's "at most one succeeded" rather than "at most one attempt".
  */
+const refundStatus = ref<'pending' | 'succeeded' | 'failed' | null>(null)
+const retryBusy = ref(false)
+const retryFailed = ref(false)
+
+async function requestRefundRetry(): Promise<void> {
+  const record = booking.value
+  if (!record || retryBusy.value) return
+  retryBusy.value = true
+  retryFailed.value = false
+  try {
+    const retried = await retryRefund(record.id)
+    refundStatus.value = retried.status
+  }
+  catch {
+    retryFailed.value = true
+  }
+  finally {
+    retryBusy.value = false
+  }
+}
+
+/**
+ * T35 — "Message host". Opens (or reuses) the booking's thread with a greeting,
+ * then lands on it. A failed open keeps the guest here with an inline error:
+ * the booking page is not the place for a dead end.
+ */
+const messageBusy = ref(false)
+const messageFailed = ref(false)
+
+async function messageHost(): Promise<void> {
+  const record = booking.value
+  if (!record || messageBusy.value) return
+  messageBusy.value = true
+  messageFailed.value = false
+  try {
+    const thread = await createThread({
+      bookingId: record.id,
+      body: t('messages.firstMessage', { reference: record.reference }),
+    })
+    await navigateTo(`/messages/${thread.id}`)
+  }
+  catch {
+    messageFailed.value = true
+  }
+  finally {
+    messageBusy.value = false
+  }
+}
+
+/**
+  * The real cancel first. On success the response *is* the new state, so the page
+  * renders the flip from it — and T38's `refund` is the attempt Stripe was asked for,
+  * so the status line below reads its answer rather than a guess. A real envelope
+  * error (409 `INVALID_CANCEL_STATE`, 400 `NO_CAPTURED_PAYMENT`, a 403, a 404) means the
+  * trip was not cancelled — the claim is not made. Only when nothing answered does the
+  * fixture store own the flip, and `UNAUTHORIZED` counts as nothing answered: it is
+  * exactly what the read above degrades on, so the two can never disagree.
+  */
 async function requestCancel(): Promise<void> {
   const record = booking.value
   if (!record || cancelBusy.value) return
   cancelBusy.value = true
   cancelFailed.value = false
   try {
-    const updated = await cancelBooking(record.id)
+    const result = await cancelBooking(record.id)
     // `apiFetch` hands back `undefined` for a body it could not read, so a 200 with
     // nothing usable in it is not a confirmed cancellation. Claiming it would show
     // the success alert beside a CONFIRMED badge and a live Cancel button.
-    if (!updated || updated.status !== 'CANCELLED') {
+    if (!result || result.booking.status !== 'CANCELLED') {
       cancelFailed.value = true
       return
     }
-    Object.assign(record, updated)
+    Object.assign(record, result.booking)
+    refundStatus.value = result.refund?.status ?? null
     cancelled.value = true
   }
   catch (cancelError: unknown) {
@@ -300,6 +396,36 @@ useSeoMeta({
         class="mt-6 max-w-[720px]"
       >
         {{ $t('bookings.cancelledBody', { reference: booking.reference }) }}
+
+        <!-- T38: what the refund actually did. Succeeded is news; failed is a way back. -->
+        <p
+          v-if="refundStatus"
+          class="mt-2 text-sm"
+          role="status"
+        >
+          {{ $t(`bookings.refund.${refundStatus}`) }}
+        </p>
+        <div
+          v-if="refundStatus === 'failed'"
+          class="mt-3 flex flex-wrap items-center gap-3"
+        >
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            :loading="retryBusy"
+            :disabled="retryBusy"
+            @click="requestRefundRetry()"
+          >
+            {{ retryBusy ? $t('bookings.refund.retrying') : $t('bookings.refund.retry') }}
+          </BaseButton>
+          <span
+            v-if="retryFailed"
+            class="text-danger text-sm"
+            role="alert"
+          >
+            {{ $t('bookings.refund.retryFailed') }}
+          </span>
+        </div>
       </BaseAlert>
 
       <BaseAlert
@@ -409,15 +535,74 @@ useSeoMeta({
             </p>
           </section>
 
-          <div v-if="cancellable">
+          <div class="flex flex-wrap items-center gap-3">
+            <div v-if="cancellable">
+              <BaseButton
+                variant="secondary"
+                size="md"
+                @click="cancelOpen = true"
+              >
+                {{ $t('bookings.cancelBooking') }}
+              </BaseButton>
+            </div>
+
+            <!-- T35: opens (or reuses) the booking's thread, then lands on it. -->
             <BaseButton
               variant="secondary"
               size="md"
-              @click="cancelOpen = true"
+              :loading="messageBusy"
+              :disabled="messageBusy"
+              @click="messageHost()"
             >
-              {{ $t('bookings.cancelBooking') }}
+              {{ $t('messages.messageHost') }}
             </BaseButton>
           </div>
+          <p
+            v-if="messageFailed"
+            class="text-danger mt-2 text-sm"
+            role="alert"
+          >
+            {{ $t('messages.sendError') }}
+          </p>
+
+          <!-- T37: the same policy the host wrote, as a plain-language table. -->
+          <section
+            v-if="policy"
+            aria-labelledby="booking-policy"
+            class="border-rule bg-surface rounded-none border p-6"
+          >
+            <h2
+              id="booking-policy"
+              class="text-fg-muted text-label uppercase"
+            >
+              {{ $t('bookings.policyHeading') }}
+            </h2>
+            <ul class="mt-3 flex flex-col gap-1 text-sm">
+              <li
+                v-for="tier in policy.tiers"
+                :key="tier.daysBefore"
+              >
+                {{
+                  tier.daysBefore === 1
+                    ? $t('bookings.policyTierDay', { percent: wholeNumber(tier.refundPercent) })
+                    : $t('bookings.policyTierDays', { percent: wholeNumber(tier.refundPercent), days: wholeNumber(tier.daysBefore) })
+                }}
+              </li>
+              <li>
+                {{
+                  policy.noRefundWithinHours === 1
+                    ? $t('bookings.policyWindowHour')
+                    : $t('bookings.policyWindowHours', { hours: wholeNumber(policy.noRefundWithinHours) })
+                }}
+              </li>
+            </ul>
+            <p
+              v-if="quote"
+              class="tabular mt-3 text-sm font-medium"
+            >
+              {{ $t('bookings.quoteLine', { percent: wholeNumber(quote.refundPercent), total: payableCents(booking.totalCents, booking.currency), refund: payableCents(quote.refundCents, quote.currency) }) }}
+            </p>
+          </section>
 
           <!-- T24: the review form, once per completed stay. Fixtures are read-only. -->
           <section

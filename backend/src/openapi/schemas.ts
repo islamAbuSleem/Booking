@@ -9,6 +9,9 @@ import { DTO_SCHEMAS as HOST_DTO_SCHEMAS } from '../modules/host/dto/host.api.js
 import { DTO_SCHEMAS as REVIEWS_DTO_SCHEMAS } from '../modules/reviews/dto/review.dto.js';
 import { DTO_SCHEMAS as ADMIN_DTO_SCHEMAS } from '../modules/admin/dto/admin.dto.js';
 import { DTO_SCHEMAS as PAYMENTS_DTO_SCHEMAS } from '../modules/payments/dto/payment.dto.js';
+import { DTO_SCHEMAS as CANCELLATIONS_DTO_SCHEMAS } from '../modules/cancellations/dto/cancellation.dto.js';
+import { DTO_SCHEMAS as THREADS_DTO_SCHEMAS } from '../modules/threads/dto/thread.dto.js';
+import { DTO_SCHEMAS as REFUNDS_DTO_SCHEMAS } from '../modules/refunds/dto/refund.dto.js';
 import { DTO_SCHEMAS as UPLOADS_DTO_SCHEMAS } from '../modules/uploads/dto/uploads.dto.js';
 import { DTO_SCHEMAS as USER_DTO_SCHEMAS } from '../modules/users/dto/user.dto.js';
 
@@ -50,6 +53,14 @@ export const CONTRACT_SCHEMAS = {
   ...ADMIN_DTO_SCHEMAS,
   // T26 - payment intent and payment components.
   ...PAYMENTS_DTO_SCHEMAS,
+  // T35 — messaging threads and messages. `NOT_THREAD_PARTICIPANT` and
+  // `THREAD_NOT_FOUND` join `ERROR_CODES` the same way.
+  ...THREADS_DTO_SCHEMAS,
+  // T37 — cancellation policy and quote components.
+  ...CANCELLATIONS_DTO_SCHEMAS,
+  // T38 — refund ledger components. `ALREADY_REFUNDED` and `NO_CAPTURED_PAYMENT` join
+  // `ERROR_CODES` the same way.
+  ...REFUNDS_DTO_SCHEMAS,
 } as const satisfies Record<string, z.ZodType>;
 
 export type ContractSchemaName = keyof typeof CONTRACT_SCHEMAS;

@@ -220,10 +220,127 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Cancel the caller's booking
-         * @description Guarded to CONFIRMED only: a PENDING booking is an unpaid hold that T26/T27 confirm, and cancelling it out from under the payment would strand the money, so a PENDING booking answers INVALID_CANCEL_STATE until it is confirmed. Refunds are a later ticket; this flips the status only. Answers 200 with the booking in its CANCELLED state, not 204: the client renders the flip from the body.
+         * Cancel the caller's booking and refund it per policy
+         * @description Flips the booking to CANCELLED, releases the inventory hold, and appends a refund attempt paid from the T37 quote — the amount is computed once by the API and is never client-sent. A duplicate cancel answers 200 with the existing refund and its status: it is a read, not a second charge (D11). A booking that never captured payment answers 400 NO_CAPTURED_PAYMENT and is left CONFIRMED.
          */
         post: operations["BookingsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}/refund/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed refund
+         * @description Appends a new attempt to the ledger and calls Stripe again with the same server-computed amount. A booking that already has a succeeded refund answers 409 ALREADY_REFUNDED — the D11 invariant, enforced rather than hoped for.
+         */
+        post: operations["BookingsController_refundRetry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The booking's refund ledger
+         * @description Every attempt, newest first, for the caller's own booking. An append-only history of tries rather than a single status column.
+         */
+        get: operations["BookingsController_listRefunds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}/cancellation-quote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Quote the refund for cancelling a booking
+         * @description The one computation, by the API, from the whole elapsed time between now and check-in: the tier the cancellation lands in decides the percent of the booking’s own total, in its own currency. Only CONFIRMED bookings quote — anything else is a 400 with the reason, mirroring the cancel guard.
+         */
+        post: operations["BookingsController_cancellationQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the Stripe PaymentIntent for a pending booking
+         * @description Idempotent by construction: the Stripe idempotency key derives from the booking reference, so a retry is the same Stripe call rather than a second charge, and the single payment row is upserted. The browser confirms the returned `clientSecret` with Stripe.js; confirmation itself arrives via webhook in T27.
+         */
+        post: operations["PaymentsController_createIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/{bookingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the payment for a booking */
+        get: operations["PaymentsController_getPayment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stripe webhook: confirm or release a booking
+         * @description Signature-verified against the RAW body (`rawBody: true` at scaffold; never `@Body({ bodyParser: false })`, which does not exist, and never `app.use(express.json())`, which nulls `rawBody`). `payment_intent.succeeded` flips the booking PENDING → CONFIRMED and upserts the payment row with the receipt URL; `payment_intent.payment_failed` releases the hold (PENDING → CANCELLED). A late failure for an already-confirmed stay changes nothing. Unknown events 200 and are ignored, so a new Stripe event type never wedges deliveries into a retry loop. Fully idempotent: Stripe retries, and a repeated event finds nothing in `from` and writes nothing.
+         */
+        post: operations["PaymentsController_webhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -390,6 +507,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hotels/{id}/cancellation-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The hotel’s cancellation policy
+         * @description The stored policy, or the API default when the hotel has none — never "no policy". Resolves by uuid or by slug, like the detail route, so the guest-facing table and the booking quote read the same row.
+         */
+        get: operations["HotelsController_findCancellationPolicy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sitemap/urls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Publishable hotel slugs for the sitemap
+         * @description Slugs and lastmod timestamps for every PUBLISHED hotel. The Nuxt sitemap module reads this at build time; a non-published row never appears because the filter is in SQL, not applied afterwards.
+         */
+        get: operations["SitemapController_urls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/host/hotels": {
         parameters: {
             query?: never;
@@ -414,6 +571,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/host/hotels/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List incoming bookings for my hotels
+         * @description Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.
+         */
+        get: operations["HostController_listMyBookings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/host/hotels/{id}": {
         parameters: {
             query?: never;
@@ -430,7 +607,7 @@ export interface paths {
         post?: never;
         /**
          * Delete my hotel
-         * @description Deletes the hotel and all its rooms, images, and blackout dates. Only if no confirmed bookings exist.
+         * @description Deletes the hotel and all its rooms, images, and blackout dates. Only if none of its rooms has any booking: booking history is kept, so a hotel that has hosted a stay is not removable (409 HOTEL_HAS_BOOKINGS).
          */
         delete: operations["HostController_deleteHotel"];
         options?: never;
@@ -440,6 +617,26 @@ export interface paths {
          * @description Updates hotel fields. A host can suspend their own listing, but only an admin can publish it.
          */
         patch: operations["HostController_updateHotel"];
+        trace?: never;
+    };
+    "/api/host/hotels/{id}/cancellation-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set my hotel’s cancellation policy
+         * @description Stores the tiered refund rules and the no-refund window, bumping the policy version. Ownership is asserted first: a hotel that is not this host’s is a 403 NOT_HOTEL_OWNER, never a 404.
+         */
+        put: operations["HostController_setCancellationPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/host/hotels/{id}/rooms": {
@@ -453,7 +650,7 @@ export interface paths {
         put?: never;
         /**
          * Add a room to my hotel
-         * @description Creates a room type with prices (per currency), images, and inventory.
+         * @description Creates a room type with prices (per currency), images, and inventory. Every image `publicId` must start with the caller's own `booking/hotels/{hostId}/` folder or the request is 403 `UPLOAD_FOREIGN` — the rule T21 applies to `/api/uploads/attach`, since a room image is the same row.
          */
         post: operations["HostController_createRoom"];
         delete?: never;
@@ -474,7 +671,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a room
-         * @description Deletes the room and its blackout dates. Only if no confirmed bookings exist for this room.
+         * @description Deletes the room and its blackout dates. Only if no booking exists for this room, cancelled or completed ones included (409 ROOM_HAS_BOOKINGS).
          */
         delete: operations["HostController_deleteRoom"];
         options?: never;
@@ -523,26 +720,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/host/hotels/bookings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List incoming bookings for my hotels
-         * @description Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.
-         */
-        get: operations["HostController_listMyBookings"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/hotels/{hotelId}/reviews": {
         parameters: {
             query?: never;
@@ -581,6 +758,74 @@ export interface paths {
         get: operations["ReviewsController_reviewable"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the caller's conversations
+         * @description Guest side and host side both, newest first. The unread count on each row is the caller's own — never the peer's.
+         */
+        get: operations["ThreadsController_list"];
+        put?: never;
+        /**
+         * Start or reuse a conversation about a booking
+         * @description Creates the thread for the booking on the first message and reuses it thereafter: one thread per (booking, guest, host). The parties come from the booking itself, so the body carries a `bookingId` only — never a guest or host id.
+         */
+        post: operations["ThreadsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/threads/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one page of a conversation
+         * @description Oldest first, up to one page, ending before `before` when given. A thread the caller is not part of is a 403, not a 404.
+         */
+        get: operations["ThreadsController_listMessages"];
+        put?: never;
+        /**
+         * Send a message in a conversation
+         * @description Appends the message and bumps the peer participant’s unread counter. Bodies over 5000 chars are a 400.
+         */
+        post: operations["ThreadsController_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/threads/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a conversation read
+         * @description Clears the reader’s unread counter only — the peer’s badge is untouched. Answers 200 with the cleared count, not 204: the client renders the badge flip from the body.
+         */
+        post: operations["ThreadsController_markRead"];
         delete?: never;
         options?: never;
         head?: never;
@@ -722,63 +967,6 @@ export interface paths {
          * @description HIDDEN removes it from every public list; VISIBLE restores it.
          */
         patch: operations["AdminController_setReviewStatus"];
-        trace?: never;
-    };
-    "/api/payments/intent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create the Stripe PaymentIntent for a pending booking
-         * @description Idempotent by construction: the Stripe idempotency key derives from the booking reference, so a retry is the same Stripe call rather than a second charge, and the single payment row is upserted. The browser confirms the returned `clientSecret` with Stripe.js; confirmation itself arrives via webhook in T27.
-         */
-        post: operations["PaymentsController_createIntent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/payments/{bookingId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read the payment for a booking */
-        get: operations["PaymentsController_getPayment"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/payments/webhook": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Stripe webhook: confirm or release a booking
-         * @description Signature-verified against the RAW body (`rawBody: true` at scaffold; never `@Body({ bodyParser: false })`, which does not exist, and never `app.use(express.json())`, which nulls `rawBody`). `payment_intent.succeeded` flips the booking PENDING → CONFIRMED and upserts the payment row with the receipt URL; `payment_intent.payment_failed` releases the hold (PENDING → CANCELLED). A late failure for an already-confirmed stay changes nothing. Unknown events 200 and are ignored, so a new Stripe event type never wedges deliveries into a retry loop. Fully idempotent: Stripe retries, and a repeated event finds nothing in `from` and writes nothing.
-         */
-        post: operations["PaymentsController_webhook"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/health": {
@@ -924,6 +1112,20 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["HealthData"];
+        };
+        SitemapUrl: {
+            /** @description Stable, URL-safe. The detail route accepts this. */
+            slug: string;
+            /** @description ISO 8601 lastmod for the sitemap entry. */
+            updatedAt: string;
+        };
+        SitemapUrlsData: {
+            items: components["schemas"]["SitemapUrl"][];
+        };
+        SitemapUrlsEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["SitemapUrlsData"];
         };
         AuthUser: {
             /** Format: uuid */
@@ -1232,12 +1434,16 @@ export interface components {
             sortOrder?: number;
         };
         CreateBlackout: {
-            /** Format: uuid */
-            roomId: string | null;
-            startsOn: string;
-            endsOn: string;
-            reason: string | null;
+            roomId: components["schemas"]["CreateBlackout-__schema0"];
+            startsOn: components["schemas"]["CreateBlackout-__schema1"];
+            endsOn: components["schemas"]["CreateBlackout-__schema2"];
+            reason: components["schemas"]["CreateBlackout-__schema3"];
         };
+        /** Format: uuid */
+        "CreateBlackout-__schema0": string | null;
+        "CreateBlackout-__schema1": string;
+        "CreateBlackout-__schema2": string;
+        "CreateBlackout-__schema3": string | null;
         ImageSummary: {
             /** Format: uuid */
             id: string;
@@ -1618,6 +1824,193 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["WebhookData"];
+        };
+        CreateThread: {
+            /**
+             * Format: uuid
+             * @description The booking the conversation is about, by uuid.
+             */
+            bookingId: string;
+            /** @description The first message. Creates the thread when none exists for the triple. */
+            body: string;
+        };
+        SendMessage: {
+            /** @description The message text, 1-5000 chars. */
+            body: string;
+        };
+        Thread: {
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The booking the conversation is about.
+             */
+            bookingId: string;
+            /** Format: uuid */
+            guestId: string;
+            /** Format: uuid */
+            hostId: string;
+            /** @description The caller's unread count in this thread — never the other side's. */
+            unreadCount: number;
+            /** @description ISO 8601 instant of the newest message, or null when empty. */
+            lastMessageAt: components["schemas"]["Thread-__schema0"] | null;
+            /** @description ISO 8601 instant the thread was created. */
+            createdAt: string;
+        };
+        "Thread-__schema0": string;
+        ThreadEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Thread"];
+        };
+        "ThreadEnvelope-__schema0": string;
+        ThreadListData: {
+            items: components["schemas"]["Thread"][];
+            /** @description Always `items.length` until the list is paginated. */
+            total: number;
+        };
+        "ThreadListData-__schema0": string;
+        ThreadListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ThreadListData"];
+        };
+        "ThreadListEnvelope-__schema0": string;
+        Message: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            threadId: string;
+            /**
+             * Format: uuid
+             * @description The author, by user uuid. The client renders own vs peer.
+             */
+            senderId: string;
+            body: string;
+            /** @description ISO 8601 read receipt, or null until the peer marks the thread read. */
+            readAt: components["schemas"]["Message-__schema0"] | null;
+            /** @description ISO 8601 instant the message was sent. */
+            createdAt: string;
+        };
+        "Message-__schema0": string;
+        MessageEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Message"];
+        };
+        "MessageEnvelope-__schema0": string;
+        MessageListData: {
+            /** @description Oldest first, so the client appends. */
+            items: components["schemas"]["Message"][];
+            /** @description Always `items.length` until the list is paginated. */
+            total: number;
+        };
+        "MessageListData-__schema0": string;
+        MessageListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MessageListData"];
+        };
+        "MessageListEnvelope-__schema0": string;
+        ThreadReadData: {
+            /** @description Always 0: the reader's counter after the clear. */
+            unreadCount: number;
+        };
+        ThreadReadEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ThreadReadData"];
+        };
+        UpdatePolicy: {
+            /** @description Ordered highest-`daysBefore` first. Stored sorted that way. */
+            tiers: components["schemas"]["UpdatePolicy-__schema0"][];
+            /** @description Inside this many hours of check-in the refund is 0, whatever the tiers say. */
+            noRefundWithinHours: number;
+        };
+        "UpdatePolicy-__schema0": {
+            /** @description Whole days before check-in this tier starts at, inclusive. */
+            daysBefore: number;
+            /** @description Percent of the booking total refunded from this tier on. */
+            refundPercent: number;
+        };
+        CancellationPolicy: {
+            /** Format: uuid */
+            hotelId: string;
+            tiers: {
+                /** @description Whole days before check-in this tier starts at, inclusive. */
+                daysBefore: number;
+                /** @description Percent of the booking total refunded from this tier on. */
+                refundPercent: number;
+            }[];
+            noRefundWithinHours: number;
+            /** @description Bumps on every PUT. 0 means the API default, not a stored row. */
+            version: number;
+        };
+        CancellationPolicyEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CancellationPolicy"];
+        };
+        CancellationQuote: {
+            /** @description 0-100, from the tier the cancellation lands in. */
+            refundPercent: number;
+            /** @description Integer cents of the booking total at that percent. */
+            refundCents: number;
+            /** @description The booking’s own currency, never re-denominated. */
+            currency: string;
+            /** @description The policy version this quote priced against. */
+            policyVersion: number;
+        };
+        CancellationQuoteEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CancellationQuote"];
+        };
+        Refund: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            bookingId: string;
+            /** @description Integer cents, from the T37 quote. Never a client-sent amount. */
+            amountCents: number;
+            /** @description The booking’s own currency, as quoted. */
+            currency: string;
+            /** @description The percent of the total this attempt refunded. */
+            percent: number;
+            /** @enum {string} */
+            status: "pending" | "succeeded" | "failed";
+            /** @description 1 for the cancellation’s own refund, 2+ for each retry. */
+            attempts: number;
+            /** @description ISO 8601 instant the attempt was appended. */
+            createdAt: string;
+        };
+        RefundEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Refund"];
+        };
+        CancelResult: {
+            booking: components["schemas"]["Booking"];
+            /** @description Null when there was no captured payment to refund. */
+            refund: components["schemas"]["Refund"] | null;
+        };
+        "CancelResult-__schema0": string;
+        CancelResultEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CancelResult"];
+        };
+        "CancelResultEnvelope-__schema0": string;
+        RefundListData: {
+            /** @description Newest attempt first. */
+            items: components["schemas"]["Refund"][];
+            /** @description Always `items.length` until the list is paginated. */
+            total: number;
+        };
+        RefundListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["RefundListData"];
         };
     };
     responses: never;
@@ -2021,13 +2414,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The booking, now CANCELLED. */
+            /** @description The booking, now CANCELLED, and the refund attempt it produced. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BookingEnvelope"];
+                    "application/json": components["schemas"]["CancelResultEnvelope"];
                 };
             };
             /** @description No valid session. */
@@ -2059,6 +2452,322 @@ export interface operations {
             };
             /** @description The booking is not CONFIRMED (INVALID_CANCEL_STATE): PENDING until payment confirms it, and COMPLETED past cancelling. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_refundRetry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The cancelled booking whose refund failed, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new attempt, after Stripe answered. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundEnvelope"];
+                };
+            };
+            /** @description The booking is not cancelled, or has no captured payment. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description A refund already succeeded for this booking (ALREADY_REFUNDED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_listRefunds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The attempts, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundListEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_cancellationQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking to price a cancellation for, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The percent, the integer-cent refund, and the policy version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationQuoteEnvelope"];
+                };
+            };
+            /** @description The booking is not CONFIRMED (INVALID_CANCEL_STATE). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PaymentsController_createIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntentRequest"];
+            };
+        };
+        responses: {
+            /** @description The intent to confirm, with the server-computed amount. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntentEnvelope"];
+                };
+            };
+            /** @description The body failed validation, or the booking is not PENDING. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PaymentsController_getPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking, by uuid. */
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The payment row, if an intent has been created. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking, or no payment started for it yet. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PaymentsController_webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted — verified and dispatched, or verified and ignored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEnvelope"];
+                };
+            };
+            /** @description The signature is missing or does not verify. */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2439,6 +3148,55 @@ export interface operations {
             };
         };
     };
+    HotelsController_findCancellationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy, with its version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationPolicyEnvelope"];
+                };
+            };
+            /** @description No such hotel. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    SitemapController_urls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slugs, with ISO 8601 lastmod each. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SitemapUrlsEnvelope"];
+                };
+            };
+        };
+    };
     HostController_listMyHotels: {
         parameters: {
             query?: never;
@@ -2502,6 +3260,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_listMyBookings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of bookings with hotel, room, guest and price snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostBookingListEnvelope"];
                 };
             };
             /** @description Not authenticated. */
@@ -2620,7 +3416,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Hotel has confirmed bookings and cannot be deleted. */
+            /** @description The hotel has bookings on any of its rooms (`HOTEL_HAS_BOOKINGS`). Booking history is kept, so a listing with past stays is not removable either. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2690,6 +3486,60 @@ export interface operations {
             };
         };
     };
+    HostController_setCancellationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePolicy"];
+            };
+        };
+        responses: {
+            /** @description The stored policy, with its new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationPolicyEnvelope"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     HostController_createRoom: {
         parameters: {
             query?: never;
@@ -2729,7 +3579,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Not a host/admin, or not the owner of the hotel. */
+            /** @description Not a host/admin, not the owner of the hotel, or an image `publicId` outside the caller's own folder (`UPLOAD_FOREIGN`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2795,7 +3645,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Room has confirmed bookings and cannot be deleted. */
+            /** @description The room has bookings on it (`ROOM_HAS_BOOKINGS`). Booking history is kept, so a room with past stays is not removable either. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2972,44 +3822,6 @@ export interface operations {
             };
         };
     };
-    HostController_listMyBookings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A page of bookings with hotel, room, guest and price snapshot. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HostBookingListEnvelope"];
-                };
-            };
-            /** @description Not authenticated. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Not a host or admin. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
     ReviewsController_list: {
         parameters: {
             query?: never;
@@ -3163,6 +3975,258 @@ export interface operations {
                 };
             };
             /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's threads, most recent first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadListEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateThread"];
+            };
+        };
+        responses: {
+            /** @description The thread (new or reused). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadEnvelope"];
+                };
+            };
+            /** @description The body failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest and host. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_listMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The thread, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageListEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The thread exists but the caller is not part of it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such thread. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The thread, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendMessage"];
+            };
+        };
+        responses: {
+            /** @description The message that was appended. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageEnvelope"];
+                };
+            };
+            /** @description The body failed validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The thread exists but the caller is not part of it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such thread. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ThreadsController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The thread, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cleared counter (always 0). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThreadReadEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The thread exists but the caller is not part of it. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such thread. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3520,145 +4584,6 @@ export interface operations {
             };
             /** @description No such review. */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    PaymentsController_createIntent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IntentRequest"];
-            };
-        };
-        responses: {
-            /** @description The intent to confirm, with the server-computed amount. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntentEnvelope"];
-                };
-            };
-            /** @description The body failed validation, or the booking is not PENDING. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description No valid session. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description The booking belongs to a different guest. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description No such booking. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    PaymentsController_getPayment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The booking, by uuid. */
-                bookingId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The payment row, if an intent has been created. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaymentEnvelope"];
-                };
-            };
-            /** @description No valid session. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description The booking belongs to a different guest. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description No such booking, or no payment started for it yet. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    PaymentsController_webhook: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Accepted — verified and dispatched, or verified and ignored. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookEnvelope"];
-                };
-            };
-            /** @description The signature is missing or does not verify. */
-            400: {
                 headers: {
                     [name: string]: unknown;
                 };

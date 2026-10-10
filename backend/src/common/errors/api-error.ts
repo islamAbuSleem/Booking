@@ -113,7 +113,18 @@ export const ERROR_CODES = [
   'ACCOUNT_SUSPENDED',
   // `ADMIN_SELF_SUSPEND`: an admin suspending their own account, refused as a 400.
   'ADMIN_SELF_SUSPEND',
-
+  // T35 — messaging. A thread that exists but names neither the guest nor the host is
+  // a 403, not a 404, so the code states which rule failed rather than hiding the
+  // row's existence (same shape as T20's NOT_BOOKING_OWNER).
+  'NOT_THREAD_PARTICIPANT',
+  'THREAD_NOT_FOUND',
+  // T38 — refunds. `ALREADY_REFUNDED` is the D11 invariant made visible: a booking
+  // with one `succeeded` refund row takes no further refund, so a retry after success
+  // is a 409 rather than a second charge back to the guest.
+  'ALREADY_REFUNDED',
+  // T38 — the booking has no captured payment to refund against. A 400, not a 404:
+  // the booking exists and is the caller's, it simply never took money.
+  'NO_CAPTURED_PAYMENT',
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

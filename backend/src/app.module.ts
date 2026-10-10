@@ -5,11 +5,14 @@ import { HealthModule } from './modules/health/health.module.js';
 import { HotelsModule } from './modules/hotels/hotels.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { BookingsModule } from './modules/bookings/bookings.module.js';
+import { CancellationsModule } from './modules/cancellations/cancellations.module.js';
 import { FavoritesModule } from './modules/favorites/favorites.module.js';
 import { UploadsModule } from './modules/uploads/uploads.module.js';
 import { UsersModule } from './modules/users/users.module.js';
 import { HostModule } from './modules/host/host.module.js';
 import { ReviewsModule } from './modules/reviews/reviews.module.js';
+import { RefundsModule } from './modules/refunds/refunds.module.js';
+import { ThreadsModule } from './modules/threads/threads.module.js';
 import { AdminModule } from './modules/admin/admin.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -23,11 +26,14 @@ import { PrismaModule } from './prisma/prisma.module.js';
     UsersModule,
     AuthModule,
     BookingsModule,
+    CancellationsModule,
     FavoritesModule,
     UploadsModule,
     HotelsModule,
     HostModule,
     ReviewsModule,
+    RefundsModule,
+    ThreadsModule,
     AdminModule,
     PaymentsModule,
     HealthModule,

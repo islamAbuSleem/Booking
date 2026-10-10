@@ -88,10 +88,10 @@
 - [x] T34 Deploy configuration
 
 ### Phase 5 — Deferred features
-- [ ] T35 Messaging: threads and messages
-- [ ] T36 Messaging: live delivery
-- [ ] T37 Cancellation policy engine
-- [ ] T38 Stripe refunds
+- [x] T35 Messaging: threads and messages
+- [x] T36 Messaging: live delivery
+- [x] T37 Cancellation policy engine
+- [x] T38 Stripe refunds
 - [ ] T39 Multi-currency
 - [ ] T40 Transactional email
 - [ ] T41 Host analytics dashboard
@@ -689,6 +689,42 @@
     `frontend/vercel.json`, `context/deploy.md` (Neon runbook + first-deploy checklist:
     migrate, OAuth callbacks, Stripe webhook URL, Cloudinary, `FRONTEND_ORIGIN`,
     `NUXT_PUBLIC_API_BASE`). `.env.example` files already contract the two apps.
+  - **D79 — T35 messaging.** `threads`/`messages` tables (offline-written additive
+    migration; unique key on the triple makes "one thread per booking/guest/host"
+    structural, racing creates reuse the row). Parties resolve server-side from the
+    booking, so no route reads a participant id from the request; a non-participant
+    gets 403 `NOT_THREAD_PARTICIPANT`. Unread state is two counters cleared per reader.
+    Frontend: `/messages`, `/messages/[id]` (composer + read receipts, 10s polling),
+    `/dashboard/host/messages`, "Message host" on `/bookings/[id]`, nav entries.
+  - **D80 — T36 live delivery.** `ThreadsGateway` at `/socket.io` (`message:new`,
+    `message:read`, rooms keyed `thread:<id>`). Same JWT cookie as HTTP, verified in
+    the gateway; the global `JwtAuthGuard` skips non-HTTP contexts so it never runs on
+    the socket, and `@SkipEnvelope()` keeps the global envelope off gateway acks.
+    Membership re-checked server-side before every join; the HTTP path fans out after
+    each write, and the frontend     reconnects with a banner, refetching missed messages
+    over HTTP (`useThreadSocket`, polling as fallback).
+  - **D81 — T37 cancellation policy engine.** `cancellation_policies` (one row per
+    hotel, tiers as ordered JSONB, version bumps per PUT; offline-written additive
+    migration). Refund computed once by the API from now-vs-check-in through a pure
+    function (no clock reads, timestamp passed in): no-refund window wins, boundaries
+    inclusive. Routes: public `GET /api/hotels/:id/cancellation-policy` (default at
+    version 0), owner-scoped `PUT /api/host/hotels/:id/cancellation-policy` (ownership
+    asserted first), `POST /api/bookings/:id/cancellation-quote` (CONFIRMED only, else
+    400 with the reason).     Frontend: policy editor on the host edit page, plain-language
+    table + live quote on the booking detail page.
+  - **D81 — T38 Stripe refunds.** New `refunds` table: one row per *attempt*, amount
+    and percent written once and never rewritten, only `status` and `stripeRefundId`
+    move (webhook/Stripe answer). Invariant is at most one `succeeded` row per booking
+    (D11) — so a duplicate cancel is a **read** answering 200 with the existing refund,
+    a `failed` attempt is retried by appending a new row, and a retry after success is
+    409 `ALREADY_REFUNDED`. The quote is computed **before** the CONFIRMED→CANCELLED
+    flip, because T37's guard is that state and a cancellation must not change the price
+    it was quoted at; a booking with nothing captured answers 400 `NO_CAPTURED_PAYMENT`
+    and is left CONFIRMED. Amounts are keyed `refunds:<reference>:<attempt>` so a
+    redelivery is not a second charge. This supersedes the T20 `BookingsService.cancel`
+    (deleted, along with its specs) — the cancel route now answers `{ booking, refund }`.
+    Live-mode verification (a real refund appearing in Stripe test mode) is still
+    outstanding pending a `STRIPE_SECRET_KEY`.
   - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo
