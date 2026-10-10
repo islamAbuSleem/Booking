@@ -114,7 +114,10 @@ export class ThreadsGateway
         const body = error.getResponse() as { code?: string };
         return { error: { code: body.code ?? 'FORBIDDEN' } };
       }
-      throw error;
+      // A rethrow out of an event handler reaches nothing: Socket.IO surfaces
+      // it as an unhandled rejection and the process dies. Answer instead.
+      this.logger.error('[threads] join failed', error);
+      return { error: { code: 'INTERNAL_ERROR' } };
     }
   }
 
