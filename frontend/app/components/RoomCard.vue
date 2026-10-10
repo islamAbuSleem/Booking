@@ -64,9 +64,9 @@ const inventory = computed(() =>
           <p class="flex flex-col">
             <span class="flex items-baseline gap-1.5">
               <span class="tabular text-price">{{ priceLabel }}</span>
-              <span class="text-fg-subtle text-sm">{{ $t('hotel.perNight') }}</span>
+              <span class="text-fg-muted text-sm">{{ $t('hotel.perNight') }}</span>
             </span>
-            <span class="text-fg-subtle text-label uppercase">
+            <span class="text-fg-muted text-label uppercase">
               {{ $t('detail.inventory', { count: inventory }) }}
             </span>
           </p>

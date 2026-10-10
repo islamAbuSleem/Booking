@@ -36,7 +36,7 @@ the photos carry the colour.
   /* Accent — terracotta */
   --color-accent:       #A63D22;  /* SOLID FILLS, white text on top (6.4:1) */
   --color-accent-hover: #8E3319;
-  --color-accent-bright:#C9522F;  /* on paper: large text + rules only (4.0:1) */
+  --color-accent-bright:#B84A1F;  /* on paper: large text + rules only (~4.7:1) */
   --color-accent-wash:  #F6E7E1;  /* tinted backgrounds */
 
   /* Teal — links, info, and the one cool note */
@@ -66,7 +66,7 @@ Measured against `--color-bg` (`#F7F4EF`) unless noted. AA is a project rule, no
 | `link` on `bg` | ~7.1:1 | AAA — links at body size |
 | `success` on `bg` | ~5.5:1 | AA |
 | **white on `accent`** | ~6.4:1 | **AA — the only valid text on an accent fill** |
-| `accent-bright` on `bg` | ~4.0:1 | AA large text only (≥24px, or ≥19px bold) |
+| `accent-bright` on `bg` | ~4.7:1 | AA large text only (≥24px, or ≥19px bold) |
 | `fg` on `accent` | ~2.6:1 | **FAILS — never put ink on terracotta** |
 | `fg-subtle` on `bg` | ~2.8:1 | Disabled/placeholder only, never body text |
 

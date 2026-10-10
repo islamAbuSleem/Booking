@@ -179,7 +179,7 @@ useSeoMeta({
           class="border-rule flex-1 border-t"
           aria-hidden="true"
         />
-        <span class="text-fg-subtle text-sm">{{ $t('common.or') }}</span>
+        <span class="text-fg-muted text-sm">{{ $t('common.or') }}</span>
         <span
           class="border-rule flex-1 border-t"
           aria-hidden="true"

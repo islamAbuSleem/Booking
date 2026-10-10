@@ -21,7 +21,7 @@ defineProps<{
     </p>
     <p
       v-if="hint"
-      class="text-fg-subtle mt-1 text-sm"
+      class="text-fg-muted mt-1 text-sm"
     >
       {{ hint }}
     </p>

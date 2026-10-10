@@ -77,7 +77,7 @@ const submit = async (): Promise<void> => {
           v-model="destination"
           type="search"
           :placeholder="$t('search.destinationPlaceholder')"
-          class="text-fg placeholder:text-fg-subtle border-rule-strong bg-surface h-12 w-full rounded-sm border px-3 text-sm focus:border-fg focus:outline-none"
+          class="text-fg placeholder:text-fg-muted border-rule-strong bg-surface h-12 w-full rounded-sm border px-3 text-sm focus:border-fg focus:outline-none"
         >
       </div>
 
@@ -168,7 +168,7 @@ const submit = async (): Promise<void> => {
       {{ $t('search.submit') }}
     </button>
 
-    <p class="text-fg-subtle mt-3 text-center text-sm">
+    <p class="text-fg-muted mt-3 text-center text-sm">
       {{ $t('search.freeCancellationNote') }}
     </p>
   </form>

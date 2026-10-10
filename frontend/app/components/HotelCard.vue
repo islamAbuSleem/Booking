@@ -94,7 +94,7 @@ const canFavorite = computed(() => isUuid(props.hotel.id))
           >{{ name }}</li>
           <li
             v-if="overflowCount > 0"
-            class="text-fg-subtle"
+            class="text-fg-muted"
           >
             {{ $t('hotel.amenitiesMore', { count: wholeNumber(overflowCount) }) }}
           </li>
@@ -103,14 +103,14 @@ const canFavorite = computed(() => isUuid(props.hotel.id))
         <div class="mt-auto flex items-end justify-between gap-4 pt-3">
           <p class="flex items-baseline gap-1.5 text-sm">
             <span class="tabular text-lg font-semibold">{{ ratingLabel }}</span>
-            <span class="text-fg-subtle">
+            <span class="text-fg-muted">
               {{ $t('hotel.reviews', { count: wholeNumber(hotel.rating.totalReviews) }) }}
             </span>
           </p>
 
           <p class="flex items-baseline gap-1.5">
             <span class="tabular text-lg font-semibold">{{ priceLabel }}</span>
-            <span class="text-fg-subtle text-sm">{{ $t('hotel.perNight') }}</span>
+            <span class="text-fg-muted text-sm">{{ $t('hotel.perNight') }}</span>
           </p>
         </div>
       </div>

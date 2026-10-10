@@ -49,7 +49,7 @@ const go = (page: number): void => {
     >
       <span
         v-if="entry === -1"
-        class="text-fg-subtle px-2"
+        class="text-fg-muted px-2"
         aria-hidden="true"
       >…</span>
       <button

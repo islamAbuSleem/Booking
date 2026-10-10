@@ -98,6 +98,7 @@ const heroAlt = computed(() => heroImage.value?.altText ?? featured.value[0]?.na
               decoding="async"
               class="aspect-[16/9] w-full object-cover"
             >
+            <div class="absolute inset-0 bg-surface-inv/60" />
             <figcaption
               class="absolute right-3 bottom-3 left-3 text-sm text-white"
             >
@@ -163,9 +164,9 @@ const heroAlt = computed(() => heroImage.value?.altText ?? featured.value[0]?.na
             decoding="async"
             class="aspect-[4/3] w-full object-cover"
           >
-          <div class="absolute inset-0 bg-surface-inv/35" />
+          <div class="absolute inset-0 bg-surface-inv/75" />
           <div class="absolute right-0 bottom-0 left-0 p-5 text-white">
-            <p class="text-label uppercase opacity-80">{{ hotel.country }}</p>
+            <p class="text-label uppercase">{{ hotel.country }}</p>
             <p class="font-display mt-1 text-2xl">{{ hotel.city }}</p>
           </div>
         </NuxtLink>

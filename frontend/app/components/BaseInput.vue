@@ -55,7 +55,7 @@ const describedBy = computed(() => {
       :autocomplete="autocomplete"
       :aria-invalid="error ? true : undefined"
       :aria-describedby="describedBy"
-      class="text-fg placeholder:text-fg-subtle border-rule-strong bg-surface h-12 w-full rounded-sm border px-3 text-sm transition-colors duration-150 focus:border-fg focus:outline-none"
+      class="text-fg placeholder:text-fg-muted border-rule-strong bg-surface h-12 w-full rounded-sm border px-3 text-sm transition-colors duration-150 focus:border-fg focus:outline-none"
       :class="error ? 'border-danger' : ''"
     >
 
@@ -70,7 +70,7 @@ const describedBy = computed(() => {
     <p
       v-else-if="hint"
       :id="hintId"
-      class="text-fg-subtle text-sm"
+      class="text-fg-muted text-sm"
     >
       {{ hint }}
     </p>

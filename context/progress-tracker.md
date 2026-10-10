@@ -82,7 +82,7 @@
 
 ### Phase 4 — Polish
 - [x] T31 SEO
-- [ ] T32 Accessibility audit
+- [x] T32 Accessibility audit
 - [ ] T32b Performance baseline and UX pass
 - [ ] T33 Test suite completion
 - [ ] T34 Deploy configuration
@@ -666,6 +666,15 @@
   4.5:1 line — `warning` at ~4.5:1 and `accent-bright` at ~4.0:1 — have almost no margin.
   Verify both with a real contrast checker before relying on them, and if either fails,
   darken the token rather than relaxing the rule.
+- **D76 — T32 accessibility audit.** axe-core/Playwright tests run against all phase pages.
+  Found and fixed: missing `<html lang>` (in `app.vue`), insufficient contrast on
+  `text-fg-subtle` (#918878 on #fffdfa = 3.4:1) — replaced with `text-fg-muted` in
+  `HotelCard`, `ReviewCard`, `StatCard`, `HotelBookingPanel`, `RoomCard`, `SearchWidget`,
+  `BasePagination`, `BaseInput`, layout footer, login/register pages. Also darkened
+  `accent-bright` from #C9522F (~4.0:1) to #B84A1F (~4.7:1) so it passes AA at all sizes.
+  Hero/destination overlays darkened from 35% → 60-75% `surface-inv` for white-on-dark
+  readability. Test infrastructure lives in `frontend/tests/accessibility.spec.ts` plus
+  `frontend/playwright.config.ts`. Requires a running preview server (port 3000).
 - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo
