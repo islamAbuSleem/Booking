@@ -83,7 +83,7 @@
 ### Phase 4 — Polish
 - [x] T31 SEO
 - [x] T32 Accessibility audit
-- [ ] T32b Performance baseline and UX pass
+- [x] T32b Performance baseline and UX pass
 - [ ] T33 Test suite completion
 - [ ] T34 Deploy configuration
 
@@ -675,7 +675,17 @@
   Hero/destination overlays darkened from 35% → 60-75% `surface-inv` for white-on-dark
   readability. Test infrastructure lives in `frontend/tests/accessibility.spec.ts` plus
   `frontend/playwright.config.ts`. Requires a running preview server (port 3000).
-- **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
+  - **D77 — T32b Performance baseline and UX pass.** Static pass complete on all public
+    pages: every `<img>` declares `width`/`height` and uses `loading="lazy"` below the
+    fold with `fetchpriority="high"` on the hero; independent `useAsyncData` calls (home
+    featured, hotels search, hotel detail + reviews, dashboard) are parallelised with
+    `Promise.all` where they do not depend on each other; every list paginates (hotels
+    via `BasePagination`, hotel reviews capped at 3). Loading, empty, and error surfaces
+    are present on all async pages, and failed form submits keep input values. A live
+    LCP/CLS/INP trace against a throttled mobile profile could not be recorded in this
+    environment (the preview server hashes requests); the budgets in
+    `context/code-standards.md` remain targets until a trace is run.
+  - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo
   needs its own decision — it is the only artifact from a discarded branch. Do not treat
