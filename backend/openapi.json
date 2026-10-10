@@ -1541,6 +1541,73 @@
       }
     },
     "/api/host/hotels/{id}/cancellation-policy": {
+      "get": {
+        "description": "The stored policy, or the API default when the hotel has none. Ownership is asserted first, so the host can read the policy of a listing the public route cannot see — a draft 404s there for everyone but its own host. That 404 is why the edit page reads the policy here, not on the public route.",
+        "operationId": "HostController_getCancellationPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The hotel, by uuid or slug.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The policy, with its version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CancellationPolicyEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a host/admin, or not the owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hotel not found or not owned by this host.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "My hotel’s cancellation policy",
+        "tags": [
+          "Host"
+        ]
+      },
       "put": {
         "description": "Stores the tiered refund rules and the no-refund window, bumping the policy version. Ownership is asserted first: a hotel that is not this host’s is a 403 NOT_HOTEL_OWNER, never a 404.",
         "operationId": "HostController_setCancellationPolicy",

@@ -356,6 +356,14 @@ export async function fetchMyHotel(id: string): Promise<ApiHostHotelDetail> {
   return apiFetch<ApiHostHotelDetail>(`/api/host/hotels/${encodeURIComponent(id)}`)
 }
 
+/**
+ * T37. The host's read of their own listing's policy. The public route 404s a draft
+ * for everyone but its owner, so the host edit page reads the policy here.
+ */
+export async function fetchMyCancellationPolicy(id: string): Promise<ApiCancellationPolicy> {
+  return apiFetch<ApiCancellationPolicy>(`/api/host/hotels/${encodeURIComponent(id)}/cancellation-policy`)
+}
+
 /** Creates the listing `PENDING`. The slug comes back on the detail for the edit link. */
 export async function createHotel(body: ApiCreateHotel): Promise<ApiHostHotelDetail> {
   return apiFetch<ApiHostHotelDetail>('/api/host/hotels', { method: 'POST', json: body })

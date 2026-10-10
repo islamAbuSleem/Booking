@@ -17,7 +17,7 @@
  * ones seed the list.
  */
 import { HOTEL_BY_ID } from '~/utils/mock'
-import { createBlackout, deleteBlackout, fetchCancellationPolicy, fetchMyHotel, isApiError, isApiFailure, setCancellationPolicy, updateHotel, updateRoom } from '~/utils/api'
+import { createBlackout, deleteBlackout, fetchMyCancellationPolicy, fetchMyHotel, isApiError, isApiFailure, setCancellationPolicy, updateHotel, updateRoom } from '~/utils/api'
 import type { ApiCancellationPolicy, ApiHostHotelDetail } from '~/utils/api'
 import { formatStayDate, usd } from '~/utils/format'
 
@@ -251,7 +251,7 @@ const policyInitialised = ref(false)
 
 async function loadPolicy(hotelId: string): Promise<void> {
   try {
-    const policy: ApiCancellationPolicy = await fetchCancellationPolicy(hotelId)
+    const policy: ApiCancellationPolicy = await fetchMyCancellationPolicy(hotelId)
     policyTiers.value = policy.tiers.map(tier => ({ daysBefore: tier.daysBefore, refundPercent: tier.refundPercent }))
     policyWindow.value = policy.noRefundWithinHours
     policyVersion.value = policy.version

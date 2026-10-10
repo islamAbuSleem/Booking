@@ -474,6 +474,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/host/hotels/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List incoming bookings for my hotels
+         * @description Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.
+         */
+        get: operations["HostController_listMyBookings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/host/hotels/{id}": {
         parameters: {
             query?: never;
@@ -490,7 +510,7 @@ export interface paths {
         post?: never;
         /**
          * Delete my hotel
-         * @description Deletes the hotel and all its rooms, images, and blackout dates. Only if no confirmed bookings exist.
+         * @description Deletes the hotel and all its rooms, images, and blackout dates. Only if none of its rooms has any booking: booking history is kept, so a hotel that has hosted a stay is not removable (409 HOTEL_HAS_BOOKINGS).
          */
         delete: operations["HostController_deleteHotel"];
         options?: never;
@@ -509,7 +529,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * My hotel’s cancellation policy
+         * @description The stored policy, or the API default when the hotel has none. Ownership is asserted first, so the host can read the policy of a listing the public route cannot see — a draft 404s there for everyone but its own host. That 404 is why the edit page reads the policy here, not on the public route.
+         */
+        get: operations["HostController_getCancellationPolicy"];
         /**
          * Set my hotel’s cancellation policy
          * @description Stores the tiered refund rules and the no-refund window, bumping the policy version. Ownership is asserted first: a hotel that is not this host’s is a 403 NOT_HOTEL_OWNER, never a 404.
@@ -533,7 +557,7 @@ export interface paths {
         put?: never;
         /**
          * Add a room to my hotel
-         * @description Creates a room type with prices (per currency), images, and inventory.
+         * @description Creates a room type with prices (per currency), images, and inventory. Every image `publicId` must start with the caller's own `booking/hotels/{hostId}/` folder or the request is 403 `UPLOAD_FOREIGN` — the rule T21 applies to `/api/uploads/attach`, since a room image is the same row.
          */
         post: operations["HostController_createRoom"];
         delete?: never;
@@ -554,7 +578,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a room
-         * @description Deletes the room and its blackout dates. Only if no confirmed bookings exist for this room.
+         * @description Deletes the room and its blackout dates. Only if no booking exists for this room, cancelled or completed ones included (409 ROOM_HAS_BOOKINGS).
          */
         delete: operations["HostController_deleteRoom"];
         options?: never;
@@ -598,26 +622,6 @@ export interface paths {
         post?: never;
         /** Delete a blackout date */
         delete: operations["HostController_deleteBlackout"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/host/hotels/bookings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List incoming bookings for my hotels
-         * @description Returns all bookings (PENDING, CONFIRMED, COMPLETED, CANCELLED) for rooms in hotels owned by the authenticated host.
-         */
-        get: operations["HostController_listMyBookings"];
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1394,12 +1398,16 @@ export interface components {
             sortOrder?: number;
         };
         CreateBlackout: {
-            /** Format: uuid */
-            roomId: string | null;
-            startsOn: string;
-            endsOn: string;
-            reason: string | null;
+            roomId: components["schemas"]["CreateBlackout-__schema0"];
+            startsOn: components["schemas"]["CreateBlackout-__schema1"];
+            endsOn: components["schemas"]["CreateBlackout-__schema2"];
+            reason: components["schemas"]["CreateBlackout-__schema3"];
         };
+        /** Format: uuid */
+        "CreateBlackout-__schema0": string | null;
+        "CreateBlackout-__schema1": string;
+        "CreateBlackout-__schema2": string;
+        "CreateBlackout-__schema3": string | null;
         ImageSummary: {
             /** Format: uuid */
             id: string;
@@ -2935,6 +2943,44 @@ export interface operations {
             };
         };
     };
+    HostController_listMyBookings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of bookings with hotel, room, guest and price snapshot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostBookingListEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     HostController_getMyHotel: {
         parameters: {
             query?: never;
@@ -3031,7 +3077,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Hotel has confirmed bookings and cannot be deleted. */
+            /** @description The hotel has bookings on any of its rooms (`HOTEL_HAS_BOOKINGS`). Booking history is kept, so a listing with past stays is not removable either. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3082,6 +3128,56 @@ export interface operations {
                 };
             };
             /** @description Not a host/admin, not the owner, or a host attempting to publish. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_getCancellationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy, with its version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationPolicyEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3194,7 +3290,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Not a host/admin, or not the owner of the hotel. */
+            /** @description Not a host/admin, not the owner of the hotel, or an image `publicId` outside the caller's own folder (`UPLOAD_FOREIGN`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3260,7 +3356,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Room has confirmed bookings and cannot be deleted. */
+            /** @description The room has bookings on it (`ROOM_HAS_BOOKINGS`). Booking history is kept, so a room with past stays is not removable either. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3428,44 +3524,6 @@ export interface operations {
             };
             /** @description Blackout not found or not owned by this host. */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    HostController_listMyBookings: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A page of bookings with hotel, room, guest and price snapshot. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HostBookingListEnvelope"];
-                };
-            };
-            /** @description Not authenticated. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Not a host or admin. */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };
