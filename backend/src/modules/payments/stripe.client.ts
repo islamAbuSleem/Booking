@@ -34,8 +34,32 @@ export interface CreatedIntent {
   status: 'requires_payment' | 'succeeded' | 'failed';
 }
 
+export interface CreateRefundInput {
+  /** The original PaymentIntent to refund against — never a client-sent id. */
+  paymentIntentId: string;
+  /** Integer cents from T37's quote. Never a client-sent amount (D3). */
+  amountCents: number;
+  currency: string;
+  bookingId: string;
+  reference: string;
+  /**
+   * Deterministic per *attempt*, so a retry is a new Stripe call while a redelivery of
+   * the same attempt is not. Derived from the reference plus the attempt number, so a
+   * duplicated cancel can never produce a second charge back to the guest.
+   */
+  idempotencyKey: string;
+}
+
+export interface CreatedRefund {
+  /** Null until Stripe answers with one — a pending attempt carries nothing yet. */
+  refundId: string | null;
+  status: 'pending' | 'succeeded' | 'failed';
+}
+
 export interface StripeClient {
   createIntent(input: CreateIntentInput): Promise<CreatedIntent>;
+  /** T38 — the refund against the original intent, behind the same boundary. */
+  createRefund(input: CreateRefundInput): Promise<CreatedRefund>;
   /**
    * Verifies a webhook's signature against the raw request bytes and parses the event.
    * Pure HMAC — no network — so tests sign fixtures with the real algorithm instead of
@@ -132,6 +156,46 @@ export class StripePaymentClient implements StripeClient {
     };
   }
 
+  /**
+   * T38 — the refund. Paid from T37's quote, against the original intent, keyed per
+   * attempt so a retry is a new Stripe call and a redelivery is not.
+   *
+   * The Stripe answer is the outcome: test-mode refunds settle synchronously, so a
+   * `succeeded` here is final and the ledger row is written settled. A `pending` answer
+   * leaves the row pending for the webhook, and a thrown SDK error is caught and mapped
+   * by the caller into a `failed` row — the booking is already cancelled either way, and
+   * the guest must keep a way back.
+   */
+  async createRefund(input: CreateRefundInput): Promise<CreatedRefund> {
+    const secret = this.config.get<string>('STRIPE_SECRET_KEY');
+    if (!secret) {
+      throw new ApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'STRIPE_NOT_CONFIGURED',
+        'Payments are not configured on this deployment',
+      );
+    }
+
+    const stripe = this.stripe(secret);
+    try {
+      const refund = await stripe.refunds.create(
+        {
+          payment_intent: input.paymentIntentId,
+          amount: input.amountCents,
+          reason: 'requested_by_customer',
+          metadata: { bookingId: input.bookingId, reference: input.reference },
+        },
+        { idempotencyKey: input.idempotencyKey },
+      );
+      return { refundId: refund.id, status: mapRefundStatus(refund.status) };
+    } catch (error) {
+      this.logger.error(
+        `[payments] stripe ${stripeErrorLabel(error)} refunding ${input.reference}`,
+      );
+      throw error;
+    }
+  }
+
   async receiptUrl(intent: Stripe.PaymentIntent): Promise<string | null> {
     const secret = this.config.get<string>('STRIPE_SECRET_KEY');
     const latest = intent.latest_charge;
@@ -179,6 +243,22 @@ export class StripePaymentClient implements StripeClient {
   }
 }
 
+/**
+ * Stripe's refund lifecycle onto the three states this ledger can hold. The SDK types
+ * `status` as a plain string, so the mapping is exhaustive over the values Stripe
+ * documents and anything unrecognised reads as `pending` — the webhook decides it.
+ */
+function mapRefundStatus(status: string | null): CreatedRefund['status'] {
+  switch (status) {
+    case 'succeeded':
+      return 'succeeded';
+    case 'failed':
+    case 'canceled':
+      return 'failed';
+    default:
+      return 'pending';
+  }
+}
 /** Stripe's lifecycle collapses onto the three states this ticket can produce. */
 function mapStatus(status: Stripe.PaymentIntent.Status): CreatedIntent['status'] {
   switch (status) {

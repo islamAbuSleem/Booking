@@ -66,6 +66,9 @@ export type ApiSendMessage = components['schemas']['SendMessage']
 export type ApiCancellationPolicy = components['schemas']['CancellationPolicy']
 export type ApiUpdatePolicy = components['schemas']['UpdatePolicy']
 export type ApiCancellationQuote = components['schemas']['CancellationQuote']
+export type ApiRefund = components['schemas']['Refund']
+export type ApiCancelResult = components['schemas']['CancelResult']
+export type ApiRefundListData = components['schemas']['RefundListData']
 
 export type ApiSort = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'name_asc'
 
@@ -331,14 +334,26 @@ export async function fetchBooking(id: string): Promise<ApiBooking> {
 }
 
 /**
- * T20. `POST /api/bookings/:id/cancel` â€” no body, so it is a `POST` option without
- * `body`, unlike the quote and the favourites write. Guarded to `CONFIRMED` on the
- * server (D55); the 200 body carries the booking in its new `CANCELLED` state, which
- * is the source of truth for the flip â€” any other state answers 409
- * `INVALID_CANCEL_STATE` and the caller must not claim a cancellation.
+ * T38. `POST /api/bookings/:id/cancel` — no body, so it is a `POST` without `body`.
+ *
+ * Answers 200 with the booking in its new CANCELLED state *and* the refund attempt the
+ * cancellation produced, whose amount came from the T37 quote rather than from the
+ * client. A duplicate cancel answers 200 with the existing refund: it is a read, never a
+ * second charge (D11). 409 `INVALID_CANCEL_STATE` for anything but CONFIRMED, 400
+ * `NO_CAPTURED_PAYMENT` when the stay never took money.
  */
-export async function cancelBooking(id: string): Promise<ApiBooking> {
-  return apiFetch<ApiBooking>(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+export async function cancelBooking(id: string): Promise<ApiCancelResult> {
+  return apiFetch<ApiCancelResult>(`/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST' })
+}
+
+/** T38. `POST /api/bookings/:id/refund/retry` — the way back from a failed refund. */
+export async function retryRefund(id: string): Promise<ApiRefund> {
+  return apiFetch<ApiRefund>(`/api/bookings/${encodeURIComponent(id)}/refund/retry`, { method: 'POST' })
+}
+
+/** T38. `GET /api/bookings/:id/refunds` — the attempt ledger, newest first. */
+export async function fetchBookingRefunds(id: string): Promise<ApiRefundListData> {
+  return apiFetch<ApiRefundListData>(`/api/bookings/${encodeURIComponent(id)}/refunds`)
 }
 
 /**

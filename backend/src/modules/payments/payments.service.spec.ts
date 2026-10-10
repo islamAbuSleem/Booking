@@ -81,6 +81,9 @@ function setup(options: { bookings?: Map<string, BookingRecord> } = {}) {
     },
     verifyWebhook: () => { throw new Error('unused'); },
     receiptUrl: () => Promise.resolve(null),
+    // T38 added the refund half of the boundary. These tests only exercise T26/T27, so
+    // it is the one method deliberately unreachable here.
+    createRefund: () => { throw new Error('unused'); },
   };
   const service = new PaymentsService(bookings, payments, stripe);
   return { service, keys, upserts };

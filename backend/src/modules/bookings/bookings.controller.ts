@@ -24,7 +24,9 @@ import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import { AvailabilityService } from './availability.service.js';
 import { BookingsService } from './bookings.service.js';
 import { CancellationService } from '../cancellations/cancellations.service.js';
+import { RefundsService } from '../refunds/refunds.service.js';
 import type { QuoteDto } from '../cancellations/dto/cancellation.dto.js';
+import type { CancelResultDto, RefundDto, RefundListData } from '../refunds/dto/refund.dto.js';
 import {
   quoteRequestSchema,
   type QuoteData,
@@ -61,6 +63,7 @@ export class BookingsController {
     @Inject(BookingsService) private readonly bookings: BookingsService,
     @Inject(CancellationService)
     private readonly cancellations: CancellationService,
+    @Inject(RefundsService) private readonly refunds: RefundsService,
   ) {}
 
   @Post('quote')
@@ -231,13 +234,13 @@ export class BookingsController {
   @Throttle({ default: MUTATION_THROTTLE })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: "Cancel the caller's booking",
+    summary: "Cancel the caller's booking and refund it per policy",
     description:
-      'Guarded to CONFIRMED only: a PENDING booking is an unpaid hold that T26/T27 ' +
-      'confirm, and cancelling it out from under the payment would strand the money, so ' +
-      'a PENDING booking answers INVALID_CANCEL_STATE until it is confirmed. Refunds are ' +
-      'a later ticket; this flips the status only. Answers 200 with the booking in its ' +
-      'CANCELLED state, not 204: the client renders the flip from the body.',
+      'Flips the booking to CANCELLED, releases the inventory hold, and appends a refund ' +
+      'attempt paid from the T37 quote — the amount is computed once by the API and is ' +
+      'never client-sent. A duplicate cancel answers 200 with the existing refund and its ' +
+      'status: it is a read, not a second charge (D11). A booking that never captured ' +
+      'payment answers 400 NO_CAPTURED_PAYMENT and is left CONFIRMED.',
   })
   @ApiParam({
     name: 'id',
@@ -248,8 +251,8 @@ export class BookingsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'The booking, now CANCELLED.',
-    schema: { $ref: contractRef('BookingEnvelope') },
+    description: 'The booking, now CANCELLED, and the refund attempt it produced.',
+    schema: { $ref: contractRef('CancelResultEnvelope') },
   })
   @ApiResponse({
     status: 401,
@@ -273,11 +276,109 @@ export class BookingsController {
       'confirms it, and COMPLETED past cancelling.',
     schema: { $ref: contractRef('ApiErrorEnvelope') },
   })
-  cancel(
+  async cancel(
     @CurrentUser('id') callerId: string,
     @Param(zodPipe(bookingIdParam)) params: BookingIdParam,
-  ): Promise<BookingDto> {
-    return this.bookings.cancel(callerId, params.id);
+  ): Promise<CancelResultDto> {
+    const outcome = await this.refunds.cancel(callerId, params.id);
+    return {
+      booking: await this.bookings.describe(outcome.booking),
+      refund: outcome.refund,
+    };
+  }
+
+  @Post(':id/refund/retry')
+  @Throttle({ default: MUTATION_THROTTLE })
+  @ApiOperation({
+    summary: 'Retry a failed refund',
+    description:
+      'Appends a new attempt to the ledger and calls Stripe again with the same ' +
+      'server-computed amount. A booking that already has a succeeded refund answers 409 ' +
+      'ALREADY_REFUNDED — the D11 invariant, enforced rather than hoped for.',
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: String,
+    format: 'uuid',
+    description: 'The cancelled booking whose refund failed, by uuid.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The new attempt, after Stripe answered.',
+    schema: { $ref: contractRef('RefundEnvelope') },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'The booking is not cancelled, or has no captured payment.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No valid session.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'The booking belongs to a different guest.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No such booking.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'A refund already succeeded for this booking (ALREADY_REFUNDED).',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async refundRetry(
+    @CurrentUser('id') callerId: string,
+    @Param(zodPipe(bookingIdParam)) params: BookingIdParam,
+  ): Promise<RefundDto> {
+    return this.refunds.retry(callerId, params.id);
+  }
+
+  @Get(':id/refunds')
+  @ApiOperation({
+    summary: "The booking's refund ledger",
+    description:
+      "Every attempt, newest first, for the caller's own booking. An append-only " +
+      'history of tries rather than a single status column.',
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: String,
+    format: 'uuid',
+    description: 'The booking, by uuid.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The attempts, newest first.',
+    schema: { $ref: contractRef('RefundListEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No valid session.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'The booking belongs to a different guest.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No such booking.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async listRefunds(
+    @CurrentUser('id') callerId: string,
+    @Param(zodPipe(bookingIdParam)) params: BookingIdParam,
+  ): Promise<RefundListData> {
+    return this.refunds.list(callerId, params.id);
   }
 
   @Post(':id/cancellation-quote')
