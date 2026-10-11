@@ -43,11 +43,11 @@ export function quoteRefundPercent(args: {
   checkInMs: number;
   policy: PolicyView;
 }): number {
-  const hoursBefore = (args.checkInMs - args.nowMs) / 3_600_000;
-  if (hoursBefore < args.policy.noRefundWithinHours) return 0;
+  const msBefore = args.checkInMs - args.nowMs;
+  if (msBefore < args.policy.noRefundWithinHours * 3_600_000) return 0;
   const tiers = [...args.policy.tiers].sort((a, b) => b.daysBefore - a.daysBefore);
   for (const tier of tiers) {
-    if (hoursBefore >= tier.daysBefore * 24) return tier.refundPercent;
+    if (msBefore >= tier.daysBefore * 24 * 3_600_000) return tier.refundPercent;
   }
   return 0;
 }

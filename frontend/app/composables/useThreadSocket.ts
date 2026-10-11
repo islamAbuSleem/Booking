@@ -21,12 +21,17 @@ export function useThreadSocket(options: {
 } {
   const connected = ref(false)
   let socket: Socket | null = null
+  let disposed = false
 
   function join(): void {
     socket?.emit(
       'thread:join',
       { threadId: options.threadId },
       (answer: unknown) => {
+        // The ack for an in-flight join can land after unmount: ignore it
+        // there, or a dead socket would flip `connected` on a cleaned-up
+        // component.
+        if (disposed) return
         // A refusal (not a participant) leaves `connected` as-is: the HTTP poll
         // below still renders the thread, and the ack shape is the server's 403.
         if (
@@ -67,6 +72,7 @@ export function useThreadSocket(options: {
   })
 
   onUnmounted(() => {
+    disposed = true
     socket?.disconnect()
     socket = null
     connected.value = false

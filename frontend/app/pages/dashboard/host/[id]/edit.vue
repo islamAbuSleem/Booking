@@ -17,7 +17,7 @@
  * ones seed the list.
  */
 import { HOTEL_BY_ID } from '~/utils/mock'
-import { createBlackout, deleteBlackout, fetchCancellationPolicy, fetchMyHotel, isApiError, isApiFailure, setCancellationPolicy, updateHotel, updateRoom } from '~/utils/api'
+import { createBlackout, deleteBlackout, fetchMyCancellationPolicy, fetchMyHotel, isApiError, isApiFailure, setCancellationPolicy, updateHotel, updateRoom } from '~/utils/api'
 import type { ApiCancellationPolicy, ApiHostHotelDetail } from '~/utils/api'
 import { formatStayDate, usd } from '~/utils/format'
 
@@ -251,7 +251,7 @@ const policyInitialised = ref(false)
 
 async function loadPolicy(hotelId: string): Promise<void> {
   try {
-    const policy: ApiCancellationPolicy = await fetchCancellationPolicy(hotelId)
+    const policy: ApiCancellationPolicy = await fetchMyCancellationPolicy(hotelId)
     policyTiers.value = policy.tiers.map(tier => ({ daysBefore: tier.daysBefore, refundPercent: tier.refundPercent }))
     policyWindow.value = policy.noRefundWithinHours
     policyVersion.value = policy.version
@@ -273,7 +273,11 @@ async function loadPolicy(hotelId: string): Promise<void> {
 }
 
 function addTier(): void {
-  policyTiers.value.push({ daysBefore: 0, refundPercent: 0 })
+  const last = policyTiers.value[policyTiers.value.length - 1]
+  policyTiers.value.push({
+    daysBefore: last?.daysBefore ?? 30,
+    refundPercent: last?.refundPercent ?? 50,
+  })
   policyTiers.value.sort((a, b) => b.daysBefore - a.daysBefore)
 }
 

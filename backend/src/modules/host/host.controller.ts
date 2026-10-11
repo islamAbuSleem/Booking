@@ -230,6 +230,50 @@ export class HostController {
     return this.host.updateHotel(id, hostId, data);
   }
 
+  @Get(':id/cancellation-policy')
+  @ApiOperation({
+    summary: 'My hotel’s cancellation policy',
+    description:
+      'The stored policy, or the API default when the hotel has none. Ownership is ' +
+      'asserted first, so the host can read the policy of a listing the public route ' +
+      'cannot see — a draft 404s there for everyone but its own host. That 404 is why ' +
+      'the edit page reads the policy here, not on the public route.',
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: String,
+    format: 'uuid',
+    description: 'The hotel, by uuid or slug.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The policy, with its version.',
+    schema: { $ref: contractRef('CancellationPolicyEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Not a host/admin, or not the owner.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Hotel not found or not owned by this host.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async getCancellationPolicy(
+    @CurrentUser('id') hostId: string,
+    @Param('id') id: string,
+  ): Promise<PolicyDto> {
+    const hotel = await this.host.getMyHotel(id, hostId);
+    return this.cancellations.getPolicy(hotel.id);
+  }
+
   @Put(':id/cancellation-policy')
   @ApiOperation({
     summary: 'Set my hotel\u2019s cancellation policy',

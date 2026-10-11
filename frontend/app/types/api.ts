@@ -626,7 +626,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * My hotel’s cancellation policy
+         * @description The stored policy, or the API default when the hotel has none. Ownership is asserted first, so the host can read the policy of a listing the public route cannot see — a draft 404s there for everyone but its own host. That 404 is why the edit page reads the policy here, not on the public route.
+         */
+        get: operations["HostController_getCancellationPolicy"];
         /**
          * Set my hotel’s cancellation policy
          * @description Stores the tiered refund rules and the no-refund window, bumping the policy version. Ownership is asserted first: a hotel that is not this host’s is a 403 NOT_HOTEL_OWNER, never a 404.
@@ -3467,6 +3471,56 @@ export interface operations {
                 };
             };
             /** @description Not a host/admin, not the owner, or a host attempting to publish. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Hotel not found or not owned by this host. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    HostController_getCancellationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The hotel, by uuid or slug. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy, with its version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancellationPolicyEnvelope"];
+                };
+            };
+            /** @description Not authenticated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Not a host/admin, or not the owner. */
             403: {
                 headers: {
                     [name: string]: unknown;

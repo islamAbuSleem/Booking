@@ -344,6 +344,40 @@ describe('Cancellation policy API (e2e)', () => {
     });
   });
 
+  describe('GET /api/host/hotels/:id/cancellation-policy', () => {
+    it('reads the stored policy for the owning host — the read a draft listing needs', async () => {
+      // The public route 404s a draft for everyone but its host, so the host edit
+      // page reads the policy here instead.
+      await request(app.getHttpServer())
+        .put(`/api/host/hotels/${HOTEL_ID}/cancellation-policy`)
+        .set('Cookie', hostCookie)
+        .send({
+          tiers: [{ daysBefore: 21, refundPercent: 80 }],
+          noRefundWithinHours: 48,
+        })
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get(`/api/host/hotels/${HOTEL_ID}/cancellation-policy`)
+        .set('Cookie', hostCookie)
+        .expect(200);
+
+      expect(response.body.data).toEqual({
+        hotelId: HOTEL_ID,
+        tiers: [{ daysBefore: 21, refundPercent: 80 }],
+        noRefundWithinHours: 48,
+        version: 1,
+      });
+    });
+
+    it('403s for a caller who does not own the listing', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/host/hotels/${HOTEL_ID}/cancellation-policy`)
+        .set('Cookie', strangerCookie)
+        .expect(403);
+    });
+  });
+
   describe('PUT /api/host/hotels/:id/cancellation-policy', () => {
     it('stores the policy and bumps the version on every write', async () => {
       const first = await request(app.getHttpServer())
