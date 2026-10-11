@@ -236,9 +236,16 @@ export class RefundsService {
         reference,
         idempotencyKey: RefundsService.refundKey(reference, attempt.attempts),
       });
-      // A `pending` answer leaves the row pending for the webhook to settle: there is
-      // nothing to move yet, and writing `pending` over `pending` is a no-op.
-      if (created.status === 'pending') return attempt;
+      // A `pending` answer leaves the row pending for the webhook to settle: nothing
+      // terminal has happened yet, so no status moves. The Stripe id it answered with
+      // is still attached now — the webhook that settles this row finds it by that id,
+      // and a pending refund that carries no id can never be reconciled.
+      if (created.status === 'pending') {
+        const attached = await this.refunds.settle(attempt.id, {
+          stripeRefundId: created.refundId,
+        });
+        return attached ?? attempt;
+      }
       const settled = await this.refunds.settle(attempt.id, {
         stripeRefundId: created.refundId,
         status: created.status,

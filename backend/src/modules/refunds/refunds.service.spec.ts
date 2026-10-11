@@ -299,6 +299,20 @@ describe('RefundsService.cancel', () => {
     });
   });
 
+  it('persists the Stripe refund id on a pending refund, so the webhook can find it', async () => {
+    const { refunds, ledger } = harness({
+      stripe: { refundId: 're_4821_pending', status: 'pending' },
+    });
+
+    const outcome = await refunds.cancel(GUEST_ID, BOOKING_ID);
+
+    expect(outcome.refund?.status).toBe('pending');
+    // The id is attached while the row is still pending — no status moved, but the
+    // webhook that settles it now has something to find the row by.
+    expect(ledger.settles).toEqual([['refund-1', { stripeRefundId: 're_4821_pending' }]]);
+    expect(ledger.rows[0]?.stripeRefundId).toBe('re_4821_pending');
+  });
+
   it('keys the Stripe call per attempt, so a retry is a new call and a redelivery is not', async () => {
     const { refunds, stripe } = harness({
       stripe: [new Error('stripe unreachable'), { refundId: 're_4821', status: 'succeeded' }],
