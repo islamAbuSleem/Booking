@@ -220,10 +220,50 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Cancel the caller's booking
-         * @description Guarded to CONFIRMED only: a PENDING booking is an unpaid hold that T26/T27 confirm, and cancelling it out from under the payment would strand the money, so a PENDING booking answers INVALID_CANCEL_STATE until it is confirmed. Refunds are a later ticket; this flips the status only. Answers 200 with the booking in its CANCELLED state, not 204: the client renders the flip from the body.
+         * Cancel the caller's booking and refund it per policy
+         * @description Flips the booking to CANCELLED, releases the inventory hold, and appends a refund attempt paid from the T37 quote — the amount is computed once by the API and is never client-sent. A duplicate cancel answers 200 with the existing refund and its status: it is a read, not a second charge (D11). A booking that never captured payment answers 400 NO_CAPTURED_PAYMENT and is left CONFIRMED.
          */
         post: operations["BookingsController_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}/refund/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a failed refund
+         * @description Appends a new attempt to the ledger and calls Stripe again with the same server-computed amount. A booking that already has a succeeded refund answers 409 ALREADY_REFUNDED — the D11 invariant, enforced rather than hoped for.
+         */
+        post: operations["BookingsController_refundRetry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bookings/{id}/refunds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The booking's refund ledger
+         * @description Every attempt, newest first, for the caller's own booking. An append-only history of tries rather than a single status column.
+         */
+        get: operations["BookingsController_listRefunds"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -244,6 +284,63 @@ export interface paths {
          * @description The one computation, by the API, from the whole elapsed time between now and check-in: the tier the cancellation lands in decides the percent of the booking’s own total, in its own currency. Only CONFIRMED bookings quote — anything else is a 400 with the reason, mirroring the cancel guard.
          */
         post: operations["BookingsController_cancellationQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create the Stripe PaymentIntent for a pending booking
+         * @description Idempotent by construction: the Stripe idempotency key derives from the booking reference, so a retry is the same Stripe call rather than a second charge, and the single payment row is upserted. The browser confirms the returned `clientSecret` with Stripe.js; confirmation itself arrives via webhook in T27.
+         */
+        post: operations["PaymentsController_createIntent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/{bookingId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the payment for a booking */
+        get: operations["PaymentsController_getPayment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/payments/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stripe webhook: confirm or release a booking
+         * @description Signature-verified against the RAW body (`rawBody: true` at scaffold; never `@Body({ bodyParser: false })`, which does not exist, and never `app.use(express.json())`, which nulls `rawBody`). `payment_intent.succeeded` flips the booking PENDING → CONFIRMED and upserts the payment row with the receipt URL; `payment_intent.payment_failed` releases the hold (PENDING → CANCELLED). A late failure for an already-confirmed stay changes nothing. Unknown events 200 and are ignored, so a new Stripe event type never wedges deliveries into a retry loop. Fully idempotent: Stripe retries, and a repeated event finds nothing in `from` and writes nothing.
+         */
+        post: operations["PaymentsController_webhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -874,63 +971,6 @@ export interface paths {
          * @description HIDDEN removes it from every public list; VISIBLE restores it.
          */
         patch: operations["AdminController_setReviewStatus"];
-        trace?: never;
-    };
-    "/api/payments/intent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create the Stripe PaymentIntent for a pending booking
-         * @description Idempotent by construction: the Stripe idempotency key derives from the booking reference, so a retry is the same Stripe call rather than a second charge, and the single payment row is upserted. The browser confirms the returned `clientSecret` with Stripe.js; confirmation itself arrives via webhook in T27.
-         */
-        post: operations["PaymentsController_createIntent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/payments/{bookingId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read the payment for a booking */
-        get: operations["PaymentsController_getPayment"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/payments/webhook": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Stripe webhook: confirm or release a booking
-         * @description Signature-verified against the RAW body (`rawBody: true` at scaffold; never `@Body({ bodyParser: false })`, which does not exist, and never `app.use(express.json())`, which nulls `rawBody`). `payment_intent.succeeded` flips the booking PENDING → CONFIRMED and upserts the payment row with the receipt URL; `payment_intent.payment_failed` releases the hold (PENDING → CANCELLED). A late failure for an already-confirmed stay changes nothing. Unknown events 200 and are ignored, so a new Stripe event type never wedges deliveries into a retry loop. Fully idempotent: Stripe retries, and a repeated event finds nothing in `from` and writes nothing.
-         */
-        post: operations["PaymentsController_webhook"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/health": {
@@ -1930,6 +1970,52 @@ export interface components {
             success: true;
             data: components["schemas"]["CancellationQuote"];
         };
+        Refund: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            bookingId: string;
+            /** @description Integer cents, from the T37 quote. Never a client-sent amount. */
+            amountCents: number;
+            /** @description The booking’s own currency, as quoted. */
+            currency: string;
+            /** @description The percent of the total this attempt refunded. */
+            percent: number;
+            /** @enum {string} */
+            status: "pending" | "succeeded" | "failed";
+            /** @description 1 for the cancellation’s own refund, 2+ for each retry. */
+            attempts: number;
+            /** @description ISO 8601 instant the attempt was appended. */
+            createdAt: string;
+        };
+        RefundEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Refund"];
+        };
+        CancelResult: {
+            booking: components["schemas"]["Booking"];
+            /** @description Null when there was no captured payment to refund. */
+            refund: components["schemas"]["Refund"] | null;
+        };
+        "CancelResult-__schema0": string;
+        CancelResultEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CancelResult"];
+        };
+        "CancelResultEnvelope-__schema0": string;
+        RefundListData: {
+            /** @description Newest attempt first. */
+            items: components["schemas"]["Refund"][];
+            /** @description Always `items.length` until the list is paginated. */
+            total: number;
+        };
+        RefundListEnvelope: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["RefundListData"];
+        };
     };
     responses: never;
     parameters: never;
@@ -2332,13 +2418,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The booking, now CANCELLED. */
+            /** @description The booking, now CANCELLED, and the refund attempt it produced. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BookingEnvelope"];
+                    "application/json": components["schemas"]["CancelResultEnvelope"];
                 };
             };
             /** @description No valid session. */
@@ -2370,6 +2456,124 @@ export interface operations {
             };
             /** @description The booking is not CONFIRMED (INVALID_CANCEL_STATE): PENDING until payment confirms it, and COMPLETED past cancelling. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_refundRetry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The cancelled booking whose refund failed, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new attempt, after Stripe answered. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundEnvelope"];
+                };
+            };
+            /** @description The booking is not cancelled, or has no captured payment. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description A refund already succeeded for this booking (ALREADY_REFUNDED). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BookingsController_listRefunds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking, by uuid. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The attempts, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefundListEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2429,6 +2633,145 @@ export interface operations {
             };
             /** @description No such booking. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PaymentsController_createIntent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntentRequest"];
+            };
+        };
+        responses: {
+            /** @description The intent to confirm, with the server-computed amount. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntentEnvelope"];
+                };
+            };
+            /** @description The body failed validation, or the booking is not PENDING. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PaymentsController_getPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The booking, by uuid. */
+                bookingId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The payment row, if an intent has been created. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentEnvelope"];
+                };
+            };
+            /** @description No valid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The booking belongs to a different guest. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description No such booking, or no payment started for it yet. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PaymentsController_webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accepted — verified and dispatched, or verified and ignored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEnvelope"];
+                };
+            };
+            /** @description The signature is missing or does not verify. */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4295,145 +4638,6 @@ export interface operations {
             };
             /** @description No such review. */
             404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    PaymentsController_createIntent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["IntentRequest"];
-            };
-        };
-        responses: {
-            /** @description The intent to confirm, with the server-computed amount. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IntentEnvelope"];
-                };
-            };
-            /** @description The body failed validation, or the booking is not PENDING. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description No valid session. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description The booking belongs to a different guest. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description No such booking. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    PaymentsController_getPayment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The booking, by uuid. */
-                bookingId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The payment row, if an intent has been created. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaymentEnvelope"];
-                };
-            };
-            /** @description No valid session. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description The booking belongs to a different guest. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description No such booking, or no payment started for it yet. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
-    PaymentsController_webhook: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Accepted — verified and dispatched, or verified and ignored. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["WebhookEnvelope"];
-                };
-            };
-            /** @description The signature is missing or does not verify. */
-            400: {
                 headers: {
                     [name: string]: unknown;
                 };

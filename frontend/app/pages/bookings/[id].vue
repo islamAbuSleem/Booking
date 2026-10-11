@@ -9,7 +9,7 @@
  * Cancel goes through the real endpoint and degrades to the local store the
  * same way the read does.
  */
-import { cancelBooking, createReview, createThread, fetchBooking, fetchCancellationPolicy, fetchCancellationQuote, fetchReviewable, isApiError, isApiFailure } from '~/utils/api'
+import { cancelBooking, createReview, createThread, fetchBooking, fetchCancellationPolicy, fetchCancellationQuote, fetchReviewable, isApiError, isApiFailure, retryRefund } from '~/utils/api'
 import type { ApiBooking, ApiCancellationPolicy, ApiCancellationQuote } from '~/utils/api'
 import { bookingCoverImage, mockBookingToApi } from '~/utils/bookingAdapters'
 import { useBookings } from '~/composables/useBookings'
@@ -218,6 +218,33 @@ const cancelled = ref(false)
 const cancelFailed = ref(false)
 
 /**
+ * T38 — the refund attempt the cancellation produced. Null means "no refund row" (a
+ * stay that was never paid, or the fixture world); the three statuses are what the
+ * API's ledger says, not a guess. A `failed` one is retryable, which is the whole point
+ * of D11's "at most one succeeded" rather than "at most one attempt".
+ */
+const refundStatus = ref<'pending' | 'succeeded' | 'failed' | null>(null)
+const retryBusy = ref(false)
+const retryFailed = ref(false)
+
+async function requestRefundRetry(): Promise<void> {
+  const record = booking.value
+  if (!record || retryBusy.value) return
+  retryBusy.value = true
+  retryFailed.value = false
+  try {
+    const retried = await retryRefund(record.id)
+    refundStatus.value = retried.status
+  }
+  catch {
+    retryFailed.value = true
+  }
+  finally {
+    retryBusy.value = false
+  }
+}
+
+/**
  * T35 — "Message host". Opens (or reuses) the booking's thread with a greeting,
  * then lands on it. A failed open keeps the guest here with an inline error:
  * the booking page is not the place for a dead end.
@@ -246,28 +273,30 @@ async function messageHost(): Promise<void> {
 }
 
 /**
- * The real cancel first. On success the response *is* the new state, so the
- * page renders the flip from it. A real envelope error (409
- * `INVALID_CANCEL_STATE`, a 403, a 404) means the trip was not cancelled —
- * the claim is not made. Only when nothing answered does the fixture store
- * own the flip, and `UNAUTHORIZED` counts as nothing answered: it is exactly
- * what the read above degrades on, so the two can never disagree.
- */
+  * The real cancel first. On success the response *is* the new state, so the page
+  * renders the flip from it — and T38's `refund` is the attempt Stripe was asked for,
+  * so the status line below reads its answer rather than a guess. A real envelope
+  * error (409 `INVALID_CANCEL_STATE`, 400 `NO_CAPTURED_PAYMENT`, a 403, a 404) means the
+  * trip was not cancelled — the claim is not made. Only when nothing answered does the
+  * fixture store own the flip, and `UNAUTHORIZED` counts as nothing answered: it is
+  * exactly what the read above degrades on, so the two can never disagree.
+  */
 async function requestCancel(): Promise<void> {
   const record = booking.value
   if (!record || cancelBusy.value) return
   cancelBusy.value = true
   cancelFailed.value = false
   try {
-    const updated = await cancelBooking(record.id)
+    const result = await cancelBooking(record.id)
     // `apiFetch` hands back `undefined` for a body it could not read, so a 200 with
     // nothing usable in it is not a confirmed cancellation. Claiming it would show
     // the success alert beside a CONFIRMED badge and a live Cancel button.
-    if (!updated || updated.status !== 'CANCELLED') {
+    if (!result || result.booking.status !== 'CANCELLED') {
       cancelFailed.value = true
       return
     }
-    Object.assign(record, updated)
+    Object.assign(record, result.booking)
+    refundStatus.value = result.refund?.status ?? null
     cancelled.value = true
   }
   catch (cancelError: unknown) {
@@ -367,6 +396,36 @@ useSeoMeta({
         class="mt-6 max-w-[720px]"
       >
         {{ $t('bookings.cancelledBody', { reference: booking.reference }) }}
+
+        <!-- T38: what the refund actually did. Succeeded is news; failed is a way back. -->
+        <p
+          v-if="refundStatus"
+          class="mt-2 text-sm"
+          role="status"
+        >
+          {{ $t(`bookings.refund.${refundStatus}`) }}
+        </p>
+        <div
+          v-if="refundStatus === 'failed'"
+          class="mt-3 flex flex-wrap items-center gap-3"
+        >
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            :loading="retryBusy"
+            :disabled="retryBusy"
+            @click="requestRefundRetry()"
+          >
+            {{ retryBusy ? $t('bookings.refund.retrying') : $t('bookings.refund.retry') }}
+          </BaseButton>
+          <span
+            v-if="retryFailed"
+            class="text-danger text-sm"
+            role="alert"
+          >
+            {{ $t('bookings.refund.retryFailed') }}
+          </span>
+        </div>
       </BaseAlert>
 
       <BaseAlert

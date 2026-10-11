@@ -71,6 +71,18 @@ enum ReviewStatus {
   HIDDEN
 }
 
+/// T38 — the refund ledger. One row per *attempt*: the amount, currency and percent are
+/// written once and never rewritten, and a retry appends a new row rather than editing
+/// the failed one. Only `status` and `stripeRefundId` move, which is what the webhook
+/// confirmation writes. The invariant is **at most one `succeeded` row per booking**
+/// (D11) — not at most one attempt, because a failed refund must never strand a guest's
+/// money with no way back.
+enum RefundStatus {
+  pending
+  succeeded
+  failed
+}
+
 model User {
   id        String  @id @default(uuid()) @db.Uuid
   email     String  @unique
@@ -335,6 +347,7 @@ model Booking {
   payment Payment?
   review  Review?
   threads Thread[]
+  refunds Refund[]
 
   @@index([guestId, status])
   @@index([roomId, checkIn, checkOut])
@@ -357,8 +370,41 @@ model Payment {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  refunds Refund[]
 
   @@map("payments")
+}
+
+model Refund {
+  id        String @id @default(uuid()) @db.Uuid
+  bookingId String @map("booking_id") @db.Uuid
+  paymentId String @map("payment_id") @db.Uuid
+
+  /// Null until Stripe answers with one. Unique, and Postgres allows repeated NULLs,
+  /// so every pending attempt can coexist and a settled id can only ever appear once.
+  stripeRefundId String? @unique @map("stripe_refund_id")
+
+  amountCents Int    @map("amount_cents")
+  currency    String @db.Char(3)
+
+  /// The percent this row refunded, straight from T37's quote. Stored so a later policy
+  /// edit can never rewrite what an earlier cancellation was actually paid.
+  percent Int
+
+  reason String?
+
+  status   RefundStatus @default(pending)
+  /// 1 for the cancellation's own refund, 2+ for each retry. The ledger's attempt number.
+  attempts Int          @default(1)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@map("refunds")
 }
 
 model Review {

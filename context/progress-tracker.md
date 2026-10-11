@@ -91,7 +91,7 @@
 - [x] T35 Messaging: threads and messages
 - [x] T36 Messaging: live delivery
 - [x] T37 Cancellation policy engine
-- [ ] T38 Stripe refunds
+- [x] T38 Stripe refunds
 - [ ] T39 Multi-currency
 - [ ] T40 Transactional email
 - [ ] T41 Host analytics dashboard
@@ -710,8 +710,21 @@
     inclusive. Routes: public `GET /api/hotels/:id/cancellation-policy` (default at
     version 0), owner-scoped `PUT /api/host/hotels/:id/cancellation-policy` (ownership
     asserted first), `POST /api/bookings/:id/cancellation-quote` (CONFIRMED only, else
-    400 with the reason). Frontend: policy editor on the host edit page, plain-language
+    400 with the reason).     Frontend: policy editor on the host edit page, plain-language
     table + live quote on the booking detail page.
+  - **D81 — T38 Stripe refunds.** New `refunds` table: one row per *attempt*, amount
+    and percent written once and never rewritten, only `status` and `stripeRefundId`
+    move (webhook/Stripe answer). Invariant is at most one `succeeded` row per booking
+    (D11) — so a duplicate cancel is a **read** answering 200 with the existing refund,
+    a `failed` attempt is retried by appending a new row, and a retry after success is
+    409 `ALREADY_REFUNDED`. The quote is computed **before** the CONFIRMED→CANCELLED
+    flip, because T37's guard is that state and a cancellation must not change the price
+    it was quoted at; a booking with nothing captured answers 400 `NO_CAPTURED_PAYMENT`
+    and is left CONFIRMED. Amounts are keyed `refunds:<reference>:<attempt>` so a
+    redelivery is not a second charge. This supersedes the T20 `BookingsService.cancel`
+    (deleted, along with its specs) — the cancel route now answers `{ booking, refund }`.
+    Live-mode verification (a real refund appearing in Stripe test mode) is still
+    outstanding pending a `STRIPE_SECRET_KEY`.
   - **`design/` is 13 folders and only 10 are the chosen direction.** Two are discarded
   single-screen branches (`home_editorial_travel_guide`, `home_grand_tour_dispatch`) and
   one is an orphan (`editorial_hotel_guide_logo`) with no follow-on screens. The logo

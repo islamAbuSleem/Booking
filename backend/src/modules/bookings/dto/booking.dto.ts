@@ -127,7 +127,7 @@ const bookingHotelSchema = z.object({
     .describe('The hotel cover image URL, or null when it has none.'),
 });
 
-const bookingSchema = z.object({
+export const bookingSchema = z.object({
   id: z.uuid(),
   reference: z
     .string()

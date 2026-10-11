@@ -12,8 +12,10 @@ import { PrismaHotelsRepository } from './prisma-hotels.repository.js';
 import { PrismaUploadsRepository } from './prisma-uploads.repository.js';
 import { PrismaThreadsRepository } from './prisma-threads.repository.js';
 import { PrismaCancellationRepository } from './prisma-cancellation.repository.js';
+import { PrismaRefundsRepository } from './prisma-refunds.repository.js';
 import { PrismaService } from './prisma.service.js';
 import { CANCELLATION_REPOSITORY } from './cancellation.repository.js';
+import { REFUNDS_REPOSITORY } from './refunds.repository.js';
 import { THREADS_REPOSITORY } from './threads.repository.js';
 import { UPLOADS_REPOSITORY } from './uploads.repository.js';
 
@@ -50,6 +52,8 @@ import { UPLOADS_REPOSITORY } from './uploads.repository.js';
       provide: CANCELLATION_REPOSITORY,
       useExisting: PrismaCancellationRepository,
     },
+    PrismaRefundsRepository,
+    { provide: REFUNDS_REPOSITORY, useExisting: PrismaRefundsRepository },
   ],
   exports: [
     PrismaService,
@@ -69,6 +73,8 @@ import { UPLOADS_REPOSITORY } from './uploads.repository.js';
     THREADS_REPOSITORY,
     PrismaCancellationRepository,
     CANCELLATION_REPOSITORY,
+    PrismaRefundsRepository,
+    REFUNDS_REPOSITORY,
   ],
 })
 export class PrismaModule {}
