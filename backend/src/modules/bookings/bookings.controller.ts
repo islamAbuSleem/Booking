@@ -23,6 +23,8 @@ import { MUTATION_THROTTLE } from '../../common/throttle/app-throttler.guard.js'
 import { contractRef } from '../hotels/dto/hotel-search.api.js';
 import { AvailabilityService } from './availability.service.js';
 import { BookingsService } from './bookings.service.js';
+import { CancellationService } from '../cancellations/cancellations.service.js';
+import type { QuoteDto } from '../cancellations/dto/cancellation.dto.js';
 import {
   quoteRequestSchema,
   type QuoteData,
@@ -57,6 +59,8 @@ export class BookingsController {
     @Inject(AvailabilityService)
     private readonly availability: AvailabilityService,
     @Inject(BookingsService) private readonly bookings: BookingsService,
+    @Inject(CancellationService)
+    private readonly cancellations: CancellationService,
   ) {}
 
   @Post('quote')
@@ -274,5 +278,55 @@ export class BookingsController {
     @Param(zodPipe(bookingIdParam)) params: BookingIdParam,
   ): Promise<BookingDto> {
     return this.bookings.cancel(callerId, params.id);
+  }
+
+  @Post(':id/cancellation-quote')
+  @Throttle({ default: MUTATION_THROTTLE })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Quote the refund for cancelling a booking',
+    description:
+      'The one computation, by the API, from the whole elapsed time between now and ' +
+      'check-in: the tier the cancellation lands in decides the percent of the ' +
+      'booking\u2019s own total, in its own currency. Only CONFIRMED bookings quote — ' +
+      'anything else is a 400 with the reason, mirroring the cancel guard.',
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: String,
+    format: 'uuid',
+    description: 'The booking to price a cancellation for, by uuid.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The percent, the integer-cent refund, and the policy version.',
+    schema: { $ref: contractRef('CancellationQuoteEnvelope') },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'The booking is not CONFIRMED (INVALID_CANCEL_STATE).',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'No valid session.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'The booking belongs to a different guest.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No such booking.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  cancellationQuote(
+    @CurrentUser('id') callerId: string,
+    @Param(zodPipe(bookingIdParam)) params: BookingIdParam,
+  ): Promise<QuoteDto> {
+    return this.cancellations.quote(callerId, params.id, Date.now());
   }
 }

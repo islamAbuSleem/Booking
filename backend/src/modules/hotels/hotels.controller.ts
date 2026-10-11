@@ -17,6 +17,8 @@ import {
 } from './dto/hotel-search-query.js';
 import type { HotelDetailDto, HotelListDataDto } from './dto/hotel.dto.js';
 import { HotelsService } from './hotels.service.js';
+import { CancellationService } from '../cancellations/cancellations.service.js';
+import type { PolicyDto } from '../cancellations/dto/cancellation.dto.js';
 
 @Controller('hotels')
 export class HotelsController {
@@ -26,6 +28,8 @@ export class HotelsController {
     @Inject(HotelsService) private readonly hotels: HotelsService,
     @Inject(AvailabilityService)
     private readonly availability: AvailabilityService,
+    @Inject(CancellationService)
+    private readonly cancellations: CancellationService,
   ) {}
 
   @Get()
@@ -116,5 +120,31 @@ export class HotelsController {
     @Query(zodPipe(availabilityQuerySchema)) query: AvailabilityQuery,
   ): Promise<HotelAvailabilityData> {
     return this.availability.hotelAvailability(params.id, query);
+  }
+
+  @Get(':id/cancellation-policy')
+  @Public()
+  @ApiOperation({
+    summary: 'The hotel\u2019s cancellation policy',
+    description:
+      'The stored policy, or the API default when the hotel has none — never ' +
+      '"no policy". Resolves by uuid or by slug, like the detail route, so the ' +
+      'guest-facing table and the booking quote read the same row.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The policy, with its version.',
+    schema: { $ref: contractRef('CancellationPolicyEnvelope') },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No such hotel.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async findCancellationPolicy(
+    @Param(zodPipe(hotelIdParam)) params: { id: string },
+  ): Promise<PolicyDto> {
+    const hotel = await this.hotels.findOne(params.id);
+    return this.cancellations.getPolicy(hotel.id);
   }
 }

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Patch,
   Delete,
   HttpCode,
@@ -10,7 +11,7 @@ import {
   Body,
   Inject,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { zodPipe } from '../../common/pipes/zod-validation.pipe.js';
@@ -35,6 +36,12 @@ import {
   type CreateHotelData,
 } from './dto/host.api.js';
 import { HostService } from './host.service.js';
+import { CancellationService } from '../cancellations/cancellations.service.js';
+import {
+  updatePolicySchema,
+  type PolicyDto,
+  type UpdatePolicy,
+} from '../cancellations/dto/cancellation.dto.js';
 
 @ApiTags('Host')
 @ApiBearerAuth()
@@ -43,6 +50,8 @@ import { HostService } from './host.service.js';
 export class HostController {
   constructor(
     @Inject(HostService) private readonly host: HostService,
+    @Inject(CancellationService)
+    private readonly cancellations: CancellationService,
   ) {}
 
   // --- Hotels list ---
@@ -219,6 +228,95 @@ export class HostController {
     @Body(zodPipe(updateHotelSchema)) data: UpdateHotelDto,
   ): Promise<HostHotelDetailDto> {
     return this.host.updateHotel(id, hostId, data);
+  }
+
+  @Get(':id/cancellation-policy')
+  @ApiOperation({
+    summary: 'My hotel’s cancellation policy',
+    description:
+      'The stored policy, or the API default when the hotel has none. Ownership is ' +
+      'asserted first, so the host can read the policy of a listing the public route ' +
+      'cannot see — a draft 404s there for everyone but its own host. That 404 is why ' +
+      'the edit page reads the policy here, not on the public route.',
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: String,
+    format: 'uuid',
+    description: 'The hotel, by uuid or slug.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'The policy, with its version.',
+    schema: { $ref: contractRef('CancellationPolicyEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Not a host/admin, or not the owner.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Hotel not found or not owned by this host.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async getCancellationPolicy(
+    @CurrentUser('id') hostId: string,
+    @Param('id') id: string,
+  ): Promise<PolicyDto> {
+    const hotel = await this.host.getMyHotel(id, hostId);
+    return this.cancellations.getPolicy(hotel.id);
+  }
+
+  @Put(':id/cancellation-policy')
+  @ApiOperation({
+    summary: 'Set my hotel\u2019s cancellation policy',
+    description:
+      'Stores the tiered refund rules and the no-refund window, bumping the policy ' +
+      'version. Ownership is asserted first: a hotel that is not this host\u2019s is a ' +
+      '403 NOT_HOTEL_OWNER, never a 404.',
+  })
+  @ApiParam({
+    name: 'id',
+    required: true,
+    type: String,
+    format: 'uuid',
+    description: 'The hotel, by uuid or slug.',
+  })
+  @ApiBody({ schema: { $ref: contractRef('UpdatePolicy') } })
+  @ApiResponse({
+    status: 200,
+    description: 'The stored policy, with its new version.',
+    schema: { $ref: contractRef('CancellationPolicyEnvelope') },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Not authenticated.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Not a host/admin, or not the owner.',
+    schema: { $ref: contractRef('ApiErrorEnvelope') },
+  })
+  async setCancellationPolicy(
+    @CurrentUser('id') hostId: string,
+    @Param('id') id: string,
+    @Body(zodPipe(updatePolicySchema)) data: UpdatePolicy,
+  ): Promise<PolicyDto> {
+    const hotel = await this.host.getMyHotel(id, hostId);
+    return this.cancellations.setPolicy(hotel.id, data);
   }
 
   @Delete(':id')
