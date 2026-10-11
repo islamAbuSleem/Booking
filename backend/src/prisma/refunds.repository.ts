@@ -47,7 +47,11 @@ export interface CreateRefundInput {
 export interface SettleRefundInput {
   /** Null while the attempt is pending: Stripe answers with one once it accepts. */
   stripeRefundId?: string | null;
-  status: 'succeeded' | 'failed';
+  /**
+   * Omitted on a `pending` Stripe answer: nothing terminal has happened yet, so the
+   * row stays pending for the webhook to settle and only the Stripe id is attached.
+   */
+  status?: 'pending' | 'succeeded' | 'failed';
 }
 
 export interface RefundsRepository {
@@ -58,7 +62,8 @@ export interface RefundsRepository {
   /**
    * Move one attempt's outcome, and only that: `status` plus the Stripe id. A row
    * already on a terminal status is left alone, so a redelivered webhook cannot
-   * walk a settled refund backwards.
+   * walk a settled refund backwards. With `status` omitted it only attaches the
+   * Stripe id, which is how a `pending` attempt becomes webhook-findable.
    */
   settle(refundId: string, input: SettleRefundInput): Promise<RefundRecord | null>;
   /** The newest attempt first. `null` when this booking has never been refunded. */

@@ -183,7 +183,7 @@ class FakeRefunds implements RefundsRepository {
     const row = this.rows.find((candidate) => candidate.id === refundId);
     if (!row) return null;
     if (row.status !== 'pending') return row;
-    row.status = input.status;
+    if (input.status) row.status = input.status;
     if (input.stripeRefundId) row.stripeRefundId = input.stripeRefundId;
     return row;
   }

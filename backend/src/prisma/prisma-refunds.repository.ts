@@ -53,7 +53,7 @@ export class PrismaRefundsRepository implements RefundsRepository {
 
   async settle(refundId: string, input: SettleRefundInput): Promise<RefundRecord | null> {
     const data: Prisma.RefundUpdateManyMutationInput = {
-      status: input.status,
+      ...(input.status !== undefined ? { status: input.status } : {}),
       ...(input.stripeRefundId !== undefined && input.stripeRefundId !== null
         ? { stripeRefundId: input.stripeRefundId }
         : {}),
