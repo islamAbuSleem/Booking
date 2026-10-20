@@ -1,0 +1,33 @@
+{
+  // Wrangler configuration for the Booking Platform frontend on Cloudflare
+  // Workers.
+  //
+  // The build uses Nitro's `cloudflare_module` preset, which emits a
+  // module-worker entrypoint at .output/server/index.mjs plus the static
+  // assets in .output/public.
+  //
+  //   npm run build:cloudflare   -> builds .output/
+  //   npm run preview:cloudflare -> runs it in the local Workers runtime
+  //   npm run deploy:cloudflare  -> publishes it
+  //
+  // The backend is a Node service (NestJS on Render); this Worker only
+  // serves the frontend and talks to it through NUXT_PUBLIC_API_BASE.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "booking",
+  "main": ".output/server/index.mjs",
+  "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".output/public",
+    "binding": "ASSETS"
+  },
+  "vars": {
+    "NUXT_PUBLIC_SITE_URL": "https://booking.islamabusleem.workers.dev",
+    "NUXT_PUBLIC_API_BASE": "https://booking-api.onrender.com/api",
+    "NUXT_API_BASE_URL": "https://booking-api.onrender.com/api",
+    "NUXT_PUBLIC_OAUTH_REDIRECT_BASE": "https://booking.islamabusleem.workers.dev"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

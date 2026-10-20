@@ -1,0 +1,88 @@
+# Render Blueprint for the Booking API (NestJS + Prisma + Neon)
+#
+# Apply from the Render dashboard:  New -> Blueprint -> select this repo.
+# Every `sync: false` variable must be filled in before the first deploy.
+#
+# Free-tier notes:
+#   - The free web service sleeps after 15 minutes of inactivity and takes
+#     ~50 seconds to wake on the first request after sleeping.
+#   - The database is not Render's; it lives on Neon. Set DATABASE_URL to
+#     its pooled connection string and DIRECT_URL to the direct one (Prisma
+#     needs the direct URL for migrations).
+#   - `plan: free` is what keeps the recurring cost at $0.
+#
+# The frontend Worker is https://booking.islamabusleem.workers.dev and
+# already points at https://booking-api.onrender.com/api - if this service
+# ends up with a different hostname, update the Worker's wrangler.jsonc
+# vars and redeploy.
+
+services:
+  - type: web
+    name: booking-api
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    # NODE_ENV is set to production below, which makes npm skip
+    # devDependencies. The Nest CLI and TypeScript live in devDependencies,
+    # so they must be included explicitly or the build fails with
+    # "sh: 1: nest: not found".
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/main.js
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # --- Neon ---
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # --- Auth ---
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: "7d"
+      - key: JWT_ISSUER
+        value: booking-api
+      - key: JWT_AUDIENCE
+        value: booking-frontend
+      # --- Public URLs ---
+      - key: FRONTEND_ORIGIN
+        sync: false
+      # --- OAuth ---
+      # The redirect URIs in Google and GitHub must both point at
+      # https://<this service>/auth/<provider>/callback
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CALLBACK_URL
+        sync: false
+      # --- Payments ---
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # --- Media and email ---
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: EMAIL_PROVIDER_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false

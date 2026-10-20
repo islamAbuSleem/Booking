@@ -12,7 +12,10 @@
     "typecheck": "nuxt typecheck",
     "gen:api": "openapi-typescript ../backend/openapi.json -o app/types/api.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build:cloudflare": "nuxt build --preset cloudflare_module",
+    "preview:cloudflare": "npm run build:cloudflare && wrangler dev",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy"
   },
   "dependencies": {
     "@nuxtjs/robots": "6.2.4",
@@ -36,6 +39,7 @@
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
-    "vue-tsc": "^3.3.11"
+    "vue-tsc": "^3.3.11",
+    "wrangler": "^4.151.3"
   }
 }
